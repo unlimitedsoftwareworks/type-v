@@ -12,6 +12,30 @@
 #include <stdint.h>
 #include "queue/queue.h"
 
+#define PTR_SIZE sizeof(void*)
+#define MAX_REG 20
+
+
+typedef struct TypeV_Struct {
+    uint16_t* fieldOffsets;
+    uint8_t data[];
+}TypeV_Struct;
+
+typedef struct TypeV_Class{
+    /** methods */
+    uint16_t* methodsOffset;  ///< method offset table
+    size_t* methods;          ///< A pointer to the method table
+    /** fields */
+    uint16_t* fieldsOffset;     ///< field offset table
+    uint8_t data[];           ///< Fields start from here, direct access
+}TypeV_Class;
+
+typedef struct TypeV_Interface {
+    uint16_t* methodsOffset;  ///< method offset table
+    TypeV_Class* classPtr;    ///< Pointer to the class that implements this interface
+}TypeV_Interface;
+
+
 /**
  * @brief TypeV_Register
  */
@@ -65,14 +89,21 @@ typedef struct TypeV_GlobalPool {
     uint8_t *pool;   ///< Constant pool
     uint64_t length; ///< Constant pool length
 }TypeV_GlobalPool;
+
 /**
  * @breif Core registers
  */
 typedef struct TypeV_Registers {
-    TypeV_Register regs[18]; ///< General purpose registers
-    uint64_t ip;             ///< Instruction counter
+    TypeV_Register regs[MAX_REG]; ///< General purpose registers, R0 -> R15 for general purpose,
+                             ///< R16 for structs, R17 for classes and 18 for interfaces
+                             ///< R19 for function return value
+
     uint64_t flags;          ///< Flags
+    uint64_t ip;             ///< Instruction counter
+
     uint64_t fp;             ///< Frame pointer
+    uint64_t fe;             ///< Frame end pointer
+    uint64_t sp;             ///< Stack pointer
 }TypeV_Registers;
 
 /**
@@ -82,9 +113,20 @@ typedef struct TypeV_Stack {
     uint8_t *stack;    ///< Stack
     uint64_t capacity; ///< Stack capacity
     uint64_t limit;    ///< Stack limit
-    uint64_t sp;       ///< Stack pointer
 }TypeV_Stack;
 
+/**
+ * @brief Future GC, right now it only holds
+ * references of the objects given.
+ */
+typedef struct TypeV_GC {
+    TypeV_Class** classes;
+    uint64_t classCount;
+    TypeV_Interface** interfaces;
+    uint64_t interfaceCount;
+    TypeV_Struct** structs;
+    uint64_t structCount;
+}TypeV_GC;
 
 /**
  * @brief Core structure, a core is the equivalent of a process in type-c.
@@ -100,6 +142,7 @@ typedef struct TypeV_Core {
     TypeV_ConstantPool constantPool;          ///< Constant pool
     TypeV_GlobalPool globalPool;              ///< Global pool
     TypeV_Program program;                    ///< Program
+    TypeV_GC memTracker;                      ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;          ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
 }TypeV_Core;
@@ -111,7 +154,6 @@ typedef struct TypeV_Core {
  * @param engineRef
  */
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef);
-
 void core_setup(TypeV_Core *core, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit);
 
 /**
@@ -133,10 +175,55 @@ void core_vm(TypeV_Core *core);
  */
 void core_resume(TypeV_Core *core);
 
+
 /**
  * Halts the execution of a core, usually to switch to another core
  * @param core
  */
 void core_halt(TypeV_Core *core);
 
+
+
+/**
+ * Allocates a struct object
+ * @param core
+ * @param numfields Number of struct fieldOffsets
+ * @param totalsize Total size of the struct
+ * @return Pointer to the allocated struct
+ */
+size_t core_alloc_struct(TypeV_Core *core, uint8_t numfields, size_t totalsize);
+
+/**
+ * Allocates a struct object as shadow to another struct
+ * @param core
+ * @param numfields Number of struct fieldOffsets
+ * @param totalsize Total size of the struct
+ * @return Pointer to the allocated struct
+ */
+size_t core_alloc_struct_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct);
+
+/**
+ * Allocates a class object
+ * @param core
+ * @param numfields number of class fields/attributes
+ * @param total_fields_size  total size of fields in bytes
+ * @return new Class object, half initialized, methods must be initialized after this call
+ */
+size_t core_alloc_class_fields(TypeV_Core *core, uint8_t numfields, size_t total_fields_size);
+
+/**
+ * Allocates a class method table
+ * @param core
+ * @param num_methods number of methods
+ * @param class_ptr class reference
+ */
+void core_alloc_class_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
+
+/**
+ * Allocates an interface object
+ * @param core
+ * @param num_methods number of methods
+ * @param class_ptr class reference
+ */
+size_t core_alloc_interface(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
 #endif //TYPE_V_CORE_H

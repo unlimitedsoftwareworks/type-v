@@ -1,19 +1,31 @@
-VERSION: 001 ; 0.0.1
+VERSION: 001
 
 CONST:
-    c1: i8[5] = [1, 2, 3, 4, 5]
-    c2: i32[5] = [1, 2, 3, 4, 5]
-    bigdata: ptr[1000]
+    c1: u16
+    c2: u16
+    addr: ptr
 
 GLOBAL:
-    x: i32 = 0
-    y: i32 = 0
 
 CODE:
-    mv_reg_const_8 r0, c1  ; moves the first byte of c1 into r0
-    mv_reg_const_32 r1, c2 ; moves the first 4 bytes of c2 into r1
-    upcast_i8_i16 r0
-    upcast_i16_i32 r0
-    cast_i32_u32 r0
-    add_u32 r0, r0, r1 ; adds
+    frame_precall
+    frame_init_args 1, 4
+
+    push_const c1
+    push_const c2
+
+    mv_reg_const_8 r2, addr
+    debug_reg r2
+    fn_call r2
+    debug_reg r19
     halt
+
+label l:
+    mv_reg_arg_16 r0, 0
+    mv_reg_arg_16 r19, 0
+    fn_main
+    debug_reg r0
+    debug_reg r1
+    frame_rm
+    fn_ret
+
