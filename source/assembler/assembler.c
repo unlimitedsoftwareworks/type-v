@@ -238,6 +238,7 @@ void lexer_tokenize(TypeV_ASM_Lexer* lexer){
         if (isdigit(c)) {
             uint64_t start = lexer->pos;
             int dotFound = 0;
+            int isHex = 0;
             while (lexer->pos < lexer->program_length && isdigit(lexer->program[lexer->pos])) {
                 lexer->col++;
                 lexer->pos++;
@@ -248,6 +249,16 @@ void lexer_tokenize(TypeV_ASM_Lexer* lexer){
                 lexer->col++;
                 lexer->pos++;
                 while (lexer->pos < lexer->program_length && isdigit(lexer->program[lexer->pos])) {
+                    lexer->col++;
+                    lexer->pos++;
+                }
+            }
+            // check if we have a hex
+            else if ((lexer->program[lexer->pos] == 'x') && (start == lexer->pos-1)) {
+                isHex = 1;
+                lexer->col++;
+                lexer->pos++;
+                while (lexer->pos < lexer->program_length && isxdigit(lexer->program[lexer->pos])) {
                     lexer->col++;
                     lexer->pos++;
                 }
@@ -560,7 +571,13 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                     // value
                     Token *value = next_token(parser);
                     assert_tok(value, TOK_NUMBER);
-                    v = atoll(value->value);
+                    if((strlen(value->value) > 2) && (value->value[0] == '0' )&& (value->value[1] == 'x')){
+                        // hex
+                        v = strtoull(value->value, NULL, 16);
+                    }
+                    else {
+                        v = atoll(value->value);
+                    }
                     tok = next_token(parser);
                 }
                 create_const(parser, identifier->value, type->type - TOK_I8, v);

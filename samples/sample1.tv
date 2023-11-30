@@ -1,10 +1,10 @@
 VERSION: 1
 
 CONST:
-    c1: u8 = 195
-    c2: u8 = 95
-    c3: u8 = 72
-    c4: u8 = 64
+    c1: u8 = 0xC3
+    c2: u8 = 0xF5
+    c3: u8 = 0x48
+    c4: u8 = 0x40
 
 GLOBAL:
 
@@ -23,7 +23,7 @@ CODE:
 
 l:
     mv_reg_arg_16 r0 0
-    mv_reg_arg_16 r19 0
+    mv_reg_arg_32 r19 0
     fn_main
     debug_reg r0
     debug_reg r1

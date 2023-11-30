@@ -30,7 +30,7 @@ int main() {
     uint8_t globalPool[]= {0x80};
     uint64_t globalPoolLength = 1;
 
-    uint8_t constPool [] = {0xc3, 0x5f, 0x48, 0x40, 23};
+    uint8_t constPool [] = {0xC3, 0xF5, 0x48, 0x40, 23};
     uint64_t constPoolLength = 5;
 
     /*
