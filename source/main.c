@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "utils/log.h"
+
 
 #include "engine.h"
 #include "platform/platform.h"
@@ -39,16 +41,16 @@ int main() {
             OP_PUSH_CONST, 1, 0, 2,
             OP_PUSH_CONST, 1, 2, 2,
             OP_MV_REG_CONST_8, 2, 1, 4,
-            OP_DEBUG_REGS, 2,
+            OP_DEBUG_REG, 2,
             OP_FN_CALL, 2,
-            OP_DEBUG_REGS, 19,
+            OP_DEBUG_REG, 19,
             OP_HALT,
 
             OP_MV_REG_ARG_16, 0, 1,0,
             OP_MV_REG_ARG_16, 19, 1,0,
             OP_FN_MAIN,
-            OP_DEBUG_REGS, 0,
-            OP_DEBUG_REGS, 1,
+            OP_DEBUG_REG, 0,
+            OP_DEBUG_REG, 1,
             OP_FRAME_RM,
             OP_FN_RET,
     };
@@ -61,7 +63,7 @@ int main() {
             OP_S_STOREF_CONST_32, 0, 1, 0,
             OP_S_LOADF_32, 2, 0,
             //OP_S_STOREF_REG, 0, 1, 4,
-            OP_DEBUG_REGS, 2,
+            OP_DEBUG_REG, 2,
             OP_HALT
     };
 
@@ -75,10 +77,22 @@ int main() {
      */
 
 
-    char* program = read_file("../samples/sample1.tv");
+    char* source = read_file("../samples/sample1.tv");
     TypeV_ASM_Lexer lexer;
-    lexer_init(&lexer, program);
+    lexer_init(&lexer, source);
     TypeV_ASM_Parser parser;
     parser_init(&parser, &lexer);
     parse(&lexer, &parser);
+    TypeV_ASM_Program* program = assemble(&parser);
+    LOG_INFO("Program assembled successfully, running.");
+
+    debug_program(program);
+
+    engine_setmain(&engine, program->codePool, program->codePoolSize,
+                   program->constPool, program->constPoolSize,
+                   program->globalPool, program->globalPoolSize, 1024, 1024);
+
+    engine_run(&engine);
+
+    engine_deallocate(&engine);
 }

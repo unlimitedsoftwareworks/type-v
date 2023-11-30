@@ -54,7 +54,7 @@ typedef enum TypeV_OpCode {
     OP_MV_MEM_REG,
 
     /**
-     * OP_MV_REG_LOCAL_[size] offset-size: Z, offset: I, source: R
+     * OP_MV_REG_LOCAL_[size] dest: R, offset-size: Z, offset: I
      * moves S bytes from local stack address frame-pointer + offset to register R
      */
     OP_MV_REG_LOCAL_8,
@@ -64,7 +64,7 @@ typedef enum TypeV_OpCode {
     OP_MV_REG_LOCAL_PTR,
 
     /**
-     * OP_MV_LOCAL_REG offset-size, src: R, offset-size: Z, offset: I
+     * OP_MV_LOCAL_REG offset-size: Z, offset: I, src: R
      * moves S bytes from register R to local stack address frame-pointer + offset
      */
     OP_MV_LOCAL_REG_8,
@@ -136,14 +136,10 @@ typedef enum TypeV_OpCode {
     OP_S_SET_OFFSET,
 
     /**
-     * OP_S_LOADF_[size] dest: R, fieldIndex: I
-     * Loads [size] bytes from field I of struct stored at R16 to register R
+     * OP_S_LOADF dest: R, fieldIndex: I, size: S
+     * Loads S bytes from field I of struct stored at R16 to register R
      */
-    OP_S_LOADF_8,
-    OP_S_LOADF_16,
-    OP_S_LOADF_32,
-    OP_S_LOADF_64,
-    OP_S_LOADF_PTR,
+    OP_S_LOADF,
 
     /**
      * OP_S_STOREF_CONST_[size] fieldIndex: I, offset-size : Z, offset-: I
@@ -189,14 +185,10 @@ typedef enum TypeV_OpCode {
     OP_C_LOADM,
 
     /**
-     * OP_CSTOREF_[size] fieldIndex: I, R: source register, size: S
+     * OP_CSTOREF fieldIndex: I, R: source register, size: S
      * Stores [size] bytes from register R to field I of class stored at R17
      */
-    OP_C_STOREF_8,
-    OP_C_STOREF_16,
-    OP_C_STOREF_32,
-    OP_C_STOREF_64,
-    OP_C_STOREF_PTR,
+    OP_C_STOREF,
 
     /**
      * OP_C_STOREF_CONST_[size] fieldIndex: I, offset-size : Z, offset-: I
@@ -210,14 +202,10 @@ typedef enum TypeV_OpCode {
     OP_C_STOREF_CONST_PTR,
 
     /**
-     * OP_C_LOADF_[size] dest: R, fieldIndex: I
+     * OP_C_LOADF_[size] dest: R, fieldIndex: I, size: S
      * Loads [size] bytes from field I of class stored at R17 to register R
      */
-    OP_C_LOADF_8,
-    OP_C_LOADF_16,
-    OP_C_LOADF_32,
-    OP_C_LOADF_64,
-    OP_C_LOADF_PTR,
+    OP_C_LOADF,
 
     /**
      * OP_I_ALLOC num_methods: I
@@ -263,13 +251,13 @@ typedef enum TypeV_OpCode {
     OP_FRAME_INIT_ARGS,
 
     /**
-     *  OP_FRAME_INIT_LOCAL size-length: Z, size: I
+     *  OP_FRAME_INIT_LOCALS size-length: Z, size: I
      *  Extends the previous stack frame with the given size.
      *  The given size is the total size of local variables.
      *  Variables are pushed to the stack in the order they
      *  are declared.
      */
-    OP_FRAME_INIT_LOCAL,
+    OP_FRAME_INIT_LOCALS,
 
     /**
      * OP_FRAME_RM removes the current stack frame from the stack
@@ -309,9 +297,17 @@ typedef enum TypeV_OpCode {
      * and the arguments are pushed to the stack
      */
     OP_FN_CALL,
+    /**
+     * OP_FN_CALLI function-address-size: Z, function-address: I
+     * Calls the function at the given address
+     * This function is called after the stack frame is initialized
+     * and the arguments are pushed to the stack
+     */
+    OP_FN_CALLI,
 
 
-    OP_DEBUG_REGS,
+
+    OP_DEBUG_REG,
     OP_HALT,
 }TypeV_OpCode;
 
@@ -366,11 +362,7 @@ VM_INSTRUCTION(s_alloc)
 VM_INSTRUCTION(s_alloc_shadow)
 VM_INSTRUCTION(s_set_offset)
 
-VM_INSTRUCTION(s_loadf_8)
-VM_INSTRUCTION(s_loadf_16)
-VM_INSTRUCTION(s_loadf_32)
-VM_INSTRUCTION(s_loadf_64)
-VM_INSTRUCTION(s_loadf_ptr)
+VM_INSTRUCTION(s_loadf)
 
 VM_INSTRUCTION(s_storef_const_8)
 VM_INSTRUCTION(s_storef_const_16)
@@ -385,11 +377,7 @@ VM_INSTRUCTION(c_allocm)
 VM_INSTRUCTION(c_storem)
 VM_INSTRUCTION(c_loadm)
 
-VM_INSTRUCTION(c_storef_8)
-VM_INSTRUCTION(c_storef_16)
-VM_INSTRUCTION(c_storef_32)
-VM_INSTRUCTION(c_storef_64)
-VM_INSTRUCTION(c_storef_ptr)
+VM_INSTRUCTION(c_storef)
 
 VM_INSTRUCTION(c_storef_const_8)
 VM_INSTRUCTION(c_storef_const_16)
@@ -397,11 +385,7 @@ VM_INSTRUCTION(c_storef_const_32)
 VM_INSTRUCTION(c_storef_const_64)
 VM_INSTRUCTION(c_storef_const_ptr)
 
-VM_INSTRUCTION(c_loadf_8)
-VM_INSTRUCTION(c_loadf_16)
-VM_INSTRUCTION(c_loadf_32)
-VM_INSTRUCTION(c_loadf_64)
-VM_INSTRUCTION(c_loadf_ptr)
+VM_INSTRUCTION(c_loadf)
 
 VM_INSTRUCTION(i_alloc)
 VM_INSTRUCTION(i_set_offset)
@@ -419,9 +403,10 @@ VM_INSTRUCTION(frame_precall)
 VM_INSTRUCTION(fn_main)
 VM_INSTRUCTION(fn_ret)
 VM_INSTRUCTION(fn_call)
+VM_INSTRUCTION(fn_calli)
 
 
-VM_INSTRUCTION(debug_regs)
+VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)
 
 
@@ -478,11 +463,7 @@ static op_func op_funcs[] = {
         &s_alloc_shadow,
         &s_set_offset,
 
-        &s_loadf_8,
-        &s_loadf_16,
-        &s_loadf_32,
-        &s_loadf_64,
-        &s_loadf_ptr,
+        &s_loadf,
 
         &s_storef_const_8,
         &s_storef_const_16,
@@ -497,11 +478,7 @@ static op_func op_funcs[] = {
 
         &c_storem,
         &c_loadm,
-        &c_storef_8,
-        &c_storef_16,
-        &c_storef_32,
-        &c_storef_64,
-        &c_storef_ptr,
+        &c_storef,
 
         &c_storef_const_8,
         &c_storef_const_16,
@@ -509,11 +486,7 @@ static op_func op_funcs[] = {
         &c_storef_const_64,
         &c_storef_const_ptr,
 
-        &c_loadf_8,
-        &c_loadf_16,
-        &c_loadf_32,
-        &c_loadf_64,
-        &c_loadf_ptr,
+        &c_loadf,
 
         &i_alloc,
         &i_set_offset,
@@ -530,8 +503,9 @@ static op_func op_funcs[] = {
         &fn_main,
         &fn_ret,
         &fn_call,
+        &fn_calli,
 
-        &debug_regs,
+        &debug_reg,
         &halt,
 };
 
