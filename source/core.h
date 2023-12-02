@@ -13,7 +13,7 @@
 #include "queue/queue.h"
 
 #define PTR_SIZE sizeof(void*)
-#define MAX_REG 20
+#define MAX_REG 21
 
 
 typedef struct TypeV_Struct {
@@ -34,6 +34,13 @@ typedef struct TypeV_Interface {
     uint16_t* methodsOffset;  ///< method offset table
     TypeV_Class* classPtr;    ///< Pointer to the class that implements this interface
 }TypeV_Interface;
+
+typedef struct TypeV_Array {
+    uint8_t elementSize;      ///< Size of each element
+    uint64_t length;          ///< Array length
+    uint64_t capacity;        ///< Array capacity
+    uint8_t* data;            ///< Array data
+}TypeV_Array;
 
 
 /**
@@ -90,20 +97,40 @@ typedef struct TypeV_GlobalPool {
     uint64_t length; ///< Constant pool length
 }TypeV_GlobalPool;
 
+
+// zero flag
+#define FLAG_ZF 0x01
+
+// sign flag
+#define FLAG_SF 0x02
+
+// overflow flag
+#define FLAG_OF 0x04
+
+// carry flag
+#define FLAG_CF 0x08
+
+// type flag: 0 for unsigned, 1 for signed
+#define FLAG_TF 0x10
+
+#define FLAG_SET(flags, flag) ((flags) |= (flag))
+#define FLAG_CLEAR(flags, flag) ((flags) &= ~(flag))
+#define FLAG_CHECK(flags, flag) ((flags) & (flag))
+#define WRITE_FLAG(flags, flag, value) ((value) ? ((flags) |= (flag)) : ((flags) &= ~(flag)))
+
 /**
  * @breif Core registers
  */
 typedef struct TypeV_Registers {
-    TypeV_Register regs[MAX_REG]; ///< General purpose registers, R0 -> R15 for general purpose,
-                             ///< R16 for structs, R17 for classes and 18 for interfaces
-                             ///< R19 for function return value
-
     uint64_t flags;          ///< Flags
     uint64_t ip;             ///< Instruction counter
 
     uint64_t fp;             ///< Frame pointer
     uint64_t fe;             ///< Frame end pointer
     uint64_t sp;             ///< Stack pointer
+    TypeV_Register regs[MAX_REG]; ///< General purpose registers, R0 -> R15 for general purpose,
+                             ///< R16 for structs, R17 for classes and 18 for interfaces
+                             ///< R19 for function return value
 }TypeV_Registers;
 
 /**
@@ -126,6 +153,8 @@ typedef struct TypeV_GC {
     uint64_t interfaceCount;
     TypeV_Struct** structs;
     uint64_t structCount;
+    TypeV_Array ** arrays;
+    uint64_t arrayCount;
 }TypeV_GC;
 
 /**
@@ -135,6 +164,7 @@ typedef struct TypeV_GC {
  */
 typedef struct TypeV_Core {
     uint32_t id;                              ///< Core ID
+    uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
     TypeV_Registers registers;                ///< Registers
     TypeV_Stack stack;                        ///< Stack
@@ -226,4 +256,31 @@ void core_alloc_class_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class
  * @param class_ptr class reference
  */
 size_t core_alloc_interface(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
+
+/**
+ * Allocates an array object
+ * @param core
+ * @param num_elements
+ * @param element_size
+ * @return
+ */
+size_t core_alloc_array(TypeV_Core *core, uint64_t num_elements, uint8_t element_size);
+
+/**
+ * Extends the size of an array
+ * @param core
+ * @param array_ptr
+ * @param num_elements new number of elements
+ * @return
+ */
+size_t core_extend_array(TypeV_Core *core, size_t array_ptr, uint64_t num_elements);
+
+/**
+ * Updates the flags of the core
+ * @param core
+ * @param value
+ */
+void core_update_flags(TypeV_Core *core, uint64_t value);
+
+
 #endif //TYPE_V_CORE_H

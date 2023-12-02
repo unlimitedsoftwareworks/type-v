@@ -25,6 +25,16 @@ void mv_reg_reg(TypeV_Core* core){
     memcpy(&core->registers.regs[target], &core->registers.regs[source], bytesize);
 }
 
+void mv_reg_i(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t immediate_size = core->program.bytecode[core->registers.ip++];
+    uint64_t immediate = 0;
+    memcpy(&immediate, &core->program.bytecode[core->registers.ip], immediate_size);
+    core->registers.ip += immediate_size;
+    memcpy(&core->registers.regs[target], &immediate, 8);
+}
+
+
 #define mv_reg_const(bits, size) \
 void mv_reg_const_##bits(TypeV_Core* core){\
     const uint8_t target = core->program.bytecode[core->registers.ip++];\
@@ -328,7 +338,7 @@ void c_loadm(TypeV_Core* core){
     core->registers.regs[target].ptr = offset;
 }
 
-void c_storef(TypeV_Core* core){
+void c_storef_reg(TypeV_Core* core){
     const uint8_t field_index = core->program.bytecode[core->registers.ip++];
     const uint8_t source = core->program.bytecode[core->registers.ip++];
     uint8_t bytesize = core->program.bytecode[core->registers.ip++];
@@ -405,6 +415,76 @@ void i_loadm(TypeV_Core* core){
     size_t offset = i->methodsOffset[method_index];
 
     core->registers.regs[target].ptr = i->classPtr->methods[offset];
+}
+
+void a_alloc(TypeV_Core* core){
+    const uint8_t num_elements_size = core->program.bytecode[core->registers.ip++];
+    size_t num_elements = 0; /* we do not increment offset here*/
+    memcpy(&num_elements, &core->program.bytecode[core->registers.ip],  num_elements_size);
+    core->registers.ip += num_elements_size;
+    // next read the element size
+    uint8_t element_size = core->program.bytecode[core->registers.ip++];
+    ASSERT(element_size <= 8, "Invalid byte size");
+    if(element_size == 0) element_size = PTR_SIZE;
+
+    // allocate memory for struct
+    size_t mem = core_alloc_array(core, num_elements, element_size);
+    // move the pointer to R19
+    core->registers.regs[19].ptr = mem;
+}
+
+void a_extend(TypeV_Core* core){
+    const uint8_t num_elements_size = core->program.bytecode[core->registers.ip++];
+    size_t num_elements = 0; /* we do not increment offset here*/
+    memcpy(&num_elements, &core->program.bytecode[core->registers.ip],  num_elements_size);
+    core->registers.ip += num_elements_size;
+
+    size_t mem = core_extend_array(core, core->registers.regs[19].ptr, num_elements);
+    core->registers.regs[19].ptr = mem;
+}
+
+void a_storef_reg(TypeV_Core* core){
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    const uint8_t element_size = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(source < MAX_REG, "Invalid register index");
+    ASSERT(index < MAX_REG, "Invalid register index");
+    ASSERT(element_size <= 8, "Invalid byte size");
+
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[19].ptr;
+    memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], element_size);
+}
+
+#define A_STOREF_CONST(bits, size) \
+void a_storef_const_##bits(TypeV_Core* core){\
+    uint8_t indexReg = core->program.bytecode[core->registers.ip++];\
+    uint8_t offset_size = core->program.bytecode[core->registers.ip++];\
+    size_t offset = 0;\
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], offset_size);\
+    \
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[19].ptr;\
+    memcpy(array->data+(core->registers.regs[indexReg].u64*array->elementSize), &core->constantPool.pool[offset], size);\
+}
+
+A_STOREF_CONST(8, 1)
+A_STOREF_CONST(16, 2)
+A_STOREF_CONST(32, 4)
+A_STOREF_CONST(64, 8)
+A_STOREF_CONST(ptr, PTR_SIZE)
+#undef A_STOREF_CONST
+
+void a_loadf(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    const uint8_t element_size = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(index < MAX_REG, "Invalid register index");
+    ASSERT(element_size <= 8, "Invalid byte size");
+
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[19].ptr;
+    memcpy(&core->registers.regs[target], array->data+(core->registers.regs[index].u64*array->elementSize), element_size);
 }
 
 void push(TypeV_Core* core){
@@ -547,8 +627,9 @@ void fn_call(TypeV_Core* core){
     const size_t adr = core->registers.regs[target].ptr;
     LOG_INFO("Calling function at %p", (void*)adr);
     // update the pushed ip to the current ip
-    // fp - 8byte (for pointer) is the location of the pushed ip
-    memcpy(core->stack.stack+core->registers.fp-8, &core->registers.ip, sizeof(uint64_t));
+    // fp - sizeof(Registers) -8 (for the unpushed R20) and -8 for the flags
+
+    memcpy(core->stack.stack+core->registers.fp-(sizeof(TypeV_Registers) - 16), &core->registers.ip, sizeof(uint64_t));
 
     // jump to the address
     core->registers.ip = adr;
@@ -563,11 +644,782 @@ void fn_calli(TypeV_Core* core){
 
     LOG_INFO("Calling function at %p", (void*)offset);
     // update the pushed ip to the current ip
-    // fp - 8byte (for pointer) is the location of the pushed ip
-    memcpy(core->stack.stack+core->registers.fp-8, &core->registers.ip, sizeof(uint64_t));
+    // fp - sizeof(Registers) -8 (for the unpushed R20) and -8 for the flags
+    memcpy(core->stack.stack+core->registers.fp-(sizeof(TypeV_Registers) - 16), &core->registers.ip, sizeof(uint64_t));
 
     // jump to the address
     core->registers.ip = offset;
+}
+
+#define OP_CAST(d1, d2, type) \
+void cast_##d1##_##d2(TypeV_Core* core){ \
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];\
+    core->registers.regs[op1].d2 = (type) core->registers.regs[op1].d1;\
+}
+
+OP_CAST(i8, u8, uint8_t)
+OP_CAST(u8, i8, int8_t)
+OP_CAST(i16, u16, uint16_t)
+OP_CAST(u16, i16, int16_t)
+OP_CAST(i32, u32, uint32_t)
+OP_CAST(u32, i32, int32_t)
+OP_CAST(i64, u64, uint64_t)
+OP_CAST(u64, i64, int64_t)
+
+OP_CAST(i32, f32, float)
+OP_CAST(f32, i32, int32_t)
+OP_CAST(i64, f64, double)
+OP_CAST(f64, i64, int64_t)
+#undef OP_CAST
+
+#define OP_UPCAST(d1, d2, type) \
+void upcast_##d1##_##d2(TypeV_Core* core){ \
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];\
+    core->registers.regs[op1].d2 = (type) core->registers.regs[op1].d1;\
+}
+
+OP_UPCAST(i8, i16, int16_t)
+OP_UPCAST(u8, u16, uint16_t)
+OP_UPCAST(i16, i32, int32_t)
+OP_UPCAST(u16, u32, uint32_t)
+OP_UPCAST(i32, i64, int64_t)
+OP_UPCAST(u32, u64, uint64_t)
+OP_UPCAST(f32, f64, double)
+#undef OP_UPCAST
+
+#define OP_DOWNCAST(d1, d2, type) \
+void dcast_##d1##_##d2(TypeV_Core* core){ \
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];\
+    core->registers.regs[op1].d2 = (type) core->registers.regs[op1].d1;\
+}
+
+OP_DOWNCAST(i16, i8, int8_t)
+OP_DOWNCAST(u16, u8, uint8_t)
+OP_DOWNCAST(i32, i16, int16_t)
+OP_DOWNCAST(u32, u16, uint16_t)
+OP_DOWNCAST(i64, i32, int32_t)
+OP_DOWNCAST(u64, u32, uint32_t)
+OP_DOWNCAST(f64, f32, float)
+#undef OP_DOWNCAST
+
+#define OP_BINARY(name, type, op)\
+void name##_##type(TypeV_Core* core){\
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];\
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];\
+    uint8_t target = core->program.bytecode[core->registers.ip++];\
+    core->registers.regs[target].type = core->registers.regs[op1].type op core->registers.regs[op2].type;\
+}
+
+OP_BINARY(add, i8, +)
+OP_BINARY(add, u8, +)
+OP_BINARY(add, i16, +)
+OP_BINARY(add, u16, +)
+OP_BINARY(add, i32, +)
+OP_BINARY(add, u32, +)
+OP_BINARY(add, i64, +)
+OP_BINARY(add, u64, +)
+OP_BINARY(add, f32, +)
+OP_BINARY(add, f64, +)
+
+void add_ptr_u8(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[target].ptr = core->registers.regs[op1].ptr + core->registers.regs[op2].u8;
+}
+
+void add_ptr_u16(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[target].ptr = core->registers.regs[op1].ptr + core->registers.regs[op2].u16;
+}
+
+void add_ptr_u32(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[target].ptr = core->registers.regs[op1].ptr + core->registers.regs[op2].u32;
+}
+
+void add_ptr_u64(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[target].ptr = core->registers.regs[op1].ptr + core->registers.regs[op2].u64;
+}
+
+OP_BINARY(sub, i8, -)
+OP_BINARY(sub, u8, -)
+OP_BINARY(sub, i16, -)
+OP_BINARY(sub, u16, -)
+OP_BINARY(sub, i32, -)
+OP_BINARY(sub, u32, -)
+OP_BINARY(sub, i64, -)
+OP_BINARY(sub, u64, -)
+OP_BINARY(sub, f32, -)
+OP_BINARY(sub, f64, -)
+
+void sub_ptr_u8(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[target].ptr = core->registers.regs[op1].ptr - core->registers.regs[op2].u8;
+}
+
+void sub_ptr_u16(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[target].ptr = core->registers.regs[op1].ptr - core->registers.regs[op2].u16;
+}
+
+void sub_ptr_u32(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[target].ptr = core->registers.regs[op1].ptr - core->registers.regs[op2].u32;
+}
+
+void sub_ptr_u64(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[target].ptr = core->registers.regs[op1].ptr - core->registers.regs[op2].u64;
+}
+
+OP_BINARY(mul, i8, *)
+OP_BINARY(mul, u8, *)
+OP_BINARY(mul, i16, *)
+OP_BINARY(mul, u16, *)
+OP_BINARY(mul, i32, *)
+OP_BINARY(mul, u32, *)
+OP_BINARY(mul, i64, *)
+OP_BINARY(mul, u64, *)
+OP_BINARY(mul, f32, *)
+OP_BINARY(mul, f64, *)
+
+OP_BINARY(div, i8, /)
+OP_BINARY(div, u8, /)
+OP_BINARY(div, i16, /)
+OP_BINARY(div, u16, /)
+OP_BINARY(div, i32, /)
+OP_BINARY(div, u32, /)
+OP_BINARY(div, i64, /)
+OP_BINARY(div, u64, /)
+OP_BINARY(div, f32, /)
+OP_BINARY(div, f64, /)
+
+OP_BINARY(mod, i8, %)
+OP_BINARY(mod, u8, %)
+OP_BINARY(mod, i16, %)
+OP_BINARY(mod, u16, %)
+OP_BINARY(mod, i32, %)
+OP_BINARY(mod, u32, %)
+OP_BINARY(mod, i64, %)
+OP_BINARY(mod, u64, %)
+
+OP_BINARY(lshift, i8, <<)
+OP_BINARY(lshift, u8, <<)
+OP_BINARY(lshift, i16, <<)
+OP_BINARY(lshift, u16, <<)
+OP_BINARY(lshift, i32, <<)
+OP_BINARY(lshift, u32, <<)
+OP_BINARY(lshift, i64, <<)
+OP_BINARY(lshift, u64, <<)
+
+OP_BINARY(rshift, i8, >>)
+OP_BINARY(rshift, u8, >>)
+OP_BINARY(rshift, i16, >>)
+OP_BINARY(rshift, u16, >>)
+OP_BINARY(rshift, i32, >>)
+OP_BINARY(rshift, u32, >>)
+OP_BINARY(rshift, i64, >>)
+OP_BINARY(rshift, u64, >>)
+#undef OP_BINARY
+
+void cmp_i8(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as int8_t
+    int8_t v1 = core->registers.regs[op1].i8;
+    int8_t v2 = core->registers.regs[op2].i8;
+
+    // Perform the comparison as int16_t
+    int16_t result = (int16_t)(int)((int16_t)v1 - (int16_t)v2);
+
+    // Set Zero Flag (ZF)
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result==0);
+
+    // Set Sign Flag (SF) using bit shifting
+    WRITE_FLAG(core->registers.flags, FLAG_SF, (result >> 15) & 1);
+
+    // Set Overflow Flag (OF) using bit shifting
+    int v1_sign = (v1 >> 7) & 1;
+    int v2_sign = (v2 >> 7) & 1;
+    int result_sign = (result >> 15) & 1;
+    WRITE_FLAG(core->registers.flags, FLAG_OF, (v1_sign != v2_sign) && (v1_sign != result_sign));
+
+    // Set SignType Flag (STF) for signed operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 1); // Corrected to FLAG_STF
+
+    // Clear Carry Flag (CF) as it is not relevant here
+    FLAG_CLEAR(core->registers.flags, FLAG_CF);
+}
+
+void cmp_u8(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as uint8_t
+    uint8_t v1 = core->registers.regs[op1].u8;
+    uint8_t v2 = core->registers.regs[op2].u8;
+
+    // Perform the comparison as uint16_t to handle any potential overflow
+    uint16_t result = (uint16_t)v1 - (uint16_t)v2;
+
+    // Set Zero Flag (ZF) using bitwise operations
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result==0);
+
+    // Overflow Flag (OF) and Sign Flag (SF) are not used in unsigned comparisons
+    // Clearing OF and SF for clarity
+    WRITE_FLAG(core->registers.flags, FLAG_OF, 0);
+    WRITE_FLAG(core->registers.flags, FLAG_SF, 0);
+
+    // Set Carry Flag (CF) if there was a borrow in the subtraction
+    WRITE_FLAG(core->registers.flags, FLAG_CF, v1 < v2);
+
+    // Set SignType Flag (STF) for unsigned operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 0);
+}
+
+void cmp_i16(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as int16_t
+    int16_t v1 = core->registers.regs[op1].i16;
+    int16_t v2 = core->registers.regs[op2].i16;
+
+    // Perform the comparison as int32_t to handle overflow properly
+    int32_t result = (int32_t)v1 - (int32_t)v2;
+
+    // Set Zero Flag (ZF) using bitwise operations
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result==0);
+
+    // Set Sign Flag (SF) using bit shifting
+    WRITE_FLAG(core->registers.flags, FLAG_SF, (result >> 31) & 1);
+
+    // Set Overflow Flag (OF) using bit shifting
+    int v1_sign = (v1 >> 15) & 1;
+    int v2_sign = (v2 >> 15) & 1;
+    int result_sign = (result >> 31) & 1;
+    WRITE_FLAG(core->registers.flags, FLAG_OF, (v1_sign != v2_sign) && (v1_sign != result_sign));
+
+    // Set SignType Flag (STF) for signed operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 1);
+}
+
+void cmp_u16(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as uint16_t
+    uint16_t v1 = core->registers.regs[op1].u16;
+    uint16_t v2 = core->registers.regs[op2].u16;
+
+    // Perform the comparison as uint32_t to handle any potential wrap-around or borrow
+    uint32_t result = (uint32_t)v1 - (uint32_t)v2;
+
+    // Set Zero Flag (ZF) using bitwise operations
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result==0);
+
+    // Overflow Flag (OF) and Sign Flag (SF) are not used in unsigned comparisons
+    // Clearing OF and SF for clarity
+    WRITE_FLAG(core->registers.flags, FLAG_OF, 0);
+    WRITE_FLAG(core->registers.flags, FLAG_SF, 0);
+
+    // Set Carry Flag (CF) if there was a borrow in the subtraction
+    WRITE_FLAG(core->registers.flags, FLAG_CF, v1 < v2);
+
+    // Set SignType Flag (STF) for unsigned operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 0);
+}
+
+void cmp_i32(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as int32_t
+    int32_t v1 = core->registers.regs[op1].i32;
+    int32_t v2 = core->registers.regs[op2].i32;
+
+    // Perform the comparison as int64_t to handle overflow properly
+    int64_t result = (int64_t)v1 - (int64_t)v2;
+
+    // Set Zero Flag (ZF) using bitwise operations
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result==0);
+
+    // Set Sign Flag (SF) using bit shifting
+    WRITE_FLAG(core->registers.flags, FLAG_SF, (result >> 63) & 1);
+
+    // Set Overflow Flag (OF) using bit shifting
+    int v1_sign = (v1 >> 31) & 1;
+    int v2_sign = (v2 >> 31) & 1;
+    int64_t result_sign = (result >> 63) & 1;
+    WRITE_FLAG(core->registers.flags, FLAG_OF, (v1_sign != v2_sign) && (v1_sign != result_sign));
+
+    // Set SignType Flag (STF) for signed operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 1);
+}
+
+void cmp_u32(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as uint32_t
+    uint32_t v1 = core->registers.regs[op1].u32;
+    uint32_t v2 = core->registers.regs[op2].u32;
+
+    // Perform the comparison as uint64_t to handle wrap-around properly
+    uint64_t result = (uint64_t)v1 - (uint64_t)v2;
+
+    // Set Zero Flag (ZF) using bitwise operations
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, ~(result | ~result) >> 63 & 1);
+
+    // Overflow Flag (OF) and Sign Flag (SF) are not used in unsigned comparisons
+    // Clearing OF and SF for clarity
+    WRITE_FLAG(core->registers.flags, FLAG_OF, 0);
+    WRITE_FLAG(core->registers.flags, FLAG_SF, 0);
+
+    // Set Carry Flag (CF) if there was a borrow in the subtraction
+    WRITE_FLAG(core->registers.flags, FLAG_CF, v1 < v2);
+
+    // Set SignType Flag (STF) for unsigned operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 0);
+}
+
+void cmp_i64(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as int64_t
+    int64_t v1 = core->registers.regs[op1].i64;
+    int64_t v2 = core->registers.regs[op2].i64;
+
+    // Detecting overflow in 64-bit integer subtraction can be complex
+    // Overflow occurs if the sign of v1 is different from v2 AND
+    // the sign of the result (v1 - v2) is different from v1
+
+    // Direct subtraction for Zero and Sign flags
+    int64_t result = v1 - v2;
+
+    // Set Zero Flag (ZF)
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result == 0);
+
+    // Set Sign Flag (SF)
+    WRITE_FLAG(core->registers.flags, FLAG_SF, result < 0);
+
+    // Set Overflow Flag (OF)
+    int v1_sign = v1 < 0;
+    int v2_sign = v2 < 0;
+    int result_sign = result < 0;
+    WRITE_FLAG(core->registers.flags, FLAG_OF, (v1_sign != v2_sign) && (v1_sign != result_sign));
+
+    // Set SignType Flag (STF) for signed operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 1);
+}
+
+void cmp_u64(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as uint64_t
+    uint64_t v1 = core->registers.regs[op1].u64;
+    uint64_t v2 = core->registers.regs[op2].u64;
+
+    // Perform the subtraction
+    uint64_t result = v1 - v2;
+
+    // Set Zero Flag (ZF)
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result == 0);
+
+    // Overflow Flag (OF) and Sign Flag (SF) are not relevant in unsigned comparisons
+    // Clearing them for clarity
+    WRITE_FLAG(core->registers.flags, FLAG_OF, 0);
+    WRITE_FLAG(core->registers.flags, FLAG_SF, 0);
+
+    // Set Carry Flag (CF) if there was a borrow in the subtraction
+    WRITE_FLAG(core->registers.flags, FLAG_CF, v1 < v2);
+
+    // Set SignType Flag (STF) for unsigned operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 0);
+}
+
+void cmp_f32(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as float
+    float v1 = core->registers.regs[op1].f32;
+    float v2 = core->registers.regs[op2].f32;
+
+    // Compare the float values
+    float result = v1 - v2;
+
+    // Set Zero Flag (ZF)
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result == 0.0f);
+
+    // Set Sign Flag (SF) - Negative if result is negative, clear otherwise
+    WRITE_FLAG(core->registers.flags, FLAG_SF, result < 0.0f);
+
+    // For floating-point comparison, Overflow Flag (OF) and Carry Flag (CF) are not applicable
+    WRITE_FLAG(core->registers.flags, FLAG_OF, 0);
+    WRITE_FLAG(core->registers.flags, FLAG_CF, 0);
+
+    // Set SignType Flag (STF) for floating-point operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 1);
+}
+
+void cmp_f64(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as double
+    double v1 = core->registers.regs[op1].f64;
+    double v2 = core->registers.regs[op2].f64;
+
+    // Compare the double values
+    double result = v1 - v2;
+
+    // Set Zero Flag (ZF)
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result == 0.0);
+
+    // Set Sign Flag (SF) - Negative if result is negative, clear otherwise
+    WRITE_FLAG(core->registers.flags, FLAG_SF, result < 0.0);
+
+    // For floating-point comparison, Overflow Flag (OF) and Carry Flag (CF) are not applicable
+    WRITE_FLAG(core->registers.flags, FLAG_OF, 0);
+    WRITE_FLAG(core->registers.flags, FLAG_CF, 0);
+
+    // Set SignType Flag (STF) for floating-point operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 1);
+}
+
+void cmp_ptr(TypeV_Core* core) {
+    // Get first and second registers
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+
+    // Get both values as pointers (assuming 64-bit pointers)
+    size_t ptr1 = core->registers.regs[op1].ptr;
+    size_t ptr2 = core->registers.regs[op2].ptr;
+
+    // Perform the comparison as uint64_t
+    size_t result = ptr1 - ptr2;
+
+    // Set Zero Flag (ZF)
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result == 0);
+
+    // Overflow Flag (OF) and Sign Flag (SF) are not relevant in pointer comparisons
+    WRITE_FLAG(core->registers.flags, FLAG_OF, 0);
+    WRITE_FLAG(core->registers.flags, FLAG_SF, 0);
+
+    // Set Carry Flag (CF) if there was a "borrow" in the subtraction
+    WRITE_FLAG(core->registers.flags, FLAG_CF, ptr1 < ptr2);
+
+    // Set SignType Flag (STF) for unsigned operation
+    WRITE_FLAG(core->registers.flags, FLAG_TF, 0);
+}
+
+void band_8(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u8 = core->registers.regs[op1].u8 & core->registers.regs[op2].u8;
+}
+
+void band_16(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u16 = core->registers.regs[op1].u16 & core->registers.regs[op2].u16;
+}
+
+void band_32(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u32 = core->registers.regs[op1].u32 & core->registers.regs[op2].u32;
+}
+
+void band_64(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u64 = core->registers.regs[op1].u64 & core->registers.regs[op2].u64;
+}
+
+void bor_8(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u8 = core->registers.regs[op1].u8 | core->registers.regs[op2].u8;
+}
+
+void bor_16(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u16 = core->registers.regs[op1].u16 | core->registers.regs[op2].u16;
+}
+
+void bor_32(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u32 = core->registers.regs[op1].u32 | core->registers.regs[op2].u32;
+}
+
+void bor_64(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u64 = core->registers.regs[op1].u64 | core->registers.regs[op2].u64;
+}
+
+void bxor_8(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u8 = core->registers.regs[op1].u8 ^ core->registers.regs[target].u8;
+}
+
+void bxor_16(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u16 = core->registers.regs[op1].u16 ^ core->registers.regs[target].u16;
+}
+
+void bxor_32(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u32 = core->registers.regs[op1].u32 ^ core->registers.regs[target].u32;
+}
+
+void bxor_64(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u64 = core->registers.regs[op1].u64 ^ core->registers.regs[target].u64;
+}
+
+void bnot_8(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u8 = ~core->registers.regs[target].u8;
+}
+
+void bnot_16(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u16 = ~core->registers.regs[target].u16;
+}
+
+void bnot_32(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u32 = ~core->registers.regs[target].u32;
+}
+
+void bnot_64(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u64 = ~core->registers.regs[target].u64;
+}
+
+void and(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u8 = core->registers.regs[op1].u8 && core->registers.regs[target].u8;
+}
+
+void or(TypeV_Core* core){
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u8 = core->registers.regs[op1].u8 || core->registers.regs[target].u8;
+}
+
+void not(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[target].u8 = !core->registers.regs[target].u8;
+}
+
+void jmp(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip = offset;
+}
+
+void jmp_e(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+
+
+    if(FLAG_CHECK(core->registers.flags, FLAG_ZF)){
+        memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+        core->registers.ip = offset;
+    }
+    else {
+        core->registers.ip += offset_length;
+    }
+}
+
+void jmp_ne(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+
+    if(!FLAG_CHECK(core->registers.flags, FLAG_ZF)){
+        memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+        core->registers.ip = offset;
+    }
+    else {
+        core->registers.ip += offset_length;
+    }
+}
+
+void jmp_g(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+
+    uint8_t can_jump = 0;
+    // Check if the last operation was signed or unsigned
+    if (FLAG_CHECK(core->registers.flags, FLAG_TF)) {
+        // Signed comparison
+        // Jump if ZF is clear, and either SF equals OF, or OF is clear and SF is clear
+        can_jump = !FLAG_CHECK(core->registers.flags, FLAG_ZF) &&
+                        ((FLAG_CHECK(core->registers.flags, FLAG_SF) == FLAG_CHECK(core->registers.flags, FLAG_OF)) ||
+                         (!FLAG_CHECK(core->registers.flags, FLAG_OF) && !FLAG_CHECK(core->registers.flags, FLAG_SF)));
+    } else {
+        // Unsigned comparison
+        // Jump if ZF is clear and CF is clear (no borrow occurred)
+        can_jump = !FLAG_CHECK(core->registers.flags, FLAG_ZF) &&
+                        !FLAG_CHECK(core->registers.flags, FLAG_CF);
+    }
+
+    if(can_jump){
+        memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+        core->registers.ip = offset;
+    }
+    else {
+        core->registers.ip += offset_length;
+    }
+}
+
+void jmp_ge(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+
+    uint8_t can_jump = 0;
+    if (FLAG_CHECK(core->registers.flags, FLAG_TF)) {
+        // Signed comparison
+        // Jump if either SF equals OF, or OF is clear and SF is clear
+        can_jump = (FLAG_CHECK(core->registers.flags, FLAG_SF) == FLAG_CHECK(core->registers.flags, FLAG_OF)) ||
+                        (!FLAG_CHECK(core->registers.flags, FLAG_OF) && !FLAG_CHECK(core->registers.flags, FLAG_SF));
+    } else {
+        // Unsigned comparison
+        // Jump if CF is clear (no borrow occurred)
+        can_jump = !FLAG_CHECK(core->registers.flags, FLAG_CF);
+    }
+
+    if (can_jump) {
+        // Perform the jump
+        core->registers.ip = can_jump;
+    }
+
+    if(can_jump){
+        memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+        core->registers.ip = offset;
+    }
+    else {
+        core->registers.ip += offset_length;
+    }
+}
+
+void jmp_l(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+
+    uint8_t can_jump = 0;
+    if (FLAG_CHECK(core->registers.flags, FLAG_TF)) {
+        // Signed comparison
+        // Jump if SF does not equal OF
+        can_jump = FLAG_CHECK(core->registers.flags, FLAG_SF) != FLAG_CHECK(core->registers.flags, FLAG_OF);
+    } else {
+        // Unsigned comparison
+        // Jump if CF is set (borrow occurred)
+        can_jump = FLAG_CHECK(core->registers.flags, FLAG_CF);
+    }
+
+    if(can_jump){
+        memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+        core->registers.ip = offset;
+    }
+    else {
+        core->registers.ip += offset_length;
+    }
+}
+
+void jmp_le(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+
+
+    uint8_t can_jump = 0;
+    if (FLAG_CHECK(core->registers.flags, FLAG_TF)) {
+        // Signed comparison
+        // Jump if ZF is set, or SF does not equal OF
+        can_jump = FLAG_CHECK(core->registers.flags, FLAG_ZF) ||
+                        (FLAG_CHECK(core->registers.flags, FLAG_SF) != FLAG_CHECK(core->registers.flags, FLAG_OF));
+    } else {
+        // Unsigned comparison
+        // Jump if CF is set (borrow occurred), or ZF is set
+        can_jump = FLAG_CHECK(core->registers.flags, FLAG_CF) ||
+                        FLAG_CHECK(core->registers.flags, FLAG_ZF);
+    }
+
+    if(can_jump){
+        memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+        core->registers.ip = offset;
+    }
+    else {
+        core->registers.ip += offset_length;
+    }
 }
 
 void debug_reg(TypeV_Core* core){
@@ -609,7 +1461,7 @@ void debug_reg(TypeV_Core* core){
 }
 
 void halt(TypeV_Core* core) {
-    exit(0);
+    core->isRunning = 0;
 }
 
 

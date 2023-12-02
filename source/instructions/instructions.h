@@ -2,318 +2,18 @@
  * Instructions for Type-V VM
  * Author: praisethemoon
  * instructions.h: VM Instructions
- * VM instructions are defined here. File is long. Yes.
+ * VM instructions headers are defined here.
  */
 #ifndef TYPE_V_INSTRUCTIONS_H
 #define TYPE_V_INSTRUCTIONS_H
 
 #include "../core.h"
+#include "./opcodes.h"
 
-
-/**
- * Terminology:
- * R: Register
- * Rm: Register containing memory address (read as ptr)
- * I: Immediate (when used alone, its <= 255), (when used with Z, it can be >= 255)
- * Z: Immediate value size in bytes (for immediate values > 255 when applicable)
- * C: Constant (offset)
- * S: byte-size, 1, 2, 4, 8 or 0 for pointer
- */
-typedef enum TypeV_OpCode {
-    /**
-     * MOVE instruction,
-     * format: MV_[dest]_[src]_[size]
-     */
-
-    /**
-     * OP_MOV_REG_REG dest: R, src: R, bits: S
-     * Move 1byte from src to dest
-     */
-    OP_MV_REG_REG = 0x00,
-
-    /**
-     * OP_MV_REG_CONST_[size] dest: R, offset-size: Z, offset: I
-     * OP_MV_REG_CONST_8 R0, 0x1, 0x10
-     */
-    OP_MV_REG_CONST_8,
-    OP_MV_REG_CONST_16,
-    OP_MV_REG_CONST_32,
-    OP_MV_REG_CONST_64,
-    OP_MV_REG_CONST_PTR,
-
-    /**
-     * OP_MV_REG_MEM dest: R, src: Rm, bytes: S
-     * moves S bytes from memory address in Rm to R
-     */
-    OP_MV_REG_MEM,
-
-    /**
-     * OP_MV_MEM_REG dest: Rm, src: R, bytes: S
-     * moves S bytes from R to memory address in Rm
-     */
-    OP_MV_MEM_REG,
-
-    /**
-     * OP_MV_REG_LOCAL_[size] dest: R, offset-size: Z, offset: I
-     * moves S bytes from local stack address frame-pointer + offset to register R
-     */
-    OP_MV_REG_LOCAL_8,
-    OP_MV_REG_LOCAL_16,
-    OP_MV_REG_LOCAL_32,
-    OP_MV_REG_LOCAL_64,
-    OP_MV_REG_LOCAL_PTR,
-
-    /**
-     * OP_MV_LOCAL_REG offset-size: Z, offset: I, src: R
-     * moves S bytes from register R to local stack address frame-pointer + offset
-     */
-    OP_MV_LOCAL_REG_8,
-    OP_MV_LOCAL_REG_16,
-    OP_MV_LOCAL_REG_32,
-    OP_MV_LOCAL_REG_64,
-    OP_MV_LOCAL_REG_PTR,
-
-    /**
-     * OP_MV_GLOBAL_REG_[size] offset-size: Z, offset: I, source: R
-     * moves S bytes from register R to global pool address offset
-     */
-    OP_MV_GLOBAL_REG_8,
-    OP_MV_GLOBAL_REG_16,
-    OP_MV_GLOBAL_REG_32,
-    OP_MV_GLOBAL_REG_64,
-    OP_MV_GLOBAL_REG_PTR,
-
-    /**
-     * OP_MV_REG_GLOBAL_[size] dest: reg, offset-size: Z, offset: I
-     * moves S bytes from global pool address offset to register R
-     */
-    OP_MV_REG_GLOBAL_8,
-    OP_MV_REG_GLOBAL_16,
-    OP_MV_REG_GLOBAL_32,
-    OP_MV_REG_GLOBAL_64,
-    OP_MV_REG_GLOBAL_PTR,
-
-    /**
-     * OP_MV_REG_ARG_[size] dest: R, arg: offset-size: Z, offset: I
-     * moves [size] bytes from argument stack address frame-pointer + offset to register R
-     */
-    OP_MV_REG_ARG_8,
-    OP_MV_REG_ARG_16,
-    OP_MV_REG_ARG_32,
-    OP_MV_REG_ARG_64,
-    OP_MV_REG_ARG_PTR,
-
-    /**
-     * OP_MV_ARG_REG_[size] arg: offset-size: Z, offset: I, source: R
-     * moves [size] bytes from register R to argument stack address frame-pointer + offset
-     */
-    OP_MV_ARG_REG_8,
-    OP_MV_ARG_REG_16,
-    OP_MV_ARG_REG_32,
-    OP_MV_ARG_REG_64,
-    OP_MV_ARG_REG_PTR,
-
-    /**
-     * OP_S_ALLOC fieldOffsets-count: I, struct-size-size: Z, struct-size: I
-     * Creates new struct of given total ﬁelds count (arg1) and total memory
-     * (arg2 and arg3), stores the address of the new struct into R16.
-     */
-    OP_S_ALLOC,
-
-    /**
-     * OP_S_ALLOC_SHADOW fieldOffsets-count: I
-     * Creates a shadow copy of a struct (who's address is stored in R16),
-     * a shadow copy is a copy that points to the same data but with different
-     * offset table. Copy address is stored in (and overrides) R16
-     */
-    OP_S_ALLOC_SHADOW,
-
-    /**
-     * OP_S_SET_OFFSET fieldIndex: I, offset-size: Z, offset-value: I
-     * Sets the offset value of field I, of the struct stored in R16
-     * to the given offset value
-     */
-    OP_S_SET_OFFSET,
-
-    /**
-     * OP_S_LOADF dest: R, fieldIndex: I, size: S
-     * Loads S bytes from field I of struct stored at R16 to register R
-     */
-    OP_S_LOADF,
-
-    /**
-     * OP_S_STOREF_CONST_[size] fieldIndex: I, offset-size : Z, offset-: I
-     * Stores [size] bytes from constant pool address offset to field I of
-     * struct stored at R16
-     */
-    OP_S_STOREF_CONST_8,
-    OP_S_STOREF_CONST_16,
-    OP_S_STOREF_CONST_32,
-    OP_S_STOREF_CONST_64,
-    OP_S_STOREF_CONST_PTR,
-
-    /**
-     * OP_S_STOREF_REG fieldIndex: I, source: R, size: S
-     * Stores [size] bytes from register R to field I of struct stored at R16
-     */
-    OP_S_STOREF_REG,
-
-    /**
-     * OP_C_ALLOCF fields-count: I, class-fields-size-size: Z, class-fields-size: I
-     * Allocates new class of given total ﬁelds count (arg1) and total fields
-     * size of (arg2 and arg3), stores the address of the new class into R17.
-     */
-    OP_C_ALLOCF,
-
-    /**
-     * OP_C_ALLOCM num_methods: I
-     * Allocates new class method table of given total methods count (arg1),
-     * Class address must be stored in R17
-     */
-    OP_C_ALLOCM,
-
-    /**
-     * OP_C_STOREM methodIndex: I, methodAddress: I
-     * Stores method address (arg2) into method table of class stored in R17
-     */
-    OP_C_STOREM,
-
-    /**
-     * OP_C_LOADM dest: R, methodIndex: I
-     * Loads method address from method table of class stored in R17 to register R
-     */
-    OP_C_LOADM,
-
-    /**
-     * OP_CSTOREF fieldIndex: I, R: source register, size: S
-     * Stores [size] bytes from register R to field I of class stored at R17
-     */
-    OP_C_STOREF,
-
-    /**
-     * OP_C_STOREF_CONST_[size] fieldIndex: I, offset-size : Z, offset-: I
-     * Stores [size] bytes from constant pool address offset to field I of
-     * class stored at R17
-     */
-    OP_C_STOREF_CONST_8,
-    OP_C_STOREF_CONST_16,
-    OP_C_STOREF_CONST_32,
-    OP_C_STOREF_CONST_64,
-    OP_C_STOREF_CONST_PTR,
-
-    /**
-     * OP_C_LOADF_[size] dest: R, fieldIndex: I, size: S
-     * Loads [size] bytes from field I of class stored at R17 to register R
-     */
-    OP_C_LOADF,
-
-    /**
-     * OP_I_ALLOC num_methods: I
-     * Allocates new interface method table of given total methods count (arg1),
-     * interface is based on class stored in R17. Interface address is
-     * stored in R18
-     */
-    OP_I_ALLOC,
-
-    /**
-     * OP_I_SET_OFFSET methodIndex: I, offset-size: Z, offset-value: I
-     * Sets the offset value of method I, of the interface stored in R18
-     */
-    OP_I_SET_OFFSET,
-
-    /**
-     * OP_I_LOADM dest: R, methodIndex: I
-     * Loads method address from method table of interface stored in R18 to register R
-     */
-    OP_I_LOADM,
-
-    /**
-     * OP_PUSH register: R, bytes: S
-     */
-    OP_PUSH,
-
-    /**
-     * OP_PUSH_CONST offset-size: Z, offset: I, bytes: S
-     */
-    OP_PUSH_CONST,
-
-    /**
-     * OP_POP register: R, bytes: S
-     */
-    OP_POP,
-
-    /**
-     * OP_FRAME_INIT_ARGS size-length: Z, size: I
-     * Creates a stack-frame of the given size.
-     * The stack frame is initialized with the specified size
-     * that is already stored in the constant pool.
-     */
-    OP_FRAME_INIT_ARGS,
-
-    /**
-     *  OP_FRAME_INIT_LOCALS size-length: Z, size: I
-     *  Extends the previous stack frame with the given size.
-     *  The given size is the total size of local variables.
-     *  Variables are pushed to the stack in the order they
-     *  are declared.
-     */
-    OP_FRAME_INIT_LOCALS,
-
-    /**
-     * OP_FRAME_RM removes the current stack frame from the stack
-     * everything on top of the frame will be removed
-     */
-    OP_FRAME_RM,
-
-    /**
-     * OP_FRAME_PRECALL
-     * pushes core state into the stack
-     * to be popped after the function exits
-     */
-    OP_FRAME_PRECALL,
-
-    /**
-     * OP_FN_MAIN
-     * Make sure that the stack contains the arguments
-     * and local variables allocated,
-     * i.e stack pointer equals frame_end
-     */
-    OP_FN_MAIN,
-
-    /**
-     * OP_FN_RET
-     * pops core state from the stack
-     * after the function exits. R19 is not popped,
-     * it is used to store the return value of the function
-     * Returns the IP to its previous value, hence, exits
-     * the function
-     */
-    OP_FN_RET,
-
-    /**
-     * OP_FN_CALL function-address: R
-     * Calls the function at the address stored in the given register
-     * This function is called after the stack frame is initialized
-     * and the arguments are pushed to the stack
-     */
-    OP_FN_CALL,
-    /**
-     * OP_FN_CALLI function-address-size: Z, function-address: I
-     * Calls the function at the given address
-     * This function is called after the stack frame is initialized
-     * and the arguments are pushed to the stack
-     */
-    OP_FN_CALLI,
-
-
-
-    OP_DEBUG_REG,
-    OP_HALT,
-}TypeV_OpCode;
-
-#define VM_INSTRUCTION(instruction) void instruction(TypeV_Core *core);
+#define VM_INSTRUCTION(instruction) inline void instruction(TypeV_Core *core);
 
 VM_INSTRUCTION(mv_reg_reg)
+VM_INSTRUCTION(mv_reg_i)
 VM_INSTRUCTION(mv_reg_const_8)
 VM_INSTRUCTION(mv_reg_const_16)
 VM_INSTRUCTION(mv_reg_const_32)
@@ -377,7 +77,7 @@ VM_INSTRUCTION(c_allocm)
 VM_INSTRUCTION(c_storem)
 VM_INSTRUCTION(c_loadm)
 
-VM_INSTRUCTION(c_storef)
+VM_INSTRUCTION(c_storef_reg)
 
 VM_INSTRUCTION(c_storef_const_8)
 VM_INSTRUCTION(c_storef_const_16)
@@ -390,6 +90,18 @@ VM_INSTRUCTION(c_loadf)
 VM_INSTRUCTION(i_alloc)
 VM_INSTRUCTION(i_set_offset)
 VM_INSTRUCTION(i_loadm)
+
+VM_INSTRUCTION(a_alloc)
+VM_INSTRUCTION(a_extend)
+
+VM_INSTRUCTION(a_storef_reg)
+VM_INSTRUCTION(a_storef_const_8)
+VM_INSTRUCTION(a_storef_const_16)
+VM_INSTRUCTION(a_storef_const_32)
+VM_INSTRUCTION(a_storef_const_64)
+VM_INSTRUCTION(a_storef_const_ptr)
+
+VM_INSTRUCTION(a_loadf)
 
 VM_INSTRUCTION(push)
 VM_INSTRUCTION(push_const)
@@ -405,108 +117,160 @@ VM_INSTRUCTION(fn_ret)
 VM_INSTRUCTION(fn_call)
 VM_INSTRUCTION(fn_calli)
 
+VM_INSTRUCTION(cast_i8_u8)
+VM_INSTRUCTION(cast_u8_i8)
+VM_INSTRUCTION(cast_i16_u16)
+VM_INSTRUCTION(cast_u16_i16)
+VM_INSTRUCTION(cast_i32_u32)
+VM_INSTRUCTION(cast_u32_i32)
+VM_INSTRUCTION(cast_i64_u64)
+VM_INSTRUCTION(cast_u64_i64)
+VM_INSTRUCTION(cast_i32_f32)
+VM_INSTRUCTION(cast_f32_i32)
+VM_INSTRUCTION(cast_i64_f64)
+VM_INSTRUCTION(cast_f64_i64)
+
+VM_INSTRUCTION(upcast_i8_i16)
+VM_INSTRUCTION(upcast_u8_u16)
+VM_INSTRUCTION(upcast_i16_i32)
+VM_INSTRUCTION(upcast_u16_u32)
+VM_INSTRUCTION(upcast_i32_i64)
+VM_INSTRUCTION(upcast_u32_u64)
+VM_INSTRUCTION(upcast_f32_f64)
+
+VM_INSTRUCTION(dcast_i16_i8)
+VM_INSTRUCTION(dcast_u16_u8)
+VM_INSTRUCTION(dcast_i32_i16)
+VM_INSTRUCTION(dcast_u32_u16)
+VM_INSTRUCTION(dcast_i64_i32)
+VM_INSTRUCTION(dcast_u64_u32)
+VM_INSTRUCTION(dcast_f64_f32)
+
+VM_INSTRUCTION(add_i8)
+VM_INSTRUCTION(add_u8)
+VM_INSTRUCTION(add_i16)
+VM_INSTRUCTION(add_u16)
+VM_INSTRUCTION(add_i32)
+VM_INSTRUCTION(add_u32)
+VM_INSTRUCTION(add_i64)
+VM_INSTRUCTION(add_u64)
+VM_INSTRUCTION(add_f32)
+VM_INSTRUCTION(add_f64)
+VM_INSTRUCTION(add_ptr_u8)
+VM_INSTRUCTION(add_ptr_u16)
+VM_INSTRUCTION(add_ptr_u32)
+VM_INSTRUCTION(add_ptr_u64)
+
+VM_INSTRUCTION(sub_i8)
+VM_INSTRUCTION(sub_u8)
+VM_INSTRUCTION(sub_i16)
+VM_INSTRUCTION(sub_u16)
+VM_INSTRUCTION(sub_i32)
+VM_INSTRUCTION(sub_u32)
+VM_INSTRUCTION(sub_i64)
+VM_INSTRUCTION(sub_u64)
+VM_INSTRUCTION(sub_f32)
+VM_INSTRUCTION(sub_f64)
+VM_INSTRUCTION(sub_ptr_u8)
+VM_INSTRUCTION(sub_ptr_u16)
+VM_INSTRUCTION(sub_ptr_u32)
+VM_INSTRUCTION(sub_ptr_u64)
+
+VM_INSTRUCTION(mul_i8)
+VM_INSTRUCTION(mul_u8)
+VM_INSTRUCTION(mul_i16)
+VM_INSTRUCTION(mul_u16)
+VM_INSTRUCTION(mul_i32)
+VM_INSTRUCTION(mul_u32)
+VM_INSTRUCTION(mul_i64)
+VM_INSTRUCTION(mul_u64)
+VM_INSTRUCTION(mul_f32)
+VM_INSTRUCTION(mul_f64)
+
+VM_INSTRUCTION(div_i8)
+VM_INSTRUCTION(div_u8)
+VM_INSTRUCTION(div_i16)
+VM_INSTRUCTION(div_u16)
+VM_INSTRUCTION(div_i32)
+VM_INSTRUCTION(div_u32)
+VM_INSTRUCTION(div_i64)
+VM_INSTRUCTION(div_u64)
+VM_INSTRUCTION(div_f32)
+VM_INSTRUCTION(div_f64)
+
+VM_INSTRUCTION(mod_i8)
+VM_INSTRUCTION(mod_u8)
+VM_INSTRUCTION(mod_i16)
+VM_INSTRUCTION(mod_u16)
+VM_INSTRUCTION(mod_i32)
+VM_INSTRUCTION(mod_u32)
+VM_INSTRUCTION(mod_i64)
+VM_INSTRUCTION(mod_u64)
+
+VM_INSTRUCTION(lshift_i8)
+VM_INSTRUCTION(lshift_u8)
+VM_INSTRUCTION(lshift_i16)
+VM_INSTRUCTION(lshift_u16)
+VM_INSTRUCTION(lshift_i32)
+VM_INSTRUCTION(lshift_u32)
+VM_INSTRUCTION(lshift_i64)
+VM_INSTRUCTION(lshift_u64)
+
+VM_INSTRUCTION(rshift_i8)
+VM_INSTRUCTION(rshift_u8)
+VM_INSTRUCTION(rshift_i16)
+VM_INSTRUCTION(rshift_u16)
+VM_INSTRUCTION(rshift_i32)
+VM_INSTRUCTION(rshift_u32)
+VM_INSTRUCTION(rshift_i64)
+VM_INSTRUCTION(rshift_u64)
+
+VM_INSTRUCTION(cmp_i8)
+VM_INSTRUCTION(cmp_u8)
+VM_INSTRUCTION(cmp_i16)
+VM_INSTRUCTION(cmp_u16)
+VM_INSTRUCTION(cmp_i32)
+VM_INSTRUCTION(cmp_u32)
+VM_INSTRUCTION(cmp_i64)
+VM_INSTRUCTION(cmp_u64)
+VM_INSTRUCTION(cmp_f32)
+VM_INSTRUCTION(cmp_f64)
+VM_INSTRUCTION(cmp_ptr)
+
+VM_INSTRUCTION(band_8)
+VM_INSTRUCTION(band_16)
+VM_INSTRUCTION(band_32)
+VM_INSTRUCTION(band_64)
+
+VM_INSTRUCTION(bor_8)
+VM_INSTRUCTION(bor_16)
+VM_INSTRUCTION(bor_32)
+VM_INSTRUCTION(bor_64)
+
+VM_INSTRUCTION(bxor_8)
+VM_INSTRUCTION(bxor_16)
+VM_INSTRUCTION(bxor_32)
+VM_INSTRUCTION(bxor_64)
+
+VM_INSTRUCTION(bnot_8)
+VM_INSTRUCTION(bnot_16)
+VM_INSTRUCTION(bnot_32)
+VM_INSTRUCTION(bnot_64)
+
+VM_INSTRUCTION(and)
+VM_INSTRUCTION(or)
+VM_INSTRUCTION(not)
+
+VM_INSTRUCTION(jmp)
+VM_INSTRUCTION(jmp_e)
+VM_INSTRUCTION(jmp_ne)
+VM_INSTRUCTION(jmp_g)
+VM_INSTRUCTION(jmp_ge)
+VM_INSTRUCTION(jmp_l)
+VM_INSTRUCTION(jmp_le)
+
 
 VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)
-
-
-typedef void (*op_func)(TypeV_Core *);
-static op_func op_funcs[] = {
-        &mv_reg_reg,
-
-        &mv_reg_const_8,
-        &mv_reg_const_16,
-        &mv_reg_const_32,
-        &mv_reg_const_64,
-        &mv_reg_const_ptr,
-
-        &mv_reg_mem,
-        &mv_mem_reg,
-
-        &mv_reg_local_8,
-        &mv_reg_local_16,
-        &mv_reg_local_32,
-        &mv_reg_local_64,
-        &mv_reg_local_ptr,
-
-        &mv_local_reg_8,
-        &mv_local_reg_16,
-        &mv_local_reg_32,
-        &mv_local_reg_64,
-        &mv_local_reg_ptr,
-
-        &mv_global_reg_8,
-        &mv_global_reg_16,
-        &mv_global_reg_32,
-        &mv_global_reg_64,
-        &mv_global_reg_ptr,
-
-        &mv_reg_global_8,
-        &mv_reg_global_16,
-        &mv_reg_global_32,
-        &mv_reg_global_64,
-        &mv_reg_global_ptr,
-
-        &mv_reg_arg_8,
-        &mv_reg_arg_16,
-        &mv_reg_arg_32,
-        &mv_reg_arg_64,
-        &mv_reg_arg_ptr,
-
-        &mv_arg_reg_8,
-        &mv_arg_reg_16,
-        &mv_arg_reg_32,
-        &mv_arg_reg_64,
-        &mv_arg_reg_ptr,
-
-        &s_alloc,
-        &s_alloc_shadow,
-        &s_set_offset,
-
-        &s_loadf,
-
-        &s_storef_const_8,
-        &s_storef_const_16,
-        &s_storef_const_32,
-        &s_storef_const_64,
-        &s_storef_const_ptr,
-
-        &s_storef_reg,
-
-        &c_allocf,
-        &c_allocm,
-
-        &c_storem,
-        &c_loadm,
-        &c_storef,
-
-        &c_storef_const_8,
-        &c_storef_const_16,
-        &c_storef_const_32,
-        &c_storef_const_64,
-        &c_storef_const_ptr,
-
-        &c_loadf,
-
-        &i_alloc,
-        &i_set_offset,
-        &i_loadm,
-
-        &push,
-        &push_const,
-        &pop,
-
-        &frame_init_args,
-        &frame_init_locals,
-        &frame_rm,
-        &frame_precall,
-        &fn_main,
-        &fn_ret,
-        &fn_call,
-        &fn_calli,
-
-        &debug_reg,
-        &halt,
-};
 
 #endif //TYPE_V_INSTRUCTIONS_H

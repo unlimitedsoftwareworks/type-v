@@ -5,10 +5,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "core.h"
 #include "queue/queue.h"
-#include "instructions/instructions.h"
+#include "instructions/opfuncs.h"
 #include "utils/log.h"
 #include "stack/stack.h"
 
@@ -49,6 +50,8 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->memTracker.interfaceCount = 0;
     core->memTracker.structs = NULL;
     core->memTracker.structCount = 0;
+    core->memTracker.arrays = NULL;
+    core->memTracker.arrayCount = 0;
 
     core->engineRef = engineRef;
 }
@@ -66,10 +69,24 @@ void core_setup(TypeV_Core *core, uint8_t* program, uint64_t programLength, uint
 }
 
 void core_vm(TypeV_Core *core) {
-    while(1){
+    clock_t start, end;
+    double cpu_time_used;
+    long sum = 0;
+
+    start = clock();
+    core->isRunning = 1;
+    while(core->isRunning){
         TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
         op_funcs[opcode](core);
     }
+    end = clock();
+
+    // Calculate the CPU time used in seconds
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+    printf("Sum: %ld\n", sum);
+    printf("Execution time: %f seconds\n", cpu_time_used);
+
 }
 
 void core_deallocate(TypeV_Core *core) {
@@ -171,4 +188,29 @@ size_t core_alloc_interface(TypeV_Core *core, uint8_t num_methods, TypeV_Class *
     core->memTracker.interfaces[core->memTracker.interfaceCount++] = interface_ptr;
 
     return (size_t)interface_ptr;
+}
+
+size_t core_alloc_array(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
+    LOG_INFO("Allocating array with %d elements of size %d, total allocated size: %d", num_elements, element_size, sizeof(size_t)+num_elements*element_size);
+    TypeV_Array* array_ptr = (TypeV_Array*)calloc(1, sizeof(size_t)+num_elements*element_size);
+
+    // add to gc
+    core->memTracker.arrays = realloc(core->memTracker.arrays, sizeof(size_t)*(core->memTracker.arrayCount+1));
+    core->memTracker.arrays[core->memTracker.arrayCount++] = array_ptr;
+
+    array_ptr->capacity = num_elements;
+    array_ptr->elementSize = element_size;
+    array_ptr->length = num_elements;
+    array_ptr->data = calloc(num_elements, element_size);
+
+    return (size_t)array_ptr;
+}
+
+size_t core_extend_array(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
+    LOG_INFO("Extending array %p with %d elements, total allocated size: %d", (void*)array_ptr, num_elements, num_elements*sizeof(size_t));
+    TypeV_Array* array = (TypeV_Array*)array_ptr;
+    array->data = realloc(array->data, num_elements);
+    array->length = num_elements;
+    array->capacity = num_elements*2;
+    return array_ptr;
 }
