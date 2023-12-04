@@ -7,4 +7,32 @@ GLOBAL:
 CODE:
     p_queue_size r0
     debug_reg r0
+
+    ; spawn
+    p_alloc r1 proc1
+    p_alloc r2 proc1
+    mv_reg_i r15 10
+    mv_reg_i r13 100
+    p_emit r1 r15
+    p_emit r2 r13
+    p_emit r1 r15
+    p_emit r2 r13
+    p_emit r1 r15
+    p_emit r2 r13
+    p_emit r1 r15
+    p_emit r2 r13
+    p_emit r1 r15
+    p_emit r2 r13
+    p_emit r1 r15
+    p_emit r2 r13
+    p_emit r1 r15
+    p_emit r2 r13
     halt
+
+
+proc1:
+    p_wait_queue
+    p_dequeue r14
+    debug_reg r14
+    j proc1
+

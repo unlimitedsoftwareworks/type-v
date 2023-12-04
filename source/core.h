@@ -82,10 +82,10 @@ typedef enum TypeV_CoreState {
     CS_HALTED = 1,      ///< Halted as the VM is running another core, or process
     CS_AWAITING_QUEUE,
     CS_AWAITING_PROMISE,
-    CS_RUNNING = 2,     ///< Process is Running
-    CS_FINISHING = 4,   ///< Process has received terminate signal and is no longer accepting messages
-    CS_TERMINATED = 5,  ///< Process has been gracefully terminated
-    CS_KILLED = 7       ///< Process has been killed
+    CS_RUNNING  ,        ///< Process is Running
+    CS_FINISHING    ,   ///< Process has received terminate signal and is no longer accepting messages
+    CS_TERMINATED    ,  ///< Process has been gracefully terminated
+    CS_KILLED           ///< Process has been killed
 }TypeV_CoreState;
 
 /**
@@ -324,6 +324,26 @@ size_t core_mem_alloc(TypeV_Core* core, size_t size);
 void core_update_flags(TypeV_Core *core, uint64_t value);
 
 void core_process_alloc(TypeV_Core* core, uint64_t ip);
+
+
+/**
+ * Sends a message to the core's queue
+ * @param core
+ * @param message
+ */
+void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message);
+
+/**
+ * Sets core to await for a queue
+ * @param core
+ */
+void core_queue_await(TypeV_Core* core);
+
+/**
+ * Awakes process
+ * @param core
+ */
+void core_queue_resolve(TypeV_Core* core);
 
 
 typedef void (*TypeV_FFIFunc)(TypeV_Core* core);

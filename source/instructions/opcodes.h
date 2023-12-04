@@ -573,7 +573,15 @@ typedef enum TypeV_OpCode {
      * Emits data from the current process to the target
      * process message queue
      */
-    //OP_P_EMIT,
+    OP_P_EMIT,
+
+
+    /**
+     * OP_P_WAIT_QUEUE,
+     * Waits for the current process queue to receive a message
+     */
+    OP_P_WAIT_QUEUE,
+
 
     /**
      * OP_P_RET

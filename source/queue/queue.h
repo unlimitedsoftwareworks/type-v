@@ -11,6 +11,8 @@
 
 #include <stdint.h>
 
+#define MAX_QUEUE_LENGTH 100
+
 /**
  * @brief Message structure
  */

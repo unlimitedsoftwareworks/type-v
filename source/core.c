@@ -228,4 +228,15 @@ size_t core_mem_alloc(TypeV_Core* core, size_t size) {
     return (size_t)mem;
 }
 
+void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message) {
+    queue_enqueue(&(core->messageInputQueue), message);
+    core_queue_resolve(core);
+}
 
+void core_queue_await(TypeV_Core* core) {
+    core->state = CS_AWAITING_QUEUE;
+}
+
+void core_queue_resolve(TypeV_Core* core) {
+    core->state = CS_RUNNING;
+}

@@ -41,6 +41,7 @@ typedef struct TypeV_Engine {
     TypeV_EngineHealth health;
     TypeV_CoreIterator* coreIterator;
     uint32_t coreCount;                         ///< number of living cores
+    uint32_t runningCoresCount;                 ///< number of running cores
     uint8_t interruptNextLoop;                  ///< interrupt the next loop, set to true when cores are spawned/killed
 } TypeV_Engine;
 

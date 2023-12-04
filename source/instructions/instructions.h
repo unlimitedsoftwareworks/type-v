@@ -277,6 +277,8 @@ VM_INSTRUCTION(close_ffi)
 VM_INSTRUCTION(p_alloc)
 VM_INSTRUCTION(p_dequeue)
 VM_INSTRUCTION(p_queue_size)
+VM_INSTRUCTION(p_emit)
+VM_INSTRUCTION(p_wait_queue)
 
 VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)

@@ -1485,6 +1485,7 @@ void p_alloc(TypeV_Core* core){
 }
 
 void p_dequeue(TypeV_Core* core){
+    LOG_INFO("Core[%d] dequeueing 1/%d", core->id, core->messageInputQueue.length);
     uint8_t dest = core->program.bytecode[core->registers.ip++];
     // get the next queue element from core queue
     // check queue length
@@ -1493,6 +1494,33 @@ void p_dequeue(TypeV_Core* core){
         ASSERT(0, "fail");
     }
     TypeV_IOMessage* msg = queue_dequeue(&core->messageInputQueue);
+    core->registers.regs[dest].ptr = (size_t)msg->message;
+}
+
+void p_emit(TypeV_Core* core){
+    uint8_t targetProcessReg = core->program.bytecode[core->registers.ip++];
+    uint8_t dataReg = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(targetProcessReg < MAX_REG, "Invalid register index");
+    ASSERT(dataReg < MAX_REG, "Invalid register index");
+
+    size_t data_ptr = core->registers.regs[dataReg].ptr;
+    TypeV_Core* target = (TypeV_Core*)core->registers.regs[targetProcessReg].ptr;
+
+    LOG_INFO("Core[%d] emitting message to Core[%d]", core->id, target->id);
+
+    TypeV_IOMessage* msg = malloc(sizeof(TypeV_IOMessage));
+    msg->sender = core->id;
+    msg->message = (void*)data_ptr;
+
+    core_enqueue_message(target, msg);
+}
+
+void p_wait_queue(TypeV_Core* core){
+    LOG_INFO("Core[%d] waiting for queue", core->id);
+    if(core->messageInputQueue.length == 0){
+        core_queue_await(core);
+    }
 }
 
 void p_queue_size(TypeV_Core* core){
@@ -1507,6 +1535,7 @@ void debug_reg(TypeV_Core* core){
 
     struct table t;
     table_init(&t,
+               "Core", "%d",
                "R?", "R%d",
                "i8", "%d",
                "u8", "%u",
@@ -1521,7 +1550,7 @@ void debug_reg(TypeV_Core* core){
                "ptr", "%p",
                "hex", "%llx", NULL);
 
-    table_add(&t, i,
+    table_add(&t, core->id, i,
               core->registers.regs[i].i8,
               core->registers.regs[i].u8,
               core->registers.regs[i].i16,

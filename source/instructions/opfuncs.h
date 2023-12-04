@@ -278,6 +278,8 @@ static op_func op_funcs[] = {
         &p_alloc,
         &p_dequeue,
         &p_queue_size,
+        &p_emit,
+        &p_wait_queue,
 
         &debug_reg,
         &halt,

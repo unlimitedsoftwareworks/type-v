@@ -1337,6 +1337,19 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 break;
             }
 
+            case OP_P_EMIT: {
+                TypeV_ASM_Reg targetReg = getRegister(parser);
+                TypeV_ASM_Reg dataReg = getRegister(parser);
+                create_instruction(parser, OP_P_EMIT, targetReg, dataReg, 0, 2);
+                parser->codePoolSize+= 2;
+                break;
+            }
+
+            case OP_P_WAIT_QUEUE: {
+                create_instruction(parser, OP_P_WAIT_QUEUE, 0, 0, 0, 0);
+                break;
+            }
+
             case OP_DEBUG_REG: {
                 TypeV_ASM_Reg reg = getRegister(parser);
 

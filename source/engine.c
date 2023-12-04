@@ -6,10 +6,12 @@
 #include "engine.h"
 #include "core.h"
 #include "instructions/opfuncs.h"
+#include "utils/log.h"
 
 void engine_init(TypeV_Engine *engine) {
     // we will allocate memory for cores later
     engine->coreCount = 0;
+    engine->runningCoresCount;
     engine->health = EH_OK;
     engine->coreIterator = calloc(1, sizeof(TypeV_CoreIterator));
     engine->coreIterator->core = calloc(1, sizeof(TypeV_Core));
@@ -71,6 +73,7 @@ uint32_t engine_generateNewCoreID(TypeV_Engine *engine) {
 }
 
 void engine_update_scheduler(TypeV_Engine *engine) {
+    engine->interruptNextLoop = 1;
     if(!engine->coreCount){return;}
     if(engine->coreCount == 1) {
         engine->coreIterator->maxInstructions = -1;
@@ -80,7 +83,7 @@ void engine_update_scheduler(TypeV_Engine *engine) {
         // iterate over all cores and set maxInstructions to 1
         TypeV_CoreIterator* iter = engine->coreIterator;
         while(iter != NULL){
-            iter->maxInstructions = 20;
+            iter->maxInstructions = 2;
             iter->currentInstructions = 0;
             iter = iter->next;
         }
@@ -144,6 +147,7 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
 }
 
 void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
+    LOG_INFO("Core[%d] detached", core->id);
     // find the core in the iterator list
     TypeV_CoreIterator* iterator = engine->coreIterator;
     TypeV_CoreIterator* prevIterator = NULL;
