@@ -290,6 +290,10 @@ static op_func op_funcs[] = {
         &promise_await,
         &promise_data,
 
+        &lock_alloc,
+        &lock_acquire,
+        &lock_release,
+
         &debug_reg,
         &halt,
 

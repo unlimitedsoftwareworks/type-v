@@ -51,7 +51,7 @@ typedef struct TypeV_Promise {
 
 typedef struct TypeV_Lock {
     uint8_t locked;         ///< locked flag
-    uint32_t owner;         ///< owner ID
+    uint32_t holder;         ///< holder ID
     uint32_t id;            ///< lock ID
     size_t value;           ///< Lock value
     TypeV_Promise *promise; ///< Promise that the lock is awaiting, NULL if none
@@ -366,7 +366,7 @@ void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal);
  * @param core
  * @return
  */
-TypeV_Lock* core_lock_alloc(TypeV_Core* core);
+TypeV_Lock* core_lock_alloc(TypeV_Core* core, size_t value);
 
 /**
  * Acquires a lock

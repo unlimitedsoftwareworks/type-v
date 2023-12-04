@@ -644,20 +644,21 @@ typedef enum TypeV_OpCode {
      * OP_LOCK_ALLOC dest: Rm, data: Rm
      * Allocates a new lock, containing data, stores its address in dest
      */
-    //OP_LOCK_ALLOC,
+    OP_LOCK_ALLOC,
 
     /**
-     * OP_LOCK_ACQUIRE lock: Rm
+     * OP_LOCK_ACQUIRE lock: Rm, data: R,
      * Acquires the given lock. Will block if the lock is already acquired.
-     * i.e waiting for lock promise to resolve
+     * i.e waiting for lock promise to resolve. Stores the lock data in
+     * the given argument
      */
-    //OP_LOCK_ACQUIRE,
+    OP_LOCK_ACQUIRE,
 
     /**
      * OP_LOCK_RELEASE lock: Rm
      * Releases the given lock.
      */
-    //OP_LOCK_RELEASE,
+    OP_LOCK_RELEASE,
 
 
     OP_DEBUG_REG,

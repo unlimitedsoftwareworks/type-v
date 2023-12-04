@@ -1398,20 +1398,24 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 break;
             }
 
+            case OP_LOCK_RELEASE:
             case OP_PROMISE_AWAIT: {
                 TypeV_ASM_Reg targetReg = getRegister(parser);
-                create_instruction(parser, OP_PROMISE_AWAIT, targetReg, 0, 0, 1);
+                create_instruction(parser, idx, targetReg, 0, 0, 1);
                 parser->codePoolSize+= 1;
                 break;
             }
 
-            case OP_PROMISE_DATA: {
+            case OP_PROMISE_DATA:
+            case OP_LOCK_ALLOC:
+            case OP_LOCK_ACQUIRE:{
                 TypeV_ASM_Reg targetReg = getRegister(parser);
                 TypeV_ASM_Reg dataReg = getRegister(parser);
-                create_instruction(parser, OP_PROMISE_DATA, targetReg, dataReg, 0, 2);
+                create_instruction(parser, idx, targetReg, dataReg, 0, 2);
                 parser->codePoolSize+= 2;
                 break;
             }
+
 
             case OP_DEBUG_REG: {
                 TypeV_ASM_Reg reg = getRegister(parser);

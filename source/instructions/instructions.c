@@ -1633,6 +1633,46 @@ void promise_data(TypeV_Core* core){
     core->registers.regs[dest].ptr = (size_t)(promise->value);
 }
 
+void lock_alloc(TypeV_Core* core){
+    LOG_INFO("Core[%d] allocating lock", core->id);
+    uint8_t destReg = core->program.bytecode[core->registers.ip++];
+    uint8_t dataReg = core->program.bytecode[core->registers.ip++];
+    ASSERT(destReg < MAX_REG, "Invalid register index");
+    ASSERT(dataReg < MAX_REG, "Invalid register index");
+    core->registers.regs[destReg].ptr = (size_t) core_lock_alloc(core, core->registers.regs[dataReg].ptr);
+}
+
+void lock_acquire(TypeV_Core* core){
+    uint8_t lockReg = core->program.bytecode[core->registers.ip++];
+    uint8_t dataReg = core->program.bytecode[core->registers.ip++];
+    ASSERT(lockReg < MAX_REG, "Invalid register index");
+    ASSERT(dataReg < MAX_REG, "Invalid register index");
+    TypeV_Lock* lock = (TypeV_Lock*)core->registers.regs[lockReg].ptr;
+    LOG_INFO("Core[%d] attempting to acquire lock %d, isLocked %d:", core->id, lock->id, lock->locked);
+
+    if(lock->locked){
+        LOG_INFO("Core[%d] waiting for lock, moving IP backwards to the lock_acquire, to be ready to acquire lock later.", core->id);
+        // go back to the main instruction to await the lock
+        core->registers.ip -= 3;
+        core_lock_acquire(core, lock);
+    }
+    else {
+        core_lock_acquire(core, lock);
+        core->registers.regs[dataReg].ptr = lock->value;
+    }
+}
+
+void lock_release(TypeV_Core* core){
+    uint8_t lockReg = core->program.bytecode[core->registers.ip++];
+    ASSERT(lockReg < MAX_REG, "Invalid register index");
+    TypeV_Lock* lock = (TypeV_Lock*)core->registers.regs[lockReg].ptr;
+    LOG_INFO("Core[%d] Releasing lock %d", core->id, lock->id);
+
+    core_lock_release(core, lock);
+}
+
+
+
 void debug_reg(TypeV_Core* core){
     // read register index
     uint8_t i = core->program.bytecode[core->registers.ip++];

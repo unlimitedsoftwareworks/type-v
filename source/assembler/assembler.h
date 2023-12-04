@@ -143,11 +143,13 @@ static char* instructions[] = {
 
         "promise_alloc", "promise_resolve", "promise_await", "promise_data",
 
+        "lock_alloc", "lock_acquire", "lock_release",
+
         "debug_reg",
         "halt",
         "vm_health"
 };
-#define MAX_INSTRUCTION 237
+#define MAX_INSTRUCTION 240
 
 typedef enum TokenType {
     TOK_INSTRUCTION=0,

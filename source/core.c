@@ -264,7 +264,7 @@ void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal) {
 
 
 TypeV_Promise* core_promise_alloc(TypeV_Core* core) {
-    static size_t promiseId = 999;
+    static size_t promiseId = 0;
     TypeV_Promise* promise = calloc(1, sizeof(TypeV_Promise));
     promise->resolved = 0;
     promise->value = 0;
@@ -290,3 +290,37 @@ void core_promise_check_resume(TypeV_Core* core) {
         core->state = CS_RUNNING;
     }
 }
+
+
+TypeV_Lock* core_lock_alloc(TypeV_Core* core, size_t value){
+    TypeV_Lock* lock = calloc(1, sizeof(TypeV_Lock));
+    lock->locked = 0;
+    lock->holder = 0;
+    lock->value = value;
+    lock->promise = core_promise_alloc(core);
+    return lock;
+}
+
+void core_lock_acquire(TypeV_Core* core, TypeV_Lock* lock) {
+    //ASSERT(lock->locked == 0, "Lock %p is already locked", lock->id);
+    if(lock->locked == 1) {
+        LOG_INFO("CORE[%d]: Lock %p is already locked, awaiting", core->id, lock->id);
+        core_promise_await(core, lock->promise);
+        return;
+    }
+    lock->locked = 1;
+    lock->holder = core->id;
+    // set promise
+    lock->promise = core_promise_alloc(core);
+}
+
+void core_lock_release(TypeV_Core* core, TypeV_Lock* lock) {
+    ASSERT(lock->holder == core->id, "Lock %p is not held by core %d", lock->id, core->id);
+    lock->locked = 0;
+    lock->holder = 0;
+    // reset promise
+    // TODO: request GC cleanup?
+    core_promise_resolve(core, lock->promise, lock->value);
+    lock->promise = NULL;
+}
+

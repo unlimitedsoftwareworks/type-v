@@ -289,6 +289,10 @@ VM_INSTRUCTION(promise_resolve)
 VM_INSTRUCTION(promise_await)
 VM_INSTRUCTION(promise_data)
 
+VM_INSTRUCTION(lock_alloc)
+VM_INSTRUCTION(lock_acquire)
+VM_INSTRUCTION(lock_release)
+
 VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)
 

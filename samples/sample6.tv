@@ -1,0 +1,32 @@
+VERSION: 1
+
+CONST:
+
+GLOBAL:
+    x: u64 = 0
+CODE:
+    p_queue_size r0
+    debug_reg r0
+
+    ; spawn
+    p_alloc r1 proc1
+    mv_reg_i r12 10
+
+    p_emit r1 r2 r3          ; emit to r2, msg r3, promise stored in r3
+    promise_await r3         ; await r3 promise, store result in r4
+    promise_data r4 r3
+    debug_reg r4
+    p_send_sig r1 1
+    halt
+
+
+proc1:
+    p_wait_queue
+    p_dequeue r14 r1
+    mv_reg_i r15 1
+    add_u32 r14 r15 r14
+
+    promise_resolve r1 r15
+    debug_reg r14
+    j proc1
+
