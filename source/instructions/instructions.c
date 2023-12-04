@@ -1533,7 +1533,7 @@ void p_send_sig(TypeV_Core * core){
     uint8_t sig = core->program.bytecode[core->registers.ip++];
 
     ASSERT(targetProcessReg < MAX_REG, "Invalid register index");
-    ASSERT(sig < CSIG_KILL, "Invalid signal value");
+    ASSERT(sig <= CSIG_KILL, "Invalid signal value");
 
     TypeV_Core* target = (TypeV_Core*)core->registers.regs[targetProcessReg].ptr;
 
