@@ -287,6 +287,7 @@ VM_INSTRUCTION(p_state)
 VM_INSTRUCTION(promise_alloc)
 VM_INSTRUCTION(promise_resolve)
 VM_INSTRUCTION(promise_await)
+VM_INSTRUCTION(promise_data)
 
 VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)

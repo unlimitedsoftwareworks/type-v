@@ -288,6 +288,7 @@ static op_func op_funcs[] = {
         &promise_alloc,
         &promise_resolve,
         &promise_await,
+        &promise_data,
 
         &debug_reg,
         &halt,

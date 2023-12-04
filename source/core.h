@@ -50,9 +50,11 @@ typedef struct TypeV_Promise {
 }TypeV_Promise;
 
 typedef struct TypeV_Lock {
-    uint8_t locked;        ///< locked flag
-    uint32_t owner;        ///< owner ID
-    void* value;           ///< Lock value
+    uint8_t locked;         ///< locked flag
+    uint32_t owner;         ///< owner ID
+    uint32_t id;            ///< lock ID
+    size_t value;           ///< Lock value
+    TypeV_Promise *promise; ///< Promise that the lock is awaiting, NULL if none
 }TypeV_Lock;
 
 
@@ -357,7 +359,29 @@ void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message);
  * @param core
  * @param signal
  */
-void core_recieve_signal(TypeV_Core* core, TypeV_CoreSignal signal);
+void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal);
+
+/**
+ * Allocates a new lock
+ * @param core
+ * @return
+ */
+TypeV_Lock* core_lock_alloc(TypeV_Core* core);
+
+/**
+ * Acquires a lock
+ * @param core
+ * @param lock
+ */
+void core_lock_acquire(TypeV_Core* core, TypeV_Lock* lock);
+
+/**
+ * Releases a lock
+ * @param core
+ * @param lock
+ */
+void core_lock_release(TypeV_Core* core, TypeV_Lock* lock);
+
 
 /**
  * Allocates new core

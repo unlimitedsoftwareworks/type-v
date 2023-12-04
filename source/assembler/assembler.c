@@ -1325,8 +1325,9 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
 
             case OP_P_DEQUEUE: {
                 TypeV_ASM_Reg dest = getRegister(parser);
-                create_instruction(parser, OP_P_DEQUEUE, dest, 0, 0, 1);
-                parser->codePoolSize++;
+                TypeV_ASM_Reg promiseDest = getRegister(parser);
+                create_instruction(parser, OP_P_DEQUEUE, dest, promiseDest, 0, 2);
+                parser->codePoolSize+= 2;
                 break;
             }
 
@@ -1340,8 +1341,9 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
             case OP_P_EMIT: {
                 TypeV_ASM_Reg targetReg = getRegister(parser);
                 TypeV_ASM_Reg dataReg = getRegister(parser);
-                create_instruction(parser, OP_P_EMIT, targetReg, dataReg, 0, 2);
-                parser->codePoolSize+= 2;
+                TypeV_ASM_Reg promiseReg = getRegister(parser);
+                create_instruction(parser, OP_P_EMIT, targetReg, dataReg, promiseReg, 3);
+                parser->codePoolSize+= 3;
                 break;
             }
 
@@ -1400,6 +1402,14 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 TypeV_ASM_Reg targetReg = getRegister(parser);
                 create_instruction(parser, OP_PROMISE_AWAIT, targetReg, 0, 0, 1);
                 parser->codePoolSize+= 1;
+                break;
+            }
+
+            case OP_PROMISE_DATA: {
+                TypeV_ASM_Reg targetReg = getRegister(parser);
+                TypeV_ASM_Reg dataReg = getRegister(parser);
+                create_instruction(parser, OP_PROMISE_DATA, targetReg, dataReg, 0, 2);
+                parser->codePoolSize+= 2;
                 break;
             }
 

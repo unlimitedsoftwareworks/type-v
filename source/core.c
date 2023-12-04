@@ -251,7 +251,7 @@ void core_queue_resolve(TypeV_Core* core) {
     core->state = CS_RUNNING;
 }
 
-void core_recieve_signal(TypeV_Core* core, TypeV_CoreSignal signal) {
+void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal) {
     LOG_WARN("CORE[%d]: Received signal %s", core->id, signal == CSIG_KILL ? "KILL" : (signal == CSIG_TERMINATE ? "TERMINATE" : "NONE"));
     if(signal == CSIG_NONE) {return;}
     if(signal == CSIG_KILL) {

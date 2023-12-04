@@ -558,8 +558,10 @@ typedef enum TypeV_OpCode {
     //OP_P_SPAWN,
 
     /**
-     * OP_P_DEQUEUE dest: R
-     * gets a message from the current process message queue
+     * OP_P_DEQUEUE dest: R, promise: Rm
+     * gets a message from the current process message queue,
+     * stores the message in dest and the address of the promise
+     * in the given register
      */
     OP_P_DEQUEUE,
 
@@ -627,21 +629,35 @@ typedef enum TypeV_OpCode {
 
     /**
      * OP_PROMISE_AWAIT promise: Rm
-     * Awaits the given promise.
+     * Awaits the given promise
      */
     OP_PROMISE_AWAIT,
 
-
-    /*
-    OP_PROMISE_ALLOC,
-    OP_PROMISE_RESOLVE,
-    OP_PROMISE_REJECT,
-    OP_PROMISE_AWAIT,
-
-    OP_LOCK_ALLOC,
-    OP_LOCK_ACQUIRE,
-    OP_LOCK_RELEASE,
+    /**
+     * OP_PROMISE_DATA dest: R, promise: Rm,
+     * Returns promise data into dest reg R of promise Pm
+     * Promise must have been resolved, otherwise fails
      */
+    OP_PROMISE_DATA,
+
+    /**
+     * OP_LOCK_ALLOC dest: Rm, data: Rm
+     * Allocates a new lock, containing data, stores its address in dest
+     */
+    //OP_LOCK_ALLOC,
+
+    /**
+     * OP_LOCK_ACQUIRE lock: Rm
+     * Acquires the given lock. Will block if the lock is already acquired.
+     * i.e waiting for lock promise to resolve
+     */
+    //OP_LOCK_ACQUIRE,
+
+    /**
+     * OP_LOCK_RELEASE lock: Rm
+     * Releases the given lock.
+     */
+    //OP_LOCK_RELEASE,
 
 
     OP_DEBUG_REG,

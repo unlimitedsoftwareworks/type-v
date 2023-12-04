@@ -11,14 +11,16 @@
 
 #include <stdint.h>
 
+
 #define MAX_QUEUE_LENGTH 100
 
 /**
  * @brief Message structure
  */
 typedef struct TypeV_IOMessage {
-    uint32_t sender; ///< Sender ID
-    void* message;   ///< Message Data Pointer
+    uint32_t sender;        ///< Sender ID
+    void* message;          ///< Message Data Pointer
+    struct TypeV_Promise* promise; ///< Promise Pointer
 } TypeV_IOMessage;
 
 /**

@@ -38,7 +38,8 @@ void mv_reg_i(TypeV_Core* core){
 
 #define mv_reg_const(bits, size) \
 void mv_reg_const_##bits(TypeV_Core* core){\
-    const uint8_t target = core->program.bytecode[core->registers.ip++];\
+    const uint8_t target = core->program.bytecode[core->registers.ip++]; \
+    ASSERT(target < MAX_REG, "Invalid register index");\
     const uint8_t offset_length = core->program.bytecode[core->registers.ip++];\
     size_t constant_offset = 0; /* we do not increment offset here*/\
     memcpy(&constant_offset, &core->program.bytecode[core->registers.ip],  offset_length);\
@@ -48,6 +49,7 @@ void mv_reg_const_##bits(TypeV_Core* core){\
 
 void mv_reg_const_8(TypeV_Core* core){
     const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
     const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
     size_t constant_offset = 0; /* we do not increment offset here*/
     memcpy(&constant_offset, &core->program.bytecode[core->registers.ip],  offset_length);
@@ -57,7 +59,18 @@ void mv_reg_const_8(TypeV_Core* core){
 
 //mv_reg_const(8, 1)
 mv_reg_const(16, 2)
-mv_reg_const(32, 4)
+//mv_reg_const(32, 4)
+
+void mv_reg_const_32(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t constant_offset = 0; /* we do not increment offset here*/
+    memcpy(&constant_offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    memcpy(&core->registers.regs[target], &core->constantPool.pool[constant_offset], 4);
+}
+
 mv_reg_const(64, 8)
 mv_reg_const(ptr, PTR_SIZE)
 #undef mv_reg_const
@@ -1487,6 +1500,10 @@ void p_alloc(TypeV_Core* core){
 void p_dequeue(TypeV_Core* core){
     LOG_INFO("Core[%d] dequeueing 1/%d", core->id, core->messageInputQueue.length);
     uint8_t dest = core->program.bytecode[core->registers.ip++];
+    uint8_t promiseDest = core->program.bytecode[core->registers.ip++];
+    ASSERT(dest < MAX_REG, "Invalid register index");
+    ASSERT(promiseDest < MAX_REG, "Invalid register index");
+
     // get the next queue element from core queue
     // check queue length
     if(core->messageInputQueue.length == 0) {
@@ -1495,14 +1512,17 @@ void p_dequeue(TypeV_Core* core){
     }
     TypeV_IOMessage* msg = queue_dequeue(&core->messageInputQueue);
     core->registers.regs[dest].ptr = (size_t)msg->message;
+    core->registers.regs[promiseDest].ptr = (size_t)msg->promise;
 }
 
 void p_emit(TypeV_Core* core){
     uint8_t targetProcessReg = core->program.bytecode[core->registers.ip++];
     uint8_t dataReg = core->program.bytecode[core->registers.ip++];
+    uint8_t promiseReg = core->program.bytecode[core->registers.ip++];
 
     ASSERT(targetProcessReg < MAX_REG, "Invalid register index");
     ASSERT(dataReg < MAX_REG, "Invalid register index");
+    ASSERT(promiseReg < MAX_REG, "Invalid register index");
 
     size_t data_ptr = core->registers.regs[dataReg].ptr;
     TypeV_Core* target = (TypeV_Core*)core->registers.regs[targetProcessReg].ptr;
@@ -1512,8 +1532,12 @@ void p_emit(TypeV_Core* core){
     TypeV_IOMessage* msg = malloc(sizeof(TypeV_IOMessage));
     msg->sender = core->id;
     msg->message = (void*)data_ptr;
+    msg->promise = core_promise_alloc(core);
+    core->registers.regs[promiseReg].ptr = (size_t)msg->promise;
 
     core_enqueue_message(target, msg);
+
+    core->registers.regs[promiseReg].ptr = (size_t)msg->promise;
 }
 
 void p_wait_queue(TypeV_Core* core){
@@ -1539,7 +1563,7 @@ void p_send_sig(TypeV_Core * core){
 
     LOG_INFO("Core[%d] sending signal %d to Core[%d]", core->id, sig, target->id);
 
-    core_recieve_signal(target, sig);
+    core_receive_signal(target, sig);
 }
 
 void p_id(TypeV_Core* core){
@@ -1596,6 +1620,17 @@ void promise_await(TypeV_Core* core){
     TypeV_Promise* promise = (TypeV_Promise*)core->registers.regs[promiseReg].ptr;
 
     core_promise_await(core, promise);
+}
+
+void promise_data(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    uint8_t promiseReg = core->program.bytecode[core->registers.ip++];
+    ASSERT(dest < MAX_REG, "Invalid register index");
+    ASSERT(promiseReg < MAX_REG, "Invalid register index");
+
+    TypeV_Promise* promise = (TypeV_Promise*)core->registers.regs[promiseReg].ptr;
+
+    core->registers.regs[dest].ptr = (size_t)(promise->value);
 }
 
 void debug_reg(TypeV_Core* core){
