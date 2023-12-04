@@ -57,6 +57,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
 
     core->engineRef = engineRef;
     core->lastSignal = CSIG_NONE;
+    core->awaitingPromise = NULL;
 }
 
 void core_setup(TypeV_Core *core, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit){
@@ -258,5 +259,34 @@ void core_recieve_signal(TypeV_Core* core, TypeV_CoreSignal signal) {
     }
     if(signal == CSIG_TERMINATE){
         core->lastSignal = CSIG_TERMINATE;
+    }
+}
+
+
+TypeV_Promise* core_promise_alloc(TypeV_Core* core) {
+    static size_t promiseId = 999;
+    TypeV_Promise* promise = calloc(1, sizeof(TypeV_Promise));
+    promise->resolved = 0;
+    promise->value = 0;
+    promise->id  = promiseId++;
+    return promise;
+}
+
+void core_promise_resolve(TypeV_Core* core, TypeV_Promise* promise, size_t value) {
+    LOG_INFO("CORE[%d]: Resolving promise", core->id);
+    promise->resolved = 1;
+    promise->value = value;
+}
+
+void core_promise_await(TypeV_Core* core, TypeV_Promise* promise) {
+    LOG_INFO("CORE[%d]: Awaiting promise %d", core->id, promise->id);
+    core->state = CS_AWAITING_PROMISE;
+    core->awaitingPromise = promise;
+}
+
+void core_promise_check_resume(TypeV_Core* core) {
+    if(core->state == CS_AWAITING_PROMISE && core->awaitingPromise->resolved) {
+        LOG_INFO("CORE[%d]: Resuming from promise %d", core->id, core->awaitingPromise->id);
+        core->state = CS_RUNNING;
     }
 }

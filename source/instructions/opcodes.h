@@ -569,9 +569,10 @@ typedef enum TypeV_OpCode {
     OP_P_QUEUE_SIZE,
 
     /**
-     * OP_P_EMIT targetProcess: Rm, data: Rm
+     * OP_P_EMIT targetProcess: Rm, data: Rm, Promise: Rm
      * Emits data from the current process to the target
-     * process message queue
+     * process message queue. Rm stores the address of the
+     * allocated promise
      */
     OP_P_EMIT,
 
@@ -612,6 +613,23 @@ typedef enum TypeV_OpCode {
     OP_P_STATE,
 
 
+    /**
+     * OP_PROMISE_ALLOC dest: Rm
+     * Allocates a new promise, stores its address in dest
+     */
+    OP_PROMISE_ALLOC,
+
+    /**
+     * OP_PROMISE_RESOLVE promise: Rm, payload: Rm
+     * Resolves the given promise with the given payload
+     */
+    OP_PROMISE_RESOLVE,
+
+    /**
+     * OP_PROMISE_AWAIT promise: Rm
+     * Awaits the given promise.
+     */
+    OP_PROMISE_AWAIT,
 
 
     /*

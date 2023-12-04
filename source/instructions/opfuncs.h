@@ -285,6 +285,10 @@ static op_func op_funcs[] = {
         &p_cid,
         &p_state,
 
+        &promise_alloc,
+        &promise_resolve,
+        &promise_await,
+
         &debug_reg,
         &halt,
 

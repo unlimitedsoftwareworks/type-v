@@ -39,29 +39,18 @@ void engine_run(TypeV_Engine *engine) {
             engine->interruptNextLoop = 0;
         }
 
-        if(engine->coreCount == 1) {
-            if(engine->coreIterator->core->lastSignal == CSIG_KILL) {
+        TypeV_CoreIterator* iter = engine->coreIterator;
+        while(iter != NULL){
+            iter->currentInstructions = 0;
+            if(iter->core->lastSignal == CSIG_KILL) {
                 // kill the core
-                LOG_INFO("Core[%d] killed", engine->coreIterator->core->id);
-                engine_detach_core(engine, engine->coreIterator->core);
+                LOG_INFO("Core[%d] killed", iter->core->id);
+                engine_detach_core(engine, iter->core);
+                iter = iter->next;
                 continue;
             }
-            engine_run_core(engine, engine->coreIterator);
-        }
-        else {
-            TypeV_CoreIterator* iter = engine->coreIterator;
-            while(iter != NULL){
-                iter->currentInstructions = 0;
-                if(iter->core->lastSignal == CSIG_KILL) {
-                    // kill the core
-                    LOG_INFO("Core[%d] killed", iter->core->id);
-                    engine_detach_core(engine, iter->core);
-                    iter = iter->next;
-                    continue;
-                }
-                engine_run_core(engine, iter);
-                iter = iter->next;
-            }
+            engine_run_core(engine, iter);
+            iter = iter->next;
         }
 
         if(engine->coreCount == 0) {
@@ -81,6 +70,13 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         LOG_INFO("Core[%d] Gracefully terminated", iter->core->id);
         engine_detach_core(engine, core);
         return;
+    }
+
+    if(core->state == CS_AWAITING_PROMISE) {
+        core_promise_check_resume(core);
+        if(core->state == CS_AWAITING_PROMISE) {
+            LOG_WARN("Core[%d] is awaiting promise %d, skipping run", iter->core->id, core->awaitingPromise->id);
+        }
     }
 
     while((core->state == CS_RUNNING) && (iter->currentInstructions != iter->maxInstructions) && !engine->interruptNextLoop){

@@ -1570,6 +1570,34 @@ void p_state(TypeV_Core* core){
     core->registers.regs[dest].u8 = c->state;
 }
 
+void promise_alloc(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    ASSERT(dest < MAX_REG, "Invalid register index");
+    core->registers.regs[dest].ptr = (size_t) core_promise_alloc(core);
+}
+
+void promise_resolve(TypeV_Core* core){
+    uint8_t promiseReg = core->program.bytecode[core->registers.ip++];
+    uint8_t dataReg = core->program.bytecode[core->registers.ip++];
+    ASSERT(promiseReg < MAX_REG, "Invalid register index");
+    ASSERT(dataReg < MAX_REG, "Invalid register index");
+
+    TypeV_Promise* promise = (TypeV_Promise*)core->registers.regs[promiseReg].ptr;
+    size_t data = core->registers.regs[dataReg].ptr;
+
+    core_promise_resolve(core, promise, data);
+}
+
+void promise_await(TypeV_Core* core){
+    //LOG_INFO("Core[%d] awaiting promise", core->id);
+    uint8_t promiseReg = core->program.bytecode[core->registers.ip++];
+    ASSERT(promiseReg < MAX_REG, "Invalid register index");
+
+    TypeV_Promise* promise = (TypeV_Promise*)core->registers.regs[promiseReg].ptr;
+
+    core_promise_await(core, promise);
+}
+
 void debug_reg(TypeV_Core* core){
     // read register index
     uint8_t i = core->program.bytecode[core->registers.ip++];

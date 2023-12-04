@@ -10,20 +10,25 @@ CODE:
 
     ; spawn
     p_alloc r1 proc1
-    p_alloc r2 proc1
     mv_reg_i r15 10
-    p_emit r1 r15
-    p_emit r2 r15
-    p_send_sig r1 2   ; KILL signal
-    p_send_sig r2 1   ; TERMINATE signal
+    promise_alloc r2
+    p_emit r1 r2
+    promise_await r2
+    p_send_sig r1 1
     halt
 
 
 proc1:
     p_wait_queue
     p_dequeue r14
-    p_cid r1
-    add_u32 r1 r14 r1
-    debug_reg r1
+    mv_reg_i r15 0
+    add_u32 r1 r1 r1
+    add_u32 r1 r1 r1
+    add_u32 r1 r1 r1
+    add_u32 r1 r1 r1
+    add_u32 r1 r1 r1
+
+    promise_resolve r14 r15
+    debug_reg r14
     j proc1
 

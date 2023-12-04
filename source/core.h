@@ -44,9 +44,9 @@ typedef struct TypeV_Array {
 }TypeV_Array;
 
 typedef struct TypeV_Promise {
-    uint8_t resolved;      ///< resolved flag
-    uint8_t isFulfilled;   ///< Fulfilled flag
-    void* value;           ///< Promise value
+    uint8_t resolved;       ///< resolved flag
+    size_t value;           ///< Promise value
+    uint32_t id;            ///< Promise ID, for debugging
 }TypeV_Promise;
 
 typedef struct TypeV_Lock {
@@ -198,7 +198,8 @@ typedef struct TypeV_Core {
     TypeV_GC memTracker;                      ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
-    TypeV_CoreSignal lastSignal;                               ///< Last signal received
+    TypeV_CoreSignal lastSignal;              ///< Last signal received
+    TypeV_Promise* awaitingPromise;           ///< Promise that the core is awaiting, NULL if none
 }TypeV_Core;
 
 /**
@@ -357,6 +358,35 @@ void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message);
  * @param signal
  */
 void core_recieve_signal(TypeV_Core* core, TypeV_CoreSignal signal);
+
+/**
+ * Allocates new core
+ * @param core
+ * @return
+ */
+TypeV_Promise* core_promise_alloc(TypeV_Core* core);
+
+/**
+ * Resolves a promise
+ * @param core
+ * @param promise
+ * @param value
+ */
+void core_promise_resolve(TypeV_Core* core, TypeV_Promise* promise, size_t value);
+
+/**
+ * Halts the core to await a promise
+ * @param core
+ * @param promise
+ */
+void core_promise_await(TypeV_Core* core, TypeV_Promise* promise);
+
+/**
+ * Checks if the core's waiting promise has been resolved
+ * and can be resumed
+ * @param core
+ */
+void core_promise_check_resume(TypeV_Core* core);
 
 
 typedef void (*TypeV_FFIFunc)(TypeV_Core* core);
