@@ -77,16 +77,22 @@ typedef union {
 /**
  * State
  */
-typedef enum TypeV_CoreState {
-    CS_INITIALIZED = 0, ///< Initialized state
-    CS_HALTED = 1,      ///< Halted as the VM is running another core, or process
-    CS_AWAITING_QUEUE,
-    CS_AWAITING_PROMISE,
-    CS_RUNNING  ,        ///< Process is Running
-    CS_FINISHING    ,   ///< Process has received terminate signal and is no longer accepting messages
-    CS_TERMINATED    ,  ///< Process has been gracefully terminated
-    CS_KILLED           ///< Process has been killed
+typedef enum {
+    CS_INITIALIZED = 0,   ///< Initialized state
+    CS_HALTED = 1,        ///< Halted as the VM is running another core, or process
+    CS_AWAITING_QUEUE,    ///< Process is awaiting for a queue
+    CS_AWAITING_PROMISE,  ///< Process is awaiting for a promise
+    CS_RUNNING,           ///< Process is Running
+    CS_FINISHING,         ///< Process has received terminate signal and is no longer accepting messages
+    CS_TERMINATED,        ///< Process has been gracefully terminated
+    CS_KILLED             ///< Process has been killed
 }TypeV_CoreState;
+
+typedef enum {
+    CSIG_NONE = 0,      ///< No signal
+    CSIG_TERMINATE = 1, ///< Terminate signal
+    CSIG_KILL = 2       ///< Kill signal
+}TypeV_CoreSignal;
 
 /**
  * @brief TypeV Program bytecode
@@ -191,7 +197,8 @@ typedef struct TypeV_Core {
     TypeV_Program program;                    ///< Program
     TypeV_GC memTracker;                      ///< Future Garbage collector
 
-    struct TypeV_Engine* engineRef;          ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
+    struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
+    TypeV_CoreSignal lastSignal;                               ///< Last signal received
 }TypeV_Core;
 
 /**
@@ -229,6 +236,17 @@ void core_resume(TypeV_Core *core);
  */
 void core_halt(TypeV_Core *core);
 
+/**
+ * Sets core to await for a queue
+ * @param core
+ */
+void core_queue_await(TypeV_Core* core);
+
+/**
+ * Awakes process
+ * @param core
+ */
+void core_queue_resolve(TypeV_Core* core);
 
 
 /**
@@ -334,16 +352,11 @@ void core_process_alloc(TypeV_Core* core, uint64_t ip);
 void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message);
 
 /**
- * Sets core to await for a queue
+ * Handles the reception of a signal
  * @param core
+ * @param signal
  */
-void core_queue_await(TypeV_Core* core);
-
-/**
- * Awakes process
- * @param core
- */
-void core_queue_resolve(TypeV_Core* core);
+void core_recieve_signal(TypeV_Core* core, TypeV_CoreSignal signal);
 
 
 typedef void (*TypeV_FFIFunc)(TypeV_Core* core);

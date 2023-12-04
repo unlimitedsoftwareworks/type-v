@@ -40,12 +40,25 @@ void engine_run(TypeV_Engine *engine) {
         }
 
         if(engine->coreCount == 1) {
+            if(engine->coreIterator->core->lastSignal == CSIG_KILL) {
+                // kill the core
+                LOG_INFO("Core[%d] killed", engine->coreIterator->core->id);
+                engine_detach_core(engine, engine->coreIterator->core);
+                continue;
+            }
             engine_run_core(engine, engine->coreIterator);
         }
         else {
             TypeV_CoreIterator* iter = engine->coreIterator;
             while(iter != NULL){
                 iter->currentInstructions = 0;
+                if(iter->core->lastSignal == CSIG_KILL) {
+                    // kill the core
+                    LOG_INFO("Core[%d] killed", iter->core->id);
+                    engine_detach_core(engine, iter->core);
+                    iter = iter->next;
+                    continue;
+                }
                 engine_run_core(engine, iter);
                 iter = iter->next;
             }
@@ -60,11 +73,25 @@ void engine_run(TypeV_Engine *engine) {
 void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
     uint8_t runInf = iter->maxInstructions == -1;
     TypeV_Core * core = iter->core;
+    if(core->state == CS_HALTED) {
+        core_resume(core);
+    }
+
+    if((core->state == CS_AWAITING_QUEUE) && (core->lastSignal == CSIG_TERMINATE)){
+        LOG_INFO("Core[%d] Gracefully terminated", iter->core->id);
+        engine_detach_core(engine, core);
+        return;
+    }
 
     while((core->state == CS_RUNNING) && (iter->currentInstructions != iter->maxInstructions) && !engine->interruptNextLoop){
         iter->currentInstructions += 1-runInf;
         TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
         op_funcs[opcode](core);
+    }
+
+    // set process to halted, if was gracefully done
+    if(core->state == CS_RUNNING && core->lastSignal == CSIG_NONE) {
+        core_halt(core);
     }
 }
 

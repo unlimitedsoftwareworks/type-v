@@ -1528,6 +1528,48 @@ void p_queue_size(TypeV_Core* core){
     core->registers.regs[dest].u64 = core->messageInputQueue.length;
 }
 
+void p_send_sig(TypeV_Core * core){
+    uint8_t targetProcessReg = core->program.bytecode[core->registers.ip++];
+    uint8_t sig = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(targetProcessReg < MAX_REG, "Invalid register index");
+    ASSERT(sig < CSIG_KILL, "Invalid signal value");
+
+    TypeV_Core* target = (TypeV_Core*)core->registers.regs[targetProcessReg].ptr;
+
+    LOG_INFO("Core[%d] sending signal %d to Core[%d]", core->id, sig, target->id);
+
+    core_recieve_signal(target, sig);
+}
+
+void p_id(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    uint8_t processReg = core->program.bytecode[core->registers.ip++];
+    ASSERT(dest < MAX_REG, "Invalid register index");
+    ASSERT(processReg < MAX_REG, "Invalid register index");
+
+    TypeV_Core* c = (TypeV_Core*)core->registers.regs[processReg].ptr;
+
+    core->registers.regs[dest].u32 = c->id;
+}
+
+void p_cid(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    ASSERT(dest < MAX_REG, "Invalid register index");
+    core->registers.regs[dest].u32 = core->id;
+}
+
+void p_state(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    uint8_t processReg = core->program.bytecode[core->registers.ip++];
+    ASSERT(dest < MAX_REG, "Invalid register index");
+    ASSERT(processReg < MAX_REG, "Invalid register index");
+
+    TypeV_Core* c = (TypeV_Core*)core->registers.regs[processReg].ptr;
+
+    core->registers.regs[dest].u8 = c->state;
+}
+
 void debug_reg(TypeV_Core* core){
     // read register index
     uint8_t i = core->program.bytecode[core->registers.ip++];
@@ -1536,7 +1578,7 @@ void debug_reg(TypeV_Core* core){
     struct table t;
     table_init(&t,
                "Core", "%d",
-               "R?", "R%d",
+               "Reg", "R%d",
                "i8", "%d",
                "u8", "%u",
                "i16", "%d",
@@ -1571,6 +1613,13 @@ void halt(TypeV_Core* core) {
     core->isRunning = 0;
     core->state = CS_TERMINATED;
     engine_detach_core(core->engineRef, core);
+}
+
+void vm_health(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    ASSERT(dest < MAX_REG, "Invalid register index");
+
+    core->registers.regs[dest].u8 = core->engineRef->health;
 }
 
 

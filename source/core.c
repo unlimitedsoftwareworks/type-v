@@ -56,6 +56,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->memTracker.memObjectCount = 0;
 
     core->engineRef = engineRef;
+    core->lastSignal = CSIG_NONE;
 }
 
 void core_setup(TypeV_Core *core, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit){
@@ -233,10 +234,29 @@ void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message) {
     core_queue_resolve(core);
 }
 
+void core_resume(TypeV_Core* core) {
+    core->state = CS_RUNNING;
+}
+
+void core_halt(TypeV_Core* core) {
+    core->state = CS_HALTED;
+}
+
 void core_queue_await(TypeV_Core* core) {
     core->state = CS_AWAITING_QUEUE;
 }
 
 void core_queue_resolve(TypeV_Core* core) {
     core->state = CS_RUNNING;
+}
+
+void core_recieve_signal(TypeV_Core* core, TypeV_CoreSignal signal) {
+    LOG_WARN("CORE[%d]: Received signal %s", core->id, signal == CSIG_KILL ? "KILL" : (signal == CSIG_TERMINATE ? "TERMINATE" : "NONE"));
+    if(signal == CSIG_NONE) {return;}
+    if(signal == CSIG_KILL) {
+        core->lastSignal = CSIG_KILL;
+    }
+    if(signal == CSIG_TERMINATE){
+        core->lastSignal = CSIG_TERMINATE;
+    }
 }

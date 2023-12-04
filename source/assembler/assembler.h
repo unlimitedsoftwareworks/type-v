@@ -139,12 +139,13 @@ static char* instructions[] = {
         "ld_ffi","call_ffi", "close_ffi",
 
         "p_alloc", "p_dequeue", "p_queue_size", "p_emit",
-        "p_wait_queue",
+        "p_wait_queue", "p_send_sig", "p_id", "p_cid", "p_state",
 
         "debug_reg",
-        "halt"
+        "halt",
+        "vm_health"
 };
-#define MAX_INSTRUCTION 228
+#define MAX_INSTRUCTION 233
 
 typedef enum TokenType {
     TOK_INSTRUCTION=0,

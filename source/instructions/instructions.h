@@ -279,8 +279,15 @@ VM_INSTRUCTION(p_dequeue)
 VM_INSTRUCTION(p_queue_size)
 VM_INSTRUCTION(p_emit)
 VM_INSTRUCTION(p_wait_queue)
+VM_INSTRUCTION(p_send_sig)
+VM_INSTRUCTION(p_id)
+VM_INSTRUCTION(p_cid)
+VM_INSTRUCTION(p_state)
+
 
 VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)
+
+VM_INSTRUCTION(vm_health)
 
 #endif //TYPE_V_INSTRUCTIONS_H

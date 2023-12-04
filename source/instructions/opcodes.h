@@ -584,25 +584,33 @@ typedef enum TypeV_OpCode {
 
 
     /**
-     * OP_P_RET
-     * Indicates that the current process has finished
-     * processing a message and ready to process the next
-     */
-    //OP_P_RELOOP,
-
-    /**
      * OP_P_SEND_SEG targetProcess: Rm, data: I (<255)
      * Sends a signal to the target process,
      * Signals include KILL, PAUSE, RESUME, etc.
      */
-    //OP_P_SEND_SIG,
+    OP_P_SEND_SIG,
 
     /**
      * OP_P_ID dest: R
      */
-    //OP_P_ID,
-    //OP_P_STATUS,
-    //OP_P_HEATH,
+    /**
+     * OP_P_ID dest: R, process: Pm
+     * Returns process id into dest reg R[u32] of process Pm
+     */
+    OP_P_ID,
+
+    /**
+     * Returns current process ID
+     * OP_P_CID dest: R
+     */
+    OP_P_CID,
+
+    /**
+     * OP_P_STATUS dest: R, process: Pm
+     * Returns process status into dest reg R[u8] of process Pm
+     */
+    OP_P_STATE,
+
 
 
 
@@ -620,6 +628,11 @@ typedef enum TypeV_OpCode {
 
     OP_DEBUG_REG,
     OP_HALT,
+    /**
+     * OP_VM_HEALTH dest: R
+     * Returns VM health into dest reg R[u8]
+     */
+    OP_VM_HEALTH,
 }TypeV_OpCode;
 
 #endif //TYPE_V_OPCODES_H

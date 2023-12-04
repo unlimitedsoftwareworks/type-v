@@ -1350,6 +1350,37 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 break;
             }
 
+            case OP_P_SEND_SIG: {
+                TypeV_ASM_Reg reg = getRegister(parser);
+                uint8_t sig = getShortNumber(parser);
+                create_instruction(parser, OP_P_SEND_SIG, reg, sig, 0, 2);
+                parser->codePoolSize+=2;
+                break;
+            }
+
+            case OP_P_ID: {
+                TypeV_ASM_Reg targetReg = getRegister(parser);
+                TypeV_ASM_Reg dataReg = getRegister(parser);
+                create_instruction(parser, OP_P_ID, targetReg, dataReg, 0, 2);
+                parser->codePoolSize+= 2;
+                break;
+            }
+
+            case OP_P_CID: {
+                TypeV_ASM_Reg targetReg = getRegister(parser);
+                create_instruction(parser, OP_P_CID, targetReg, 0, 0, 1);
+                parser->codePoolSize+= 1;
+                break;
+            }
+
+            case OP_P_STATE: {
+                TypeV_ASM_Reg targetReg = getRegister(parser);
+                TypeV_ASM_Reg dataReg = getRegister(parser);
+                create_instruction(parser, OP_P_STATE, targetReg, dataReg, 0, 2);
+                parser->codePoolSize+= 2;
+                break;
+            }
+
             case OP_DEBUG_REG: {
                 TypeV_ASM_Reg reg = getRegister(parser);
 
@@ -1360,6 +1391,14 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
             case OP_HALT: {
                 create_instruction(parser, OP_HALT, 0, 0, 0, 0);
 
+                break;
+            }
+
+            case OP_VM_HEALTH: {
+                TypeV_ASM_Reg reg = getRegister(parser);
+
+                create_instruction(parser, OP_VM_HEALTH, reg, 0, 0, 1);
+                parser->codePoolSize++;
                 break;
             }
         }

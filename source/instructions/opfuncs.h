@@ -280,9 +280,15 @@ static op_func op_funcs[] = {
         &p_queue_size,
         &p_emit,
         &p_wait_queue,
+        &p_send_sig,
+        &p_id,
+        &p_cid,
+        &p_state,
 
         &debug_reg,
         &halt,
+
+        &vm_health,
 };
 
 #endif //TYPE_V_OPFUNCS_H

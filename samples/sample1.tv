@@ -12,27 +12,18 @@ CODE:
     p_alloc r1 proc1
     p_alloc r2 proc1
     mv_reg_i r15 10
-    mv_reg_i r13 100
     p_emit r1 r15
-    p_emit r2 r13
-    p_emit r1 r15
-    p_emit r2 r13
-    p_emit r1 r15
-    p_emit r2 r13
-    p_emit r1 r15
-    p_emit r2 r13
-    p_emit r1 r15
-    p_emit r2 r13
-    p_emit r1 r15
-    p_emit r2 r13
-    p_emit r1 r15
-    p_emit r2 r13
+    p_emit r2 r15
+    p_send_sig r1 1
+    p_send_sig r2 1
     halt
 
 
 proc1:
     p_wait_queue
     p_dequeue r14
-    debug_reg r14
+    p_cid r1
+    add_u32 r1 r14 r1
+    debug_reg r1
     j proc1
 
