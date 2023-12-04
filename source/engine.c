@@ -1,5 +1,10 @@
+
+#include <time.h>
+#include <stdio.h>
+
 #include "engine.h"
 #include "core.h"
+#include "instructions/opfuncs.h"
 
 void engine_init(TypeV_Engine *engine) {
     // we will allocate memory for cores later
@@ -21,7 +26,26 @@ void engine_deallocate(TypeV_Engine *engine) {
 }
 
 void engine_run(TypeV_Engine *engine) {
-    core_vm(engine->cores);
+    engine_run_core(engine, engine->cores);
+}
+
+void engine_run_core(TypeV_Engine *engine, TypeV_Core* core) {
+    clock_t start, end;
+    double cpu_time_used;
+    long sum = 0;
+
+    start = clock();
+    core->isRunning = 1;
+    while(core->isRunning){
+        TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
+        op_funcs[opcode](core);
+    }
+    end = clock();
+
+    // Calculate the CPU time used in seconds
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+    printf("\nExecution time: %f seconds\n", cpu_time_used);
 }
 
 uint32_t engine_generateNewCoreID(TypeV_Engine *engine) {

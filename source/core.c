@@ -5,11 +5,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 
 #include "core.h"
 #include "queue/queue.h"
-#include "instructions/opfuncs.h"
 #include "utils/log.h"
 #include "stack/stack.h"
 #include "dynlib/dynlib.h"
@@ -54,6 +52,8 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->memTracker.structCount = 0;
     core->memTracker.arrays = NULL;
     core->memTracker.arrayCount = 0;
+    core->memTracker.memObjects = NULL;
+    core->memTracker.memObjectCount = 0;
 
     core->engineRef = engineRef;
 }
@@ -70,25 +70,6 @@ void core_setup(TypeV_Core *core, uint8_t* program, uint64_t programLength, uint
 
 }
 
-void core_vm(TypeV_Core *core) {
-    clock_t start, end;
-    double cpu_time_used;
-    long sum = 0;
-
-    start = clock();
-    core->isRunning = 1;
-    while(core->isRunning){
-        TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
-        op_funcs[opcode](core);
-    }
-    end = clock();
-
-    // Calculate the CPU time used in seconds
-    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-
-    printf("Sum: %ld\n", sum);
-    printf("Execution time: %f seconds\n", cpu_time_used);
-}
 
 void core_deallocate(TypeV_Core *core) {
     stack_free(core);
@@ -227,4 +208,15 @@ size_t core_ffi_load(TypeV_Core* core, size_t namePointer){
     ASSERT(openLib != NULL, "Failed to open library %s", ffi_find_dynlib(name));
     size_t (*openFunc)(TypeV_Core*) = openLib;
     return openFunc(core);
+}
+
+size_t core_mem_alloc(TypeV_Core* core, size_t size) {
+    LOG_INFO("Allocating %d bytes", size);
+    void* mem =  calloc(1, size);
+
+    // add mem to tracker
+    core->memTracker.memObjects = realloc(core->memTracker.memObjects, sizeof(size_t)*(core->memTracker.memObjectCount+1));
+    core->memTracker.memObjects[core->memTracker.memObjectCount++] = mem;
+
+    return (size_t)mem;
 }

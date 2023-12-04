@@ -1,0 +1,29 @@
+VERSION: 1
+
+CONST:
+    f: u8 = "stdio"
+    c: u8 = "printf"
+    c1: u8 = "hello, world!\n"
+    c2: u8 = 13
+
+GLOBAL:
+    x: ptr = 0
+CODE:
+    ; prepare ffi
+    ld_ffi r1 f
+    ;ffi_ld_fn r1 r0 c
+
+    ; push data
+    frame_precall
+
+    ; init args
+    ;frame_init_args 8
+    mv_reg_const_8 r0 c2
+    push r0 8
+
+    ; call
+    call_ffi r1 0
+
+    halt
+
+

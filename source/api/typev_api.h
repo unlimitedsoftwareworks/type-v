@@ -13,17 +13,19 @@
 #include <stdlib.h>
 #include "../core.h"
 
-extern size_t typev_api_register_lib(struct TypeV_Core* core, const TypeV_FFIFunc lib[]);
+size_t typev_api_register_lib(struct TypeV_Core* core, const TypeV_FFIFunc lib[]);
 
-extern uint64_t typev_api_stack_getSize(struct TypeV_Core* core);
-extern int8_t typev_api_stack_pop_i8(struct TypeV_Core* core);
-extern uint8_t typev_api_stack_pop_u8(struct TypeV_Core* core);
-extern int16_t typev_api_stack_pop_i16(struct TypeV_Core* core);
-extern uint16_t typev_api_stack_pop_u16(struct TypeV_Core* core);
-extern int32_t typev_api_stack_pop_i32(struct TypeV_Core* core);
-extern uint32_t typev_api_stack_pop_u32(struct TypeV_Core* core);
-extern int64_t typev_api_stack_pop_i64(struct TypeV_Core* core);
-extern uint64_t typev_api_stack_pop_u64(struct TypeV_Core* core);
+size_t typev_api_get_const_address(struct TypeV_Core* core, size_t vm_adr);
+
+uint64_t typev_api_stack_getSize(struct TypeV_Core* core);
+int8_t typev_api_stack_pop_i8(struct TypeV_Core* core);
+uint8_t typev_api_stack_pop_u8(struct TypeV_Core* core);
+int16_t typev_api_stack_pop_i16(struct TypeV_Core* core);
+uint16_t typev_api_stack_pop_u16(struct TypeV_Core* core);
+int32_t typev_api_stack_pop_i32(struct TypeV_Core* core);
+uint32_t typev_api_stack_pop_u32(struct TypeV_Core* core);
+int64_t typev_api_stack_pop_i64(struct TypeV_Core* core);
+uint64_t typev_api_stack_pop_u64(struct TypeV_Core* core);
 float typev_api_stack_pop_f32(struct TypeV_Core* core);
 double typev_api_stack_pop_f64(struct TypeV_Core* core);
 TypeV_Struct* typev_api_stack_pop_struct(struct TypeV_Core* core);

@@ -26,6 +26,10 @@ size_t typev_api_register_lib(TypeV_Core* core, const TypeV_FFIFunc methods[]) {
     return (size_t)ffi;
 }
 
+size_t typev_api_get_const_address(struct TypeV_Core* core, size_t vm_adr) {
+    return (size_t)core->constantPool.pool + vm_adr;
+}
+
 uint64_t typev_api_stack_getSize(TypeV_Core* core) {
     return core->registers.sp;
 }

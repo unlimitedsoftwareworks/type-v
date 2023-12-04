@@ -55,13 +55,7 @@ typedef struct TypeV_Lock {
     void* value;           ///< Lock value
 }TypeV_Lock;
 
-typedef void (*TypeV_FFIFunc)(struct TypeV_Core* core);
 
-typedef struct TypeV_FFI {
-    uint8_t isInitialized;   ///< Is the FFI initialized
-    TypeV_FFIFunc* functions;///< FFI functions
-    uint8_t functionCount;   ///< FFI function count
-}TypeV_FFI;
 
 /**
  * @brief TypeV_Register
@@ -175,6 +169,8 @@ typedef struct TypeV_GC {
     uint64_t structCount;
     TypeV_Array ** arrays;
     uint64_t arrayCount;
+    void** memObjects;
+    uint64_t memObjectCount;
 }TypeV_GC;
 
 /**
@@ -295,8 +291,24 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
  */
 size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements);
 
-
+/**
+ * Load a FFI library
+ * @param core
+ * @param namePointer
+ * @return
+ */
 size_t core_ffi_load(TypeV_Core* core, size_t namePointer);
+
+
+/**
+ * Allocates a memory object.
+ * All memory allocated here is considered heap
+ * and collectible by GC.
+ * @param core
+ * @param size
+ * @return
+ */
+size_t core_mem_alloc(TypeV_Core* core, size_t size);
 
 /**
  * Updates the flags of the core
@@ -305,5 +317,12 @@ size_t core_ffi_load(TypeV_Core* core, size_t namePointer);
  */
 void core_update_flags(TypeV_Core *core, uint64_t value);
 
+
+typedef void (*TypeV_FFIFunc)(TypeV_Core* core);
+typedef struct TypeV_FFI {
+    uint8_t isInitialized;   ///< Is the FFI initialized
+    TypeV_FFIFunc* functions;///< FFI functions
+    uint8_t functionCount;   ///< FFI function count
+}TypeV_FFI;
 
 #endif //TYPE_V_CORE_H

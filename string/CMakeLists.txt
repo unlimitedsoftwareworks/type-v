@@ -1,7 +1,7 @@
-project(stdio VERSION 1.0)
+project(string VERSION 1.0)
 
 
-set(stdio_files source/stdio.c)
+set(string_files source/string.c)
 
 set(typev_files
         ../source/core.c
@@ -14,10 +14,10 @@ set(typev_files
         )
 
 
-add_library(stdio SHARED ${stdio_files} ${typev_files})
+add_library(string SHARED ${string_files} ${typev_files})
 
-set_target_properties(stdio PROPERTIES
-    C_STANDARD 99
-    C_STANDARD_REQUIRED YES
-    C_EXTENSIONS NO
-)
+set_target_properties(string PROPERTIES
+        C_STANDARD 99
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO
+        )

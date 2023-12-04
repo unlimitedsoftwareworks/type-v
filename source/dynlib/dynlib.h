@@ -17,6 +17,12 @@ char* ffi_find_dynlib(const char* dynlib_name);
 TV_LibraryHandle ffi_dynlib_load(const char* path);
 void ffi_dynlib_unload(TV_LibraryHandle handle);
 void* ffi_dynlib_getsym(TV_LibraryHandle handle, const char* symbol_name);
-const char* ffi_dynlib_getext();
+
+
+#if defined(_WIN32) || defined(_WIN64)
+#define DYNLIB_EXPORT __declspec(dllexport)
+#else
+#define DYNLIB_EXPORT
+#endif
 
 #endif // DYNAMIC_LIBRARY_H

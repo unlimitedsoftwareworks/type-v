@@ -35,6 +35,7 @@ typedef struct TypeV_Engine {
 
 void engine_init(TypeV_Engine *engine);
 void engine_run(TypeV_Engine *engine);
+void engine_run_core(TypeV_Engine *engine, TypeV_Core* core);
 void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit);
 void engine_deallocate(TypeV_Engine *engine);
 uint32_t engine_generateNewCoreID(TypeV_Engine *engine);

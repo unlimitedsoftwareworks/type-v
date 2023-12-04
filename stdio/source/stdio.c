@@ -12,9 +12,8 @@
 
 void stdio_print(TypeV_Core *core) {
     size_t ptr = typev_api_stack_pop_u64(core);
-    char* base = core->constantPool.pool;
-    char* adr = (base + ptr);
-    printf("%s", adr);
+    char* p = (char*)typev_api_get_const_address(core, ptr);
+    printf("%s", p);
 }
 
 static TypeV_FFIFunc stdio_lib[] = {

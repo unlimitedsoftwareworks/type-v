@@ -1436,15 +1436,15 @@ void ld_ffi(TypeV_Core* core){
 
 void call_ffi(TypeV_Core* core){
     uint8_t reg = core->program.bytecode[core->registers.ip++];
-    uint8_t offset_length = core->program.bytecode[core->registers.ip++];
-    size_t offset = 0;
-    memcpy(&offset, &core->program.bytecode[core->registers.ip], offset_length);
+    uint8_t index_length = core->program.bytecode[core->registers.ip++];
+    size_t index = 0;
+    memcpy(&index, &core->program.bytecode[core->registers.ip], index_length);
 
-    core->registers.ip += offset_length;
+    core->registers.ip += index_length;
 
     TypeV_FFI * module = (TypeV_FFI *)core->registers.regs[reg].ptr;
 
-    TypeV_FFIFunc ffi_fn = module->functions[offset];
+    TypeV_FFIFunc ffi_fn = module->functions[index];
     ffi_fn(core);
 }
 
@@ -1482,7 +1482,7 @@ void debug_reg(TypeV_Core* core){
               core->registers.regs[i].f64,
               (void*)core->registers.regs[i].ptr,
               core->registers.regs[i].u64);
-    table_print(&t, 400, stdout);
+    table_print(&t, 2000, stdout);
     table_free(&t);
 }
 
