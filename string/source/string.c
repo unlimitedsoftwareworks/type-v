@@ -55,7 +55,7 @@ DYNLIB_EXPORT void tv_string_concat(TypeV_Core *core) {
 
 DYNLIB_EXPORT void tv_string_print(TypeV_Core *core) {
     TV_String* str = (TV_String*)typev_api_stack_pop_u64(core);
-    printf("%s", str->data);
+    printf("CORE[%d]: %s",core->id, str->data);
 }
 
 static TypeV_FFIFunc string_lib[] = {

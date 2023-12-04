@@ -11,6 +11,7 @@
 #include "../utils/log.h"
 #include "../vendor/libtable/table.h"
 #include "../stack/stack.h"
+#include "../engine.h"
 
 
 void mv_reg_reg(TypeV_Core* core){
@@ -131,8 +132,8 @@ void mv_global_reg_##bits(TypeV_Core* core){\
     const uint8_t offset_length = core->program.bytecode[core->registers.ip++];\
     size_t offset = 0; /* we do not increment offset here*/\
     memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);\
-    const uint8_t source = core->program.bytecode[core->registers.ip++];\
     core->registers.ip += offset_length;\
+    const uint8_t source = core->program.bytecode[core->registers.ip++];\
     ASSERT(source < MAX_REG, "Invalid register index");\
     ASSERT(offset < core->globalPool.length, "Invalid global offset");         \
     memcpy(&core->globalPool.pool[offset], &core->registers.regs[source], size);\
@@ -141,7 +142,17 @@ void mv_global_reg_##bits(TypeV_Core* core){\
 MV_GLOBAL_REG(8, 1)
 MV_GLOBAL_REG(16, 2)
 MV_GLOBAL_REG(32, 4)
-MV_GLOBAL_REG(64, 8)
+//MV_GLOBAL_REG(64, 8)
+void mv_global_reg_64(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    ASSERT(offset < core->globalPool.length, "Invalid global offset");
+    memcpy(&core->globalPool.pool[offset], &core->registers.regs[source], 8);
+}
 MV_GLOBAL_REG(ptr, PTR_SIZE)
 #undef MV_GLOBAL_REG
 
@@ -160,7 +171,17 @@ void mv_reg_global_##bits(TypeV_Core* core){\
 MV_REG_GLOBAL(8, 1)
 MV_REG_GLOBAL(16, 2)
 MV_REG_GLOBAL(32, 4)
-MV_REG_GLOBAL(64, 8)
+//MV_REG_GLOBAL(64, 8)
+void mv_reg_global_64(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(offset < core->globalPool.length, "Invalid global offset");
+    memcpy(&core->registers.regs[target], &core->globalPool.pool[offset], 8);
+}
 MV_REG_GLOBAL(ptr, PTR_SIZE)
 #undef MV_REG_GLOBAL
 
@@ -1448,6 +1469,37 @@ void call_ffi(TypeV_Core* core){
     ffi_fn(core);
 }
 
+void close_ffi(TypeV_Core* core){
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    core_ffi_close(core, core->registers.regs[reg].ptr);
+}
+
+void p_alloc(TypeV_Core* core){
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    uint8_t size_length = core->program.bytecode[core->registers.ip++];
+    size_t size = 0;
+    memcpy(&size, &core->program.bytecode[core->registers.ip], size_length);
+    core->registers.ip += size_length;
+
+    core->registers.regs[reg].ptr = (size_t)engine_spawnCore(core->engineRef, core, size);
+}
+
+void p_dequeue(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    // get the next queue element from core queue
+    // check queue length
+    if(core->messageInputQueue.length == 0) {
+        LOG_ERROR("Core[%d] tried to dequeue from empty queue", core->id);
+        ASSERT(0, "fail");
+    }
+    TypeV_IOMessage* msg = queue_dequeue(&core->messageInputQueue);
+}
+
+void p_queue_size(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    core->registers.regs[dest].u64 = core->messageInputQueue.length;
+}
+
 void debug_reg(TypeV_Core* core){
     // read register index
     uint8_t i = core->program.bytecode[core->registers.ip++];
@@ -1488,6 +1540,8 @@ void debug_reg(TypeV_Core* core){
 
 void halt(TypeV_Core* core) {
     core->isRunning = 0;
+    core->state = CS_TERMINATED;
+    engine_detach_core(core->engineRef, core);
 }
 
 

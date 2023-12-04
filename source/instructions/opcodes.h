@@ -1,5 +1,5 @@
 /**
- * Instructions for Type-V VM
+ * Type-V Virtual Machine
  * Author: praisethemoon
  * opcodes.h: VM Instructions Enums
  * VM instructions are defined here.
@@ -528,27 +528,6 @@ typedef enum TypeV_OpCode {
     OP_JL,
     OP_JLE,
 
-/*
-    OP_P_INIT,
-    OP_P_SPAWN,
-    OP_P_EMIT,
-    OP_P_SEND_SIG,
-
-
-    OP_DL_LOAD,
-    OP_DL_FIND_SYM,
-    OP_DL_CLOSE,
-    OP_DL_CALL,
-
-    OP_PROMISE_ALLOC,
-    OP_PROMISE_RESOLVE,
-    OP_PROMISE_REJECT,
-    OP_PROMISE_AWAIT,
-
-    OP_LOCK_ALLOC,
-    OP_LOCK_ACQUIRE,
-    OP_LOCK_RELEASE,
-*/
     /**
      * OP_LD_FFI dest: R, const-offset-size: Z, const-offset: I
      * Load a FFI shared object library, stores
@@ -559,9 +538,76 @@ typedef enum TypeV_OpCode {
 
     /**
      * OP_CALL_FFI FFI-address: R, function-name-offset-size: Z, function-name-offset: I
+     * calls a FFI based on its index
      */
     OP_CALL_FFI,
-    //OP_LD_GET_FN
+
+    OP_CLOSE_FFI,
+
+    /**
+     * OP_P_ALLOC dest: R, initfn-offset-size: Z, initfn-offset: I
+     * Allocates a new process, storing its address in R
+     * and calls the init function at the given offset
+     */
+    OP_P_ALLOC,
+
+    /**
+     * OP_P_SPAWN process-address: R
+     * Spawns a new process from the given process address
+     */
+    //OP_P_SPAWN,
+
+    /**
+     * OP_P_DEQUEUE dest: R
+     * gets a message from the current process message queue
+     */
+    OP_P_DEQUEUE,
+
+    /**
+     * OP_P_QUEUE_SIZE dest: R,
+     */
+    OP_P_QUEUE_SIZE,
+
+    /**
+     * OP_P_EMIT targetProcess: Rm, data: Rm
+     * Emits data from the current process to the target
+     * process message queue
+     */
+    //OP_P_EMIT,
+
+    /**
+     * OP_P_RET
+     * Indicates that the current process has finished
+     * processing a message and ready to process the next
+     */
+    //OP_P_RELOOP,
+
+    /**
+     * OP_P_SEND_SEG targetProcess: Rm, data: I (<255)
+     * Sends a signal to the target process,
+     * Signals include KILL, PAUSE, RESUME, etc.
+     */
+    //OP_P_SEND_SIG,
+
+    /**
+     * OP_P_ID dest: R
+     */
+    //OP_P_ID,
+    //OP_P_STATUS,
+    //OP_P_HEATH,
+
+
+
+    /*
+    OP_PROMISE_ALLOC,
+    OP_PROMISE_RESOLVE,
+    OP_PROMISE_REJECT,
+    OP_PROMISE_AWAIT,
+
+    OP_LOCK_ALLOC,
+    OP_LOCK_ACQUIRE,
+    OP_LOCK_RELEASE,
+     */
 
 
     OP_DEBUG_REG,

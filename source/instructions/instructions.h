@@ -1,5 +1,5 @@
 /**
- * Instructions for Type-V VM
+ * Type-V Virtual Machine
  * Author: praisethemoon
  * instructions.h: VM Instructions
  * VM instructions headers are defined here.
@@ -272,6 +272,11 @@ VM_INSTRUCTION(jmp_le)
 
 VM_INSTRUCTION(ld_ffi)
 VM_INSTRUCTION(call_ffi)
+VM_INSTRUCTION(close_ffi)
+
+VM_INSTRUCTION(p_alloc)
+VM_INSTRUCTION(p_dequeue)
+VM_INSTRUCTION(p_queue_size)
 
 VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)

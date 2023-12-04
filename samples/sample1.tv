@@ -1,44 +1,10 @@
 VERSION: 1
 
 CONST:
-    f: u8 = "string"
-    c1: u8 = "hi"
-    c2: u8 = "hello!\n"
-    c1_adr: u8 = 7
-    c2_adr: u8 = 10
 
 GLOBAL:
-    x: ptr = 0
+    x: u64 = 0
 CODE:
-    ld_ffi r1 f
-
-    ; push data
-    ;frame_precall
-
-    mv_reg_const_8 r0 c1_adr
-    push r0 8
-    ; call
-    call_ffi r1 2
-    mv_reg_reg r2 r20 8
-
-    mv_reg_const_8 r0 c2_adr
-    push r0 8
-    ; call
-    call_ffi r1 2
-    mv_reg_reg r3 r20 8
-
-    push r2 8
-    push r3 8
-    ; call
-    call_ffi r1 3
-    mv_reg_reg r4 r20 8
-
-    push r4 8
-    ; call
-    call_ffi r1 4
-
-
-
+    p_queue_size r0
+    debug_reg r0
     halt
-
-

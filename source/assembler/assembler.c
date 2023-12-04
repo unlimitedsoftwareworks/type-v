@@ -1307,6 +1307,35 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 parser->codePoolSize += 2 + offsetSize;
                 break;
             }
+            case OP_CLOSE_FFI: {
+                TypeV_ASM_Reg dest = getRegister(parser);
+                create_instruction(parser, OP_CLOSE_FFI, dest, 0, 0, 1);
+                parser->codePoolSize++;
+                break;
+            }
+
+            case OP_P_ALLOC: {
+                TypeV_ASM_Reg dest = getRegister(parser);
+                TypeV_Label *label = getLabel(parser);
+
+                create_instruction(parser, OP_P_ALLOC, dest, (size_t)label, 0, 3);
+                parser->codePoolSize += 2+8;
+                break;
+            }
+
+            case OP_P_DEQUEUE: {
+                TypeV_ASM_Reg dest = getRegister(parser);
+                create_instruction(parser, OP_P_DEQUEUE, dest, 0, 0, 1);
+                parser->codePoolSize++;
+                break;
+            }
+
+            case OP_P_QUEUE_SIZE: {
+                TypeV_ASM_Reg dest = getRegister(parser);
+                create_instruction(parser, OP_P_QUEUE_SIZE, dest, 0, 0, 1);
+                parser->codePoolSize++;
+                break;
+            }
 
             case OP_DEBUG_REG: {
                 TypeV_ASM_Reg reg = getRegister(parser);
@@ -1450,6 +1479,21 @@ TypeV_ASM_Program* assemble(TypeV_ASM_Parser* parser) {
 
             inst->arg1 = length;
             inst->arg2 = offset;
+        }
+        else if (inst->opcode == OP_P_ALLOC){
+            TypeV_Label* label = (TypeV_Label*)inst->arg2;
+            TypeV_Label* original = find_label(parser, label->name);
+            // if original is null, fail.
+            if(original == NULL){
+                LOG_ERROR("Label %s not found", label->name);
+                exit(1);
+            }
+
+            uint64_t offset = original->primaryCodeOffset;
+            uint64_t length = 8;
+
+            inst->arg2 = length;
+            inst->arg3 = offset;
         }
 
 

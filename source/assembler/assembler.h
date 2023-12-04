@@ -136,13 +136,14 @@ static char* instructions[] = {
         "jg","jge",
         "jl","jle",
 
-        "ld_ffi",
-        "call_ffi",
+        "ld_ffi","call_ffi", "close_ffi",
+
+        "p_alloc", "p_dequeue", "p_queue_size",
 
         "debug_reg",
         "halt"
 };
-#define MAX_INSTRUCTION 222
+#define MAX_INSTRUCTION 226
 
 typedef enum TokenType {
     TOK_INSTRUCTION=0,

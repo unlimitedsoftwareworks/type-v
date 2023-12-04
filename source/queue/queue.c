@@ -11,7 +11,7 @@ void queue_init(TypeV_IOMessageQueue *queue) {
     queue->length = 0;
 }
 
-void queue_push(TypeV_IOMessageQueue *queue, TypeV_IOMessage message) {
+void queue_enqueue(TypeV_IOMessageQueue *queue, TypeV_IOMessage* message) {
     TypeV_IOMessageNode *newNode = (TypeV_IOMessageNode *)malloc(sizeof(TypeV_IOMessageNode));
     if (newNode == NULL) {
         // Handle memory allocation failure
@@ -34,17 +34,14 @@ void queue_push(TypeV_IOMessageQueue *queue, TypeV_IOMessage message) {
     queue->length++;
 }
 
-TypeV_IOMessage queue_pop(TypeV_IOMessageQueue *queue) {
+TypeV_IOMessage* queue_dequeue(TypeV_IOMessageQueue *queue) {
     if (queue->front == NULL) {
         // Queue is empty, return a default or error value
-        TypeV_IOMessage emptyMessage;
-        emptyMessage.sender = 0;
-        emptyMessage.message = NULL;
-        return emptyMessage;
+        return NULL;
     }
 
     TypeV_IOMessageNode *temp = queue->front;
-    TypeV_IOMessage message = temp->data;
+    TypeV_IOMessage* message = temp->data;
     queue->front = queue->front->next;
 
     if (queue->front == NULL) {

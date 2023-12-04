@@ -24,7 +24,7 @@ typedef struct TypeV_IOMessage {
  * Node for a message queue
  */
 typedef struct TypeV_IOMessageNode {
-    TypeV_IOMessage data;             ///< Message Brief (Sender ID, Message Data Pointer)
+    TypeV_IOMessage* data;             ///< Message Brief (Sender ID, Message Data Pointer)
     struct TypeV_IOMessageNode* next; ///< Next Node
 } TypeV_IOMessageNode;
 
@@ -48,14 +48,14 @@ void queue_init(TypeV_IOMessageQueue *queue);
  * @param queue
  * @param message
  */
-void queue_push(TypeV_IOMessageQueue *queue, TypeV_IOMessage message);
+void queue_enqueue(TypeV_IOMessageQueue *queue, TypeV_IOMessage* message);
 
 /**
- * Pop a message from the queue
+ * Dequeues a message from the queue
  * @param queue
  * @return
  */
-TypeV_IOMessage queue_pop(TypeV_IOMessageQueue *queue);
+TypeV_IOMessage* queue_dequeue(TypeV_IOMessageQueue *queue);
 
 /**
  * deallocate a queue

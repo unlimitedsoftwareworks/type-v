@@ -1,5 +1,5 @@
 /**
- * Type-V VM
+ * Type-V Virtual Machine
  * Author: praisethemoon
  * dynlib.h: Dynamic library (DLL, SO etc) loader
  */
@@ -25,4 +25,4 @@ void* ffi_dynlib_getsym(TV_LibraryHandle handle, const char* symbol_name);
 #define DYNLIB_EXPORT
 #endif
 
-#endif // DYNAMIC_LIBRARY_H
+#endif // TYPEV_DYNLIB_H

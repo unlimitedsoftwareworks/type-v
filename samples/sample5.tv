@@ -1,0 +1,84 @@
+VERSION: 1
+
+CONST:
+    f: u8 = "string"
+    c1: u8 = "raet"
+    c2: u8 = "mai "
+    c1_adr: u8 = 7
+    c2_adr: u8 = 12
+
+GLOBAL:
+    x: u64 = 0
+CODE:
+    ld_ffi r1 f
+    mv_global_reg_64 x r1
+
+    p_alloc r15 proc
+    p_alloc r15 proc
+    p_alloc r15 proc
+    p_alloc r15 proc
+    p_alloc r15 proc
+
+
+    ; push data
+    ;frame_precall
+
+    mv_reg_const_8 r0 c1_adr
+    push r0 8
+    ; call
+    call_ffi r1 2
+    mv_reg_reg r2 r20 8
+
+    mv_reg_const_8 r0 c2_adr
+    push r0 8
+    ; call
+    call_ffi r1 2
+    mv_reg_reg r3 r20 8
+
+    push r2 8
+    push r3 8
+    ; call
+    call_ffi r1 3
+    mv_reg_reg r4 r20 8
+
+    push r4 8
+    ; call
+    call_ffi r1 4
+
+    close_ffi r1
+    halt
+
+
+
+
+proc:
+    mv_reg_global_64 r1 x
+
+    ; push data
+    ;frame_precall
+
+    mv_reg_const_8 r0 c1_adr
+    push r0 8
+    ; call
+    call_ffi r1 2
+    mv_reg_reg r2 r20 8
+
+    mv_reg_const_8 r0 c2_adr
+    push r0 8
+    ; call
+    call_ffi r1 2
+    mv_reg_reg r3 r20 8
+
+    push r2 8
+    push r3 8
+    ; call
+    call_ffi r1 3
+    mv_reg_reg r4 r20 8
+
+    push r4 8
+    ; call
+    call_ffi r1 4
+
+    close_ffi r1
+    halt
+

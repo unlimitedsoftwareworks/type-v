@@ -68,6 +68,7 @@ void core_setup(TypeV_Core *core, uint8_t* program, uint64_t programLength, uint
     core->globalPool.pool = globalPool;
     core->globalPool.length = globalPoolLength;
 
+    core->state = CS_RUNNING;
 }
 
 
@@ -98,7 +99,7 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
      */
     // we want to data to have the following structure
     // [offset_pointer (size_t), data_block (totalsize)]
-    LOG_INFO("Allocating struct with %d fields and %d bytes, total allocated size: %d", numfields, totalsize, sizeof(size_t)+totalsize);
+    LOG_INFO("CORE[%d]: Allocating struct with %d fields and %d bytes, total allocated size: %d", core->id, numfields, totalsize, sizeof(size_t)+totalsize);
     TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof(TypeV_Struct));
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
     struct_ptr->data = calloc(1, totalsize);
@@ -113,7 +114,7 @@ size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
      */
 
     TypeV_Struct* original = (TypeV_Struct*)originalStruct;
-    LOG_INFO("Allocating struct shadow of %p with %d fields, total allocated size: %d", (void*)originalStruct, numfields, 2*sizeof(size_t));
+    LOG_INFO("CORE[%d]: Allocating struct shadow of %p with %d fields, total allocated size: %d", core->id, (void*)originalStruct, numfields, 2*sizeof(size_t));
     // we allocated 2 pointers, one for the offset table, and one for the data segment
     TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof (TypeV_Struct));
     struct_ptr->data = original->data;
@@ -138,7 +139,7 @@ size_t core_class_alloc_fields(TypeV_Core *core, uint8_t numfields, size_t total
 
     // we allocate 3 pointers for methods offset, methods table pointer and fields offset
     // + the total fields size
-    LOG_INFO("Allocating class with %d fields and %d bytes, total allocated size: %d", numfields, total_fields_size, (3*sizeof(size_t))+total_fields_size);
+    LOG_INFO("CORE[%d]: Allocating class with %d fields and %d bytes, total allocated size: %d", core->id, numfields, total_fields_size, (3*sizeof(size_t))+total_fields_size);
     TypeV_Class* class_ptr = (TypeV_Class*)calloc(1, (3*sizeof(size_t))+total_fields_size);
     class_ptr->fieldsOffset = calloc(numfields, sizeof(uint16_t));
 
@@ -151,7 +152,7 @@ size_t core_class_alloc_fields(TypeV_Core *core, uint8_t numfields, size_t total
 
 
 void core_class_alloc_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr){
-    LOG_INFO("Allocating class methods with %d methods, total allocated size: %d", num_methods, num_methods*sizeof(size_t));
+    LOG_INFO("CORE[%d]: Allocating class methods with %d methods, total allocated size: %d", core->id, num_methods, num_methods*sizeof(size_t));
     class_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t));
     // class methods offset table is sequential, since class objects are primitive entities
     // and cannot be a shadow copy of another class
@@ -162,7 +163,7 @@ void core_class_alloc_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class
 }
 
 size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class * class_ptr){
-    LOG_INFO("Allocating interface from class %p with %d methods, total allocated size: %d", (size_t)num_methods, num_methods*sizeof(size_t));
+    LOG_INFO("CORE[%d]: Allocating interface from class %p with %d methods, total allocated size: %d", core->id, (size_t)num_methods, num_methods*sizeof(size_t));
     TypeV_Interface* interface_ptr = (TypeV_Interface*)calloc(1, sizeof(size_t)*2);
     interface_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t)*num_methods);
     interface_ptr->classPtr = class_ptr;
@@ -175,7 +176,7 @@ size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class *
 }
 
 size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
-    //LOG_INFO("Allocating array with %d elements of size %d, total allocated size: %d", num_elements, element_size, sizeof(size_t)+num_elements*element_size);
+    LOG_INFO("CORE[%d]: Allocating array with %d elements of size %d, total allocated size: %d", core->id, num_elements, element_size, sizeof(size_t)+num_elements*element_size);
     TypeV_Array* array_ptr = (TypeV_Array*)calloc(1, sizeof(TypeV_Array));
 
     // add to gc
@@ -191,7 +192,7 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
 }
 
 size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
-    LOG_INFO("Extending array %p with %d elements, total allocated size: %d", (void*)array_ptr, num_elements, num_elements*sizeof(size_t));
+    LOG_INFO("Extending array %p with %d elements, total allocated size: %d", core->id, (void*)array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
     array->data = realloc(array->data, num_elements);
     array->length = num_elements;
@@ -201,7 +202,7 @@ size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elemen
 
 size_t core_ffi_load(TypeV_Core* core, size_t namePointer){
     char* name = (char*)namePointer;
-    LOG_INFO("Loading FFI %s", name);
+    LOG_INFO("CORE[%d]: Loading FFI %s", core->id, name);
     TV_LibraryHandle lib = ffi_dynlib_load(name);
     ASSERT(lib != NULL, "Failed to load library %s", ffi_find_dynlib(name));
     void* openLib = ffi_dynlib_getsym(lib, "typev_ffi_open");
@@ -210,8 +211,14 @@ size_t core_ffi_load(TypeV_Core* core, size_t namePointer){
     return openFunc(core);
 }
 
+void core_ffi_close(TypeV_Core* core, size_t libHandle){
+    LOG_INFO("CORE[%d]: Closing FFI %p", core->id, (void*)libHandle);
+    TV_LibraryHandle lib = (TV_LibraryHandle)libHandle;
+    ffi_dynlib_unload(lib);
+}
+
 size_t core_mem_alloc(TypeV_Core* core, size_t size) {
-    LOG_INFO("Allocating %d bytes", size);
+    LOG_INFO("CORE[%d]: Allocating %d bytes", core->id, size);
     void* mem =  calloc(1, size);
 
     // add mem to tracker
@@ -220,3 +227,5 @@ size_t core_mem_alloc(TypeV_Core* core, size_t size) {
 
     return (size_t)mem;
 }
+
+

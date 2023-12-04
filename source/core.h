@@ -80,8 +80,9 @@ typedef union {
 typedef enum TypeV_CoreState {
     CS_INITIALIZED = 0, ///< Initialized state
     CS_HALTED = 1,      ///< Halted as the VM is running another core, or process
+    CS_AWAITING_QUEUE,
+    CS_AWAITING_PROMISE,
     CS_RUNNING = 2,     ///< Process is Running
-    CS_WAITING = 3,     ///< Halted  because its queue is empty
     CS_FINISHING = 4,   ///< Process has received terminate signal and is no longer accepting messages
     CS_TERMINATED = 5,  ///< Process has been gracefully terminated
     CS_KILLED = 7       ///< Process has been killed
@@ -299,7 +300,12 @@ size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elemen
  */
 size_t core_ffi_load(TypeV_Core* core, size_t namePointer);
 
-
+/**
+ * Closes a FFI library
+ * @param core
+ * @param libHandle library handle pointer
+ */
+void core_ffi_close(TypeV_Core* core, size_t libHandle);
 /**
  * Allocates a memory object.
  * All memory allocated here is considered heap
@@ -316,6 +322,8 @@ size_t core_mem_alloc(TypeV_Core* core, size_t size);
  * @param value
  */
 void core_update_flags(TypeV_Core *core, uint64_t value);
+
+void core_process_alloc(TypeV_Core* core, uint64_t ip);
 
 
 typedef void (*TypeV_FFIFunc)(TypeV_Core* core);

@@ -1,5 +1,5 @@
 /**
- * Instructions for Type-V VM
+ * Type-V Virtual Machine
  * Author: praisethemoon
  * utils.h: VM Instructions
  * Utilities

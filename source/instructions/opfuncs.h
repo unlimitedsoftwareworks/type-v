@@ -1,5 +1,5 @@
 /**
- * Instructions for Type-V VM
+ * Type-V Virtual Machine
  * Author: praisethemoon
  * opfuncs.h: VM Instructions function array
  * VM instructions table is defined here.
@@ -273,6 +273,11 @@ static op_func op_funcs[] = {
 
         &ld_ffi,
         &call_ffi,
+        &close_ffi,
+
+        &p_alloc,
+        &p_dequeue,
+        &p_queue_size,
 
         &debug_reg,
         &halt,
