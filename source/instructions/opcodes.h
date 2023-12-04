@@ -520,8 +520,6 @@ typedef enum TypeV_OpCode {
     OP_OR,
     OP_NOT,
 
-
-
     OP_J,
     OP_JE,
     OP_JNE,
@@ -530,15 +528,41 @@ typedef enum TypeV_OpCode {
     OP_JL,
     OP_JLE,
 
-    /*
+/*
     OP_P_INIT,
     OP_P_SPAWN,
     OP_P_EMIT,
+    OP_P_SEND_SIG,
 
-    OP_PROMISE_WAIT,
+
+    OP_DL_LOAD,
+    OP_DL_FIND_SYM,
+    OP_DL_CLOSE,
+    OP_DL_CALL,
+
+    OP_PROMISE_ALLOC,
     OP_PROMISE_RESOLVE,
     OP_PROMISE_REJECT,
+    OP_PROMISE_AWAIT,
+
+    OP_LOCK_ALLOC,
+    OP_LOCK_ACQUIRE,
+    OP_LOCK_RELEASE,
+*/
+    /**
+     * OP_LD_FFI dest: R, const-offset-size: Z, const-offset: I
+     * Load a FFI shared object library, stores
+     * its memory address into R, the name is
+     * stored in the constant pool at the given offset
      */
+    OP_LD_FFI,
+
+    /**
+     * OP_CALL_FFI FFI-address: R, function-name-offset-size: Z, function-name-offset: I
+     */
+    OP_CALL_FFI,
+    //OP_LD_GET_FN
+
 
     OP_DEBUG_REG,
     OP_HALT,

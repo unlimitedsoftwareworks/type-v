@@ -1,6 +1,9 @@
-//
-// Created by praisethemoon on 24.11.23.
-//
+/**
+ * Instructions for Type-V VM
+ * Author: praisethemoon
+ * utils.h: VM Instructions
+ * Utilities
+ */
 
 #ifndef TYPE_V_UTILS_H
 #define TYPE_V_UTILS_H

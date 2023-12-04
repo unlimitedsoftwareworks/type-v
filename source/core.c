@@ -12,6 +12,8 @@
 #include "instructions/opfuncs.h"
 #include "utils/log.h"
 #include "stack/stack.h"
+#include "dynlib/dynlib.h"
+#include "utils/utils.h"
 
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->id = id;
@@ -86,7 +88,6 @@ void core_vm(TypeV_Core *core) {
 
     printf("Sum: %ld\n", sum);
     printf("Execution time: %f seconds\n", cpu_time_used);
-
 }
 
 void core_deallocate(TypeV_Core *core) {
@@ -100,7 +101,7 @@ void core_deallocate(TypeV_Core *core) {
     // Note: Program deallocation depends on how programs are loaded and managed
 }
 
-size_t core_alloc_struct(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
+size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
     /**
      * Struct layout in type-v
      * struct {offsets: uint16_t*, data: void* }
@@ -117,12 +118,14 @@ size_t core_alloc_struct(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     // we want to data to have the following structure
     // [offset_pointer (size_t), data_block (totalsize)]
     LOG_INFO("Allocating struct with %d fields and %d bytes, total allocated size: %d", numfields, totalsize, sizeof(size_t)+totalsize);
-    TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof(size_t)+totalsize);
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof(TypeV_Struct));
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
+    struct_ptr->data = calloc(1, totalsize);
+    struct_ptr->originalStruct = NULL;
     return (size_t)struct_ptr;
 }
 
-size_t core_alloc_struct_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct) {
+size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct) {
     /**
      * A shadow copy is a struct whos data segment points to another struct's data segment.
      * A shadow copy has its own offset table
@@ -131,9 +134,10 @@ size_t core_alloc_struct_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
     TypeV_Struct* original = (TypeV_Struct*)originalStruct;
     LOG_INFO("Allocating struct shadow of %p with %d fields, total allocated size: %d", (void*)originalStruct, numfields, 2*sizeof(size_t));
     // we allocated 2 pointers, one for the offset table, and one for the data segment
-    TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, 2*sizeof(size_t));
-    *(struct_ptr+sizeof(size_t)) = *(original+sizeof(size_t));
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof (TypeV_Struct));
+    struct_ptr->data = original->data;
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
+    struct_ptr->originalStruct = original;
 
     // add to gc
     core->memTracker.structs = realloc(core->memTracker.structs, sizeof(size_t)*(core->memTracker.structCount+1));
@@ -142,8 +146,7 @@ size_t core_alloc_struct_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
     return (size_t)struct_ptr;
 }
 
-
-size_t core_alloc_class_fields(TypeV_Core *core, uint8_t numfields, size_t total_fields_size) {
+size_t core_class_alloc_fields(TypeV_Core *core, uint8_t numfields, size_t total_fields_size) {
     /**
      * Class layout in type-v
      * struct {uint16* methodsOffset, size_t* methods, uint16* fieldsOffset, void* data}
@@ -166,7 +169,7 @@ size_t core_alloc_class_fields(TypeV_Core *core, uint8_t numfields, size_t total
 }
 
 
-void core_alloc_class_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr){
+void core_class_alloc_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr){
     LOG_INFO("Allocating class methods with %d methods, total allocated size: %d", num_methods, num_methods*sizeof(size_t));
     class_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t));
     // class methods offset table is sequential, since class objects are primitive entities
@@ -177,7 +180,7 @@ void core_alloc_class_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class
     class_ptr->methods = calloc(num_methods, sizeof(size_t));
 }
 
-size_t core_alloc_interface(TypeV_Core *core, uint8_t num_methods, TypeV_Class * class_ptr){
+size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class * class_ptr){
     LOG_INFO("Allocating interface from class %p with %d methods, total allocated size: %d", (size_t)num_methods, num_methods*sizeof(size_t));
     TypeV_Interface* interface_ptr = (TypeV_Interface*)calloc(1, sizeof(size_t)*2);
     interface_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t)*num_methods);
@@ -190,9 +193,9 @@ size_t core_alloc_interface(TypeV_Core *core, uint8_t num_methods, TypeV_Class *
     return (size_t)interface_ptr;
 }
 
-size_t core_alloc_array(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
-    LOG_INFO("Allocating array with %d elements of size %d, total allocated size: %d", num_elements, element_size, sizeof(size_t)+num_elements*element_size);
-    TypeV_Array* array_ptr = (TypeV_Array*)calloc(1, sizeof(size_t)+num_elements*element_size);
+size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
+    //LOG_INFO("Allocating array with %d elements of size %d, total allocated size: %d", num_elements, element_size, sizeof(size_t)+num_elements*element_size);
+    TypeV_Array* array_ptr = (TypeV_Array*)calloc(1, sizeof(TypeV_Array));
 
     // add to gc
     core->memTracker.arrays = realloc(core->memTracker.arrays, sizeof(size_t)*(core->memTracker.arrayCount+1));
@@ -206,11 +209,22 @@ size_t core_alloc_array(TypeV_Core *core, uint64_t num_elements, uint8_t element
     return (size_t)array_ptr;
 }
 
-size_t core_extend_array(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
+size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
     LOG_INFO("Extending array %p with %d elements, total allocated size: %d", (void*)array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
     array->data = realloc(array->data, num_elements);
     array->length = num_elements;
     array->capacity = num_elements*2;
     return array_ptr;
+}
+
+size_t core_ffi_load(TypeV_Core* core, size_t namePointer){
+    char* name = (char*)namePointer;
+    LOG_INFO("Loading FFI %s", name);
+    TV_LibraryHandle lib = ffi_dynlib_load(name);
+    ASSERT(lib != NULL, "Failed to load library %s", ffi_find_dynlib(name));
+    void* openLib = ffi_dynlib_getsym(lib, "typev_ffi_open");
+    ASSERT(openLib != NULL, "Failed to open library %s", ffi_find_dynlib(name));
+    size_t (*openFunc)(TypeV_Core*) = openLib;
+    return openFunc(core);
 }

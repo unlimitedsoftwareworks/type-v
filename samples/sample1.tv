@@ -1,55 +1,29 @@
 VERSION: 1
 
 CONST:
-    c1: u64 = 100000000
+    f: u8 = "stdio"
+    c: u8 = "printf"
+    c1: u8 = "hello, world!\n"
+    c2: u8 = 13
 
 GLOBAL:
-    x: i32 = 1
-    y: i32 = 2
+    x: ptr = 0
 CODE:
+    ; prepare ffi
+    ld_ffi r1 f
+    ;ffi_ld_fn r1 r0 c
 
-    mv_reg_const_64 r10 c1
-
-    mv_reg_i r11 1
-
-start:
-    mv_reg_global_32 r0 x
-    mv_reg_global_32 r1 y
-
-    ;debug_reg r10
-    j l1
-
-l1:
-    ; store everything into the stack
+    ; push data
     frame_precall
 
-    ; init stack frame args
-    frame_init_args 4
+    ; init args
+    ;frame_init_args 8
+    mv_reg_const_8 r0 c2
+    push r0 8
 
-    ; push constants into the stack
-    push r1 4
+    ; call
+    call_ffi r1 0
 
-    ; call function
-    fn_calli l
-    ; print the result
-    ;debug_reg r20
-    sub_u64 r10 r11 r10
-    cmp_u64 r10 r11
-    ;debug_reg r10
-    je  end
-    jne start
-
- end:
     halt
 
 
-; function
-l:
-    mv_reg_arg_32 r0 0
-    fn_main
-    mul_i32 r0 r0 r0
-    mv_reg_i r1 1
-    sub_i32 r0 r1 r0
-    mv_reg_reg r20 r0 4
-    frame_rm
-    fn_ret

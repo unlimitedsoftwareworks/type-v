@@ -4,13 +4,14 @@
  * instructions.h: VM Instructions
  * VM instructions headers are defined here.
  */
+
 #ifndef TYPE_V_INSTRUCTIONS_H
 #define TYPE_V_INSTRUCTIONS_H
 
 #include "../core.h"
 #include "./opcodes.h"
 
-#define VM_INSTRUCTION(instruction) inline void instruction(TypeV_Core *core);
+#define VM_INSTRUCTION(instruction) void instruction(TypeV_Core *core);
 
 VM_INSTRUCTION(mv_reg_reg)
 VM_INSTRUCTION(mv_reg_i)
@@ -269,6 +270,8 @@ VM_INSTRUCTION(jmp_ge)
 VM_INSTRUCTION(jmp_l)
 VM_INSTRUCTION(jmp_le)
 
+VM_INSTRUCTION(ld_ffi)
+VM_INSTRUCTION(call_ffi)
 
 VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)

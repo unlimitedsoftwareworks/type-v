@@ -271,6 +271,9 @@ static op_func op_funcs[] = {
         &jmp_l,
         &jmp_le,
 
+        &ld_ffi,
+        &call_ffi,
+
         &debug_reg,
         &halt,
 };

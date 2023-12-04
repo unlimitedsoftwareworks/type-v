@@ -235,6 +235,26 @@ void lexer_tokenize(TypeV_ASM_Lexer* lexer){
             }
             continue;
         }
+        if(c == '\"'){
+            // parse string
+            uint64_t start = lexer->pos+1;
+            lexer->col++;
+            lexer->pos++;
+            while (lexer->pos < lexer->program_length && lexer->program[lexer->pos] != '\"') {
+                lexer->col++;
+                lexer->pos++;
+            }
+            // add the last "
+            lexer->col++;
+            lexer->pos++;
+
+            uint64_t end = lexer->pos-1;
+            char *value = malloc(end - start + 1);
+            memcpy(value, lexer->program + start, end - start);
+            value[end - start] = '\0';
+            vector_add(&lexer->tokens, createToken(TOK_STRING, value, lexer->line, lexer->col, lexer->pos));
+
+        }
         if (isdigit(c)) {
             uint64_t start = lexer->pos;
             int dotFound = 0;
@@ -570,6 +590,14 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 if((tok != NULL) && (tok->type == TOK_EQ)){
                     // value
                     Token *value = next_token(parser);
+                    if(value->type == TOK_STRING){
+                        // we defined it as multiple constants
+                        for(int i = 0; i <= strlen(value->value); i++){
+                            create_const(parser, identifier->value, type->type - TOK_I8, (uint8_t)value->value[i]);
+                        }
+                        tok = next_token(parser);
+                        continue;
+                    }
                     assert_tok(value, TOK_NUMBER);
                     if((strlen(value->value) > 2) && (value->value[0] == '0' )&& (value->value[1] == 'x')){
                         // hex
@@ -632,7 +660,7 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
         if (idx == -1) {
             if (tok->type == TOK_IDENTIFIER) {
                 Token *next = next_token(parser);
-                if (next->type == TOK_COLON) {
+                if ((next != NULL) && (next->type == TOK_COLON)) {
                     // label
                     TypeV_Label *label = find_label(parser, tok->value);
                     if (label == NULL) {
@@ -1033,6 +1061,7 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
 
                 create_instruction(parser, OP_A_ALLOC, numElementsSize, numElements, elementSize, 3);
                 parser->codePoolSize += 2 + numElementsSize;
+                break;
             }
             case OP_A_EXTEND: {
                 // OP_A_EXTEND num_elements_size: Z, num_elements: I
@@ -1258,6 +1287,27 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 parser->codePoolSize += 1 + 8;
                 break;
             }
+
+            case OP_LD_FFI: {
+                TypeV_ASM_Reg dest = getRegister(parser);
+                TypeV_ASM_Const *c = getConst(parser);
+
+                create_instruction(parser, OP_LD_FFI, dest, c->offsetSize, c->offset, 3);
+                parser->codePoolSize += 2 + c->offsetSize;
+                break;
+            }
+
+            case OP_CALL_FFI: {
+                TypeV_ASM_Reg dest = getRegister(parser);
+                uint64_t offset = getLongNumber(parser);
+                uint8_t offsetSize = bytes_needed(offset);
+
+
+                create_instruction(parser, OP_CALL_FFI, dest, offsetSize, offset, 3);
+                parser->codePoolSize += 2 + offsetSize;
+                break;
+            }
+
             case OP_DEBUG_REG: {
                 TypeV_ASM_Reg reg = getRegister(parser);
 

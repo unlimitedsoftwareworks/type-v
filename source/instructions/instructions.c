@@ -222,7 +222,7 @@ void s_alloc(TypeV_Core* core){
     core->registers.ip += struct_size_length;
 
     // allocate memory for struct
-    size_t mem = core_alloc_struct(core, fields_count, struct_size);
+    size_t mem = core_struct_alloc(core, fields_count, struct_size);
     // move the pointer to R16
     core->registers.regs[16].ptr = mem;
 }
@@ -233,7 +233,7 @@ void s_alloc_shadow(TypeV_Core* core){
     size_t original_mem = core->registers.regs[16].ptr;
 
     // allocate memory for struct
-    size_t mem = core_alloc_struct_shadow(core, fields_count, original_mem);
+    size_t mem = core_struct_alloc_shadow(core, fields_count, original_mem);
     // move the pointer to R16
     core->registers.regs[16].ptr = mem;
 }
@@ -300,7 +300,7 @@ void c_allocf(TypeV_Core* core){
     core->registers.ip += struct_size_length;
 
     // allocate memory for struct
-    size_t mem = core_alloc_class_fields(core, fields_count, struct_size);
+    size_t mem = core_class_alloc_fields(core, fields_count, struct_size);
     // move the pointer to R17
     core->registers.regs[17].ptr = mem;
 }
@@ -309,7 +309,7 @@ void c_allocm(TypeV_Core* core){
     const uint8_t methods_count = core->program.bytecode[core->registers.ip++];
     // allocate memory for struct
     TypeV_Class* c = (TypeV_Class*)core->registers.regs[17].ptr;
-    core_alloc_class_methods(core, methods_count, c);
+    core_class_alloc_methods(core, methods_count, c);
 }
 
 void c_storem(TypeV_Core* core){
@@ -389,7 +389,7 @@ void i_alloc(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->registers.regs[17].ptr;
     // allocate memory for struct
-    size_t mem = core_alloc_interface(core, fields_count, c);
+    size_t mem = core_interface_alloc(core, fields_count, c);
     // move the pointer to R18
     core->registers.regs[18].ptr = mem;
 }
@@ -428,7 +428,7 @@ void a_alloc(TypeV_Core* core){
     if(element_size == 0) element_size = PTR_SIZE;
 
     // allocate memory for struct
-    size_t mem = core_alloc_array(core, num_elements, element_size);
+    size_t mem = core_array_alloc(core, num_elements, element_size);
     // move the pointer to R19
     core->registers.regs[19].ptr = mem;
 }
@@ -439,18 +439,20 @@ void a_extend(TypeV_Core* core){
     memcpy(&num_elements, &core->program.bytecode[core->registers.ip],  num_elements_size);
     core->registers.ip += num_elements_size;
 
-    size_t mem = core_extend_array(core, core->registers.regs[19].ptr, num_elements);
+    size_t mem = core_array_extend(core, core->registers.regs[19].ptr, num_elements);
     core->registers.regs[19].ptr = mem;
 }
 
 void a_storef_reg(TypeV_Core* core){
     const uint8_t source = core->program.bytecode[core->registers.ip++];
     const uint8_t index = core->program.bytecode[core->registers.ip++];
-    const uint8_t element_size = core->program.bytecode[core->registers.ip++];
-
+    uint8_t element_size = core->program.bytecode[core->registers.ip++];
+    if(element_size == 0) element_size = PTR_SIZE;
     ASSERT(source < MAX_REG, "Invalid register index");
     ASSERT(index < MAX_REG, "Invalid register index");
     ASSERT(element_size <= 8, "Invalid byte size");
+
+    //LOG_INFO("Storing %d bytes at index %d", element_size, core->registers.regs[index].u64);
 
     TypeV_Array* array = (TypeV_Array*)core->registers.regs[19].ptr;
     memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], element_size);
@@ -992,7 +994,7 @@ void cmp_u32(TypeV_Core* core) {
     uint64_t result = (uint64_t)v1 - (uint64_t)v2;
 
     // Set Zero Flag (ZF) using bitwise operations
-    WRITE_FLAG(core->registers.flags, FLAG_ZF, ~(result | ~result) >> 63 & 1);
+    WRITE_FLAG(core->registers.flags, FLAG_ZF, result==0);
 
     // Overflow Flag (OF) and Sign Flag (SF) are not used in unsigned comparisons
     // Clearing OF and SF for clarity
@@ -1420,6 +1422,30 @@ void jmp_le(TypeV_Core* core){
     else {
         core->registers.ip += offset_length;
     }
+}
+
+void ld_ffi(TypeV_Core* core){
+    uint8_t dest = core->program.bytecode[core->registers.ip++];
+    uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], offset_length);
+    core->registers.ip += offset_length;
+    size_t namePtr = (size_t)(core->constantPool.pool + offset);
+    core->registers.regs[dest].ptr = core_ffi_load(core, namePtr);
+}
+
+void call_ffi(TypeV_Core* core){
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], offset_length);
+
+    core->registers.ip += offset_length;
+
+    TypeV_FFI * module = (TypeV_FFI *)core->registers.regs[reg].ptr;
+
+    TypeV_FFIFunc ffi_fn = module->functions[offset];
+    ffi_fn(core);
 }
 
 void debug_reg(TypeV_Core* core){

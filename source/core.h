@@ -18,7 +18,8 @@
 
 typedef struct TypeV_Struct {
     uint16_t* fieldOffsets;
-    uint8_t data[];
+    struct TypeV_Struct* originalStruct;
+    uint8_t* data;
 }TypeV_Struct;
 
 typedef struct TypeV_Class{
@@ -27,7 +28,7 @@ typedef struct TypeV_Class{
     size_t* methods;          ///< A pointer to the method table
     /** fields */
     uint16_t* fieldsOffset;     ///< field offset table
-    uint8_t data[];           ///< Fields start from here, direct access
+    uint8_t* data;           ///< Fields start from here, direct access
 }TypeV_Class;
 
 typedef struct TypeV_Interface {
@@ -42,6 +43,25 @@ typedef struct TypeV_Array {
     uint8_t* data;            ///< Array data
 }TypeV_Array;
 
+typedef struct TypeV_Promise {
+    uint8_t resolved;      ///< resolved flag
+    uint8_t isFulfilled;   ///< Fulfilled flag
+    void* value;           ///< Promise value
+}TypeV_Promise;
+
+typedef struct TypeV_Lock {
+    uint8_t locked;        ///< locked flag
+    uint32_t owner;        ///< owner ID
+    void* value;           ///< Lock value
+}TypeV_Lock;
+
+typedef void (*TypeV_FFIFunc)(struct TypeV_Core* core);
+
+typedef struct TypeV_FFI {
+    uint8_t isInitialized;   ///< Is the FFI initialized
+    TypeV_FFIFunc* functions;///< FFI functions
+    uint8_t functionCount;   ///< FFI function count
+}TypeV_FFI;
 
 /**
  * @brief TypeV_Register
@@ -221,7 +241,7 @@ void core_halt(TypeV_Core *core);
  * @param totalsize Total size of the struct
  * @return Pointer to the allocated struct
  */
-size_t core_alloc_struct(TypeV_Core *core, uint8_t numfields, size_t totalsize);
+size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
 
 /**
  * Allocates a struct object as shadow to another struct
@@ -230,7 +250,7 @@ size_t core_alloc_struct(TypeV_Core *core, uint8_t numfields, size_t totalsize);
  * @param totalsize Total size of the struct
  * @return Pointer to the allocated struct
  */
-size_t core_alloc_struct_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct);
+size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct);
 
 /**
  * Allocates a class object
@@ -239,7 +259,7 @@ size_t core_alloc_struct_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
  * @param total_fields_size  total size of fields in bytes
  * @return new Class object, half initialized, methods must be initialized after this call
  */
-size_t core_alloc_class_fields(TypeV_Core *core, uint8_t numfields, size_t total_fields_size);
+size_t core_class_alloc_fields(TypeV_Core *core, uint8_t numfields, size_t total_fields_size);
 
 /**
  * Allocates a class method table
@@ -247,7 +267,7 @@ size_t core_alloc_class_fields(TypeV_Core *core, uint8_t numfields, size_t total
  * @param num_methods number of methods
  * @param class_ptr class reference
  */
-void core_alloc_class_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
+void core_class_alloc_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
 
 /**
  * Allocates an interface object
@@ -255,7 +275,7 @@ void core_alloc_class_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class
  * @param num_methods number of methods
  * @param class_ptr class reference
  */
-size_t core_alloc_interface(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
+size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
 
 /**
  * Allocates an array object
@@ -264,7 +284,7 @@ size_t core_alloc_interface(TypeV_Core *core, uint8_t num_methods, TypeV_Class* 
  * @param element_size
  * @return
  */
-size_t core_alloc_array(TypeV_Core *core, uint64_t num_elements, uint8_t element_size);
+size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size);
 
 /**
  * Extends the size of an array
@@ -273,7 +293,10 @@ size_t core_alloc_array(TypeV_Core *core, uint64_t num_elements, uint8_t element
  * @param num_elements new number of elements
  * @return
  */
-size_t core_extend_array(TypeV_Core *core, size_t array_ptr, uint64_t num_elements);
+size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements);
+
+
+size_t core_ffi_load(TypeV_Core* core, size_t namePointer);
 
 /**
  * Updates the flags of the core
