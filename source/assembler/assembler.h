@@ -147,9 +147,10 @@ static char* instructions[] = {
 
         "debug_reg",
         "halt",
+        "ld_std",
         "vm_health"
 };
-#define MAX_INSTRUCTION 240
+#define MAX_INSTRUCTION 241
 
 typedef enum TokenType {
     TOK_INSTRUCTION=0,

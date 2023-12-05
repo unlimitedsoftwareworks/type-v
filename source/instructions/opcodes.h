@@ -663,6 +663,13 @@ typedef enum TypeV_OpCode {
 
     OP_DEBUG_REG,
     OP_HALT,
+
+    /**
+     * OP_LOAD_STD libId: I, fnId: I, dest: R
+     * Loads a standard library function into dest reg R
+     */
+    OP_LOAD_STD,
+
     /**
      * OP_VM_HEALTH dest: R
      * Returns VM health into dest reg R[u8]

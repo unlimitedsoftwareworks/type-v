@@ -296,6 +296,8 @@ VM_INSTRUCTION(lock_release)
 VM_INSTRUCTION(debug_reg)
 VM_INSTRUCTION(halt)
 
+VM_INSTRUCTION(load_std)
+
 VM_INSTRUCTION(vm_health)
 
 #endif //TYPE_V_INSTRUCTIONS_H

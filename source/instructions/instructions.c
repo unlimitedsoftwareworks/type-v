@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "instructions.h"
+#include "../std/std.h"
 #include "../core.h"
 #include "../utils/utils.h"
 #include "../utils/log.h"
@@ -1716,6 +1717,18 @@ void halt(TypeV_Core* core) {
     core->isRunning = 0;
     core->state = CS_TERMINATED;
     engine_detach_core(core->engineRef, core);
+}
+
+void load_std(TypeV_Core* core){
+    TypeV_StdLibs* stdLibs = typev_std_get_libs();
+
+    uint8_t lib_id = core->program.bytecode[core->registers.ip++];
+    uint8_t fn_id = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(lib_id < stdLibs->len, "Invalid stdlib index");
+    ASSERT(fn_id < stdLibs->libs[lib_id].len, "Invalid stdlib function index");
+
+    stdLibs->libs[lib_id].fns[fn_id](core);
 }
 
 void vm_health(TypeV_Core* core){

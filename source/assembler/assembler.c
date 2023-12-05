@@ -1406,9 +1406,11 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 break;
             }
 
+
             case OP_PROMISE_DATA:
             case OP_LOCK_ALLOC:
-            case OP_LOCK_ACQUIRE:{
+            case OP_LOCK_ACQUIRE:
+            {
                 TypeV_ASM_Reg targetReg = getRegister(parser);
                 TypeV_ASM_Reg dataReg = getRegister(parser);
                 create_instruction(parser, idx, targetReg, dataReg, 0, 2);
@@ -1427,6 +1429,15 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
             case OP_HALT: {
                 create_instruction(parser, OP_HALT, 0, 0, 0, 0);
 
+                break;
+            }
+
+            case OP_LOAD_STD: {
+                uint8_t libId = getShortNumber(parser);
+                uint8_t  fnId = getShortNumber(parser);
+
+                create_instruction(parser, OP_LOAD_STD, libId, fnId, 0, 2);
+                parser->codePoolSize+=2;
                 break;
             }
 

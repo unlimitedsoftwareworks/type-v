@@ -297,6 +297,8 @@ static op_func op_funcs[] = {
         &debug_reg,
         &halt,
 
+        &load_std,
+
         &vm_health,
 };
 

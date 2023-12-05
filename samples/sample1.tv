@@ -1,48 +1,24 @@
 VERSION: 1
 
 CONST:
+    f: u8 = "stdio"
+    c: u8 = "printf"
+    c1: u8 = "hello, world!\n"
+    c2: u8 = 13
 
 GLOBAL:
-    x: u64 = 0
+    x: ptr = 0
 CODE:
 
-    ; spawn
-    mv_reg_i r11 990099
+    ; init args
+    ;frame_init_args 8
+    mv_reg_const_8 r0 c2
+    push r0 8
+    ld_std 0 0
+    push r20 8
+    ld_std 0 1
 
-    lock_alloc r10 r11
-    lock_acquire r10 r2
-
-    p_alloc r1 proc1
-    p_emit r1 r10 r3
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    add_u32 r19 r19 r19
-    debug_reg r2
-    lock_release r10
 
     halt
 
-
-proc1:
-    p_wait_queue
-    p_dequeue r14 r1
-
-    lock_acquire r14 r4
-    debug_reg r4
-    lock_release r14
-
-
-    promise_resolve r1 r15
-    debug_reg r14
-    halt
-    j proc1
 
