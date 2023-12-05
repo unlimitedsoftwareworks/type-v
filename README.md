@@ -1,14 +1,26 @@
 Type-V
 ===
 
-Type-V is a virtual machine for running type-c programs.
-
-### About
-Type-V is a VM and runtime environment for type-c programs.
-While the VM can be used for generic purposes, its instructions are heavily optimized
-for type-c source code, such as offset-based data types (structs, array etc), 
+<table>
+    <tr>
+        <td>
+            <img src='assets/logo.png' width='400'>
+        </td>
+        <td>
+Type-V is a virtual machine for running type-c programs. 
+Type-V is a VM and runtime environment for type-c programs. 
+While the VM can be used for generic purposes, 
+its instructions are heavily optimized for type-c source code, 
+such as offset-based data types (structs, array etc), 
 built-in concurrency, etc.
+        </td>
+    </tr>
+</table>
 
+
+
+
+### Status
 As for the right now, the VM is still experimental and lacking major features.
 
 Progress:
