@@ -240,7 +240,20 @@ void lexer_tokenize(TypeV_ASM_Lexer* lexer){
             uint64_t start = lexer->pos+1;
             lexer->col++;
             lexer->pos++;
-            while (lexer->pos < lexer->program_length && lexer->program[lexer->pos] != '\"') {
+            uint8_t prev_is_escape = 0;
+            uint8_t endchar_reached = 0;
+            while (lexer->pos < lexer->program_length && !endchar_reached) {
+                if(lexer->program[lexer->pos] == '\"'){
+                    if(lexer->program[lexer->pos-1] == '\\') {
+                        endchar_reached = 0;
+
+                    }
+                    else {
+                        endchar_reached = 1;
+                        break;
+                    }
+                }
+
                 lexer->col++;
                 lexer->pos++;
             }
@@ -250,8 +263,42 @@ void lexer_tokenize(TypeV_ASM_Lexer* lexer){
 
             uint64_t end = lexer->pos-1;
             char *value = malloc(end - start + 1);
-            memcpy(value, lexer->program + start, end - start);
-            value[end - start] = '\0';
+            // handle escape chars
+            int j = 0;
+            for(int i = start; i < end; i++){
+                if(lexer->program[i] == '\\'){
+                    i++;
+                    switch(lexer->program[i]){
+                        case 'n':
+                            value[j] = '\n';
+                            break;
+                        case 't':
+                            value[j] = '\t';
+                            break;
+                        case 'r':
+                            value[j] = '\r';
+                            break;
+                        case '0':
+                            value[j] = '\0';
+                            break;
+                        case '\\':
+                            value[j] = '\\';
+                            break;
+                        case '\"':
+                            value[j] = '\"';
+                            break;
+                        default:
+                            LOG_ERROR("Unknown escape char: %c", lexer->program[i]);
+                            assert(0);
+                    }
+                }
+                else {
+                    value[j] = lexer->program[i];
+                }
+                j++;
+            }
+
+            value[j] = '\0';
             vector_add(&lexer->tokens, createToken(TOK_STRING, value, lexer->line, lexer->col, lexer->pos));
 
         }
