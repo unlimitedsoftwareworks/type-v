@@ -2,9 +2,9 @@
 <table>
     <tr>
         <td>
-            <center>
-                <img src='assets/logo.png' width='250'>
-            </center>
+            <p align="center">
+                <img align="center" src='assets/logo.png' width='250'>
+            </p>
         </td>
     </tr>
     <tr>
