@@ -1,18 +1,21 @@
-Type-V
-===
 
 <table>
     <tr>
         <td>
-            <img src='assets/logo.png' width='400'>
+            <center>
+                <img src='assets/logo.png' width='250'>
+            </center>
         </td>
+    </tr>
+    <tr>
         <td>
-Type-V is a virtual machine for running type-c programs. 
-Type-V is a VM and runtime environment for type-c programs. 
+            <center>
+Type-V is a virtual machine and runtime environment for type-c programs. 
 While the VM can be used for generic purposes, 
 its instructions are heavily optimized for type-c source code, 
-such as offset-based data types (structs, array etc), 
+such as offset-based data types (structs, arrays, classes, interfaces, shadow structs, etc), 
 built-in concurrency, etc.
+            </center>
         </td>
     </tr>
 </table>
@@ -28,6 +31,8 @@ Progress:
 - [x] Assembler
 - [x] Instruction set specification
 - [x] Processes (not to be confused with OS processes)
+- [ ] VM API passes valgrind checks (doesn't count bytecode allocated memory since it's supposed to be handled by GC)
+- [ ] Non-blocking I/O 
 - [ ] Garbage collection
 - [ ] Unit tests
 

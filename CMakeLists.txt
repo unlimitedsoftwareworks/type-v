@@ -18,7 +18,8 @@ add_executable(type_v source/main.c source/core.c source/core.h source/queue/que
         source/vendor/sds/sds.h
         source/vendor/sds/sdsalloc.h
         source/std/io.c
-        source/std/io.h)
+        source/std/io.h
+        source/vendor/cpu_info/cpu_info.h)
 
 add_dependencies(type_v stdio string)
 target_link_libraries(type_v stdio string)

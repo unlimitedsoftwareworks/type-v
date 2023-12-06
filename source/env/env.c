@@ -7,11 +7,15 @@
 #include <unistd.h>
 #endif
 
+#include "env.h"
+
+#define CPU_INFO_IMPLEMENTATION
+#include "../vendor/cpu_info/cpu_info.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
 
-#include "env.h"
 
 char buffer[PATH_MAX];
 
@@ -44,6 +48,13 @@ void typev_env_init(){
 
     env.searchPaths = calloc(3, sizeof(char*));
     printf("current dir: %s\n", env.cwd);
+
+    ;
+    int err = cpui_get_info(&env.result);
+    if(err){
+        fprintf(stderr, "An error occured while quering CPU");
+    }
+    cpui_log_result(stdout, &env.result);
 }
 
 void typev_env_log(){
