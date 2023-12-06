@@ -1,22 +1,67 @@
+;
+; struct and shadow copy
+;
+
 VERSION: 1
 
 CONST:
-    f: u8 = "stdio"
-    c: u8 = "printf"
-    c1: u8 = "hello, world!\n"
-    c2: u8 = 13
+    c1: u8 = "mai.txt"
+    c2: u8 = "w"
+    c1_offset: u8 = 0
+    c2_offset: u8 = 8
 
 GLOBAL:
     x: ptr = 0
+    y: ptr = 0
+    z: ptr = 0
 CODE:
 
     ; init args
-    ;frame_init_args 8
-    mv_reg_const_8 r0 c2
+
+    ;string 1
+    mv_reg_const_8 r0 c1_offset
     push r0 8
     ld_std 0 0
-    push r20 8
-    ld_std 0 1
+    mv_reg_reg r1 r20 8
+
+    ;string 2
+    mv_reg_const_8 r0 c2_offset
+    push r0 8
+    ld_std 0 0
+    mv_reg_reg r2 r20 8
+
+
+    s_alloc 2 16
+    s_set_offset 0 0
+    s_set_offset 1 8
+
+    s_storef_reg 0 r1 8
+    s_storef_reg 1 r2 8
+
+    s_loadf r5 0 8
+    s_loadf r6 1 8
+
+
+    push r5 8
+    ld_std 1 0
+    push r6 8
+    ld_std 1 0
+
+    ;; shadow copy
+    s_alloc_shadow 2
+    s_set_offset 0 8
+    s_set_offset 1 0
+
+    s_loadf r5 0 8
+    s_loadf r6 1 8
+
+
+    push r5 8
+    ld_std 1 0
+    push r6 8
+    ld_std 1 0
+
+
 
 
     halt

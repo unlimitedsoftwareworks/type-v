@@ -1,0 +1,45 @@
+;
+; File creation test
+;
+
+VERSION: 1
+
+CONST:
+    c1: u8 = "mai.txt"
+    c2: u8 = "w"
+    c1_offset: u8 = 0
+    c2_offset: u8 = 8
+
+GLOBAL:
+    x: ptr = 0
+    y: ptr = 0
+    z: ptr = 0
+CODE:
+
+    ; init args
+
+    ;string 1
+    mv_reg_const_8 r0 c1_offset
+    push r0 8
+    ld_std 0 0
+    mv_reg_reg r1 r20 8
+
+    ;string 2
+    mv_reg_const_8 r0 c2_offset
+    push r0 8
+    ld_std 0 0
+    mv_reg_reg r2 r20 8
+
+    push r1 8
+    push r2 8
+    ld_std 1 1
+    mv_reg_reg r3 r20 8
+
+    push r3 8
+    ld_std 1 2
+
+
+
+    halt
+
+

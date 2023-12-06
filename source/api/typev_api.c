@@ -83,6 +83,12 @@ uint64_t typev_api_stack_pop_u64(TypeV_Core* core) {
     return value;
 }
 
+size_t typev_api_stack_pop_ptr(struct TypeV_Core* core){
+    size_t value;
+    stack_pop_ptr(core, &value);
+    return value;
+}
+
 float typev_api_stack_pop_f32(TypeV_Core* core) {
     float value;
     stack_pop_32(core, (uint32_t*)&value);
@@ -157,6 +163,11 @@ void typev_api_return_u64(TypeV_Core* core, uint64_t value) {
     core->registers.regs[20].u64 = value;
 }
 
+
+void typev_api_return_ptr(TypeV_Core* core, size_t value) {
+    core->registers.regs[20].ptr = value;
+}
+
 void typev_api_return_f32(TypeV_Core* core, float value) {
     core->registers.regs[20].f32 = value;
 }
@@ -186,10 +197,12 @@ void typev_api_return_array(TypeV_Core* core, TypeV_Array* value){
 */
 TypeV_Struct *typev_api_struct_create(TypeV_Core *core, uint16_t fieldCount, size_t structSize) {
     // allocate memory for the struct
-    TypeV_Struct *structPtr = malloc(sizeof(TypeV_Struct) + structSize);
+    TypeV_Struct *structPtr = calloc(1, sizeof(TypeV_Struct) + structSize);
     // set the field count
     structPtr->fieldOffsets = calloc(fieldCount, sizeof(uint16_t));
-    structPtr->data = (uint8_t *) calloc(1, sizeof(structSize));
+
+    // not used because it's already allocated alongside the struct, contiguous memory
+    //structPtr->data = (uint8_t *) calloc(1, sizeof(structSize));
 
     return structPtr;
 }
