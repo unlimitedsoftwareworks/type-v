@@ -312,11 +312,15 @@ TypeV_ASM_Global* find_global(Vector* constPool, char* name);
 
 
 void lexer_init(TypeV_ASM_Lexer* lexer, char* program);
+void lexer_free(TypeV_ASM_Lexer* lexer);
 void parser_init(TypeV_ASM_Parser* parser, TypeV_ASM_Lexer* lexer);
 void lexer_tokenize(TypeV_ASM_Lexer* lexer);
 void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser);
+void parser_free(TypeV_ASM_Parser* parser);
 TypeV_ASM_Program* assemble(TypeV_ASM_Parser* parser);
 
 void debug_program(TypeV_ASM_Program* program);
+
+void free_program(TypeV_ASM_Program* program);
 
 #endif //TYPE_V_ASSEMBLER_H

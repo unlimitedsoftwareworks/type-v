@@ -188,6 +188,15 @@ void lexer_init(TypeV_ASM_Lexer* lexer, char* program){
     vector_init(&lexer->tokens);
 }
 
+void lexer_free(TypeV_ASM_Lexer* lexer){
+    for(size_t i = 0; i < lexer->tokens.total; i++){
+        Token* token = vector_get(&lexer->tokens, i);
+        free(token->value);
+        free(token);
+    }
+    vector_free(&lexer->tokens);
+}
+
 uint8_t issymbol(char c){
     return (c == '|') || (c == ':') || (c == ',') || (c == '[') || (c == ']' || (c == '(') || (c == ')') ||
     c== '{' || c == '}' || c == '+' || c == '-' || c == '*' || c == '/'
@@ -210,6 +219,42 @@ void parser_init(TypeV_ASM_Parser* parser, TypeV_ASM_Lexer* lexer) {
     vector_init(&parser->globalPool);
     vector_init(&parser->codePool);
     vector_init(&parser->labels);
+}
+
+
+void parser_free(TypeV_ASM_Parser* parser){
+    /**
+     * Names are all freed from the tokens vector as they are all point there
+     *
+     */
+
+    // free consts
+    for(size_t i = 0; i < vector_total(&parser->constPool); i++){
+        TypeV_ASM_Const* c = vector_get(&parser->constPool, i);
+        free(c);
+    }
+    vector_free(&parser->constPool);
+
+    // free globals
+    for(size_t i = 0; i < vector_total(&parser->globalPool); i++){
+        TypeV_ASM_Global* g = vector_get(&parser->globalPool, i);
+        free(g);
+    }
+    vector_free(&parser->globalPool);
+
+    // free code
+    for(size_t i = 0; i < vector_total(&parser->codePool); i++){
+        TypeV_ASM_Instruction* ins = vector_get(&parser->codePool, i);
+        free(ins);
+    }
+    vector_free(&parser->codePool);
+
+    //free labels
+    for(size_t i = 0; i < vector_total(&parser->labels); i++){
+        TypeV_Label* label = vector_get(&parser->labels, i);
+        free(label);
+    }
+    vector_free(&parser->labels);
 }
 
 void lexer_tokenize(TypeV_ASM_Lexer* lexer){
@@ -1660,6 +1705,7 @@ TypeV_ASM_Program* assemble(TypeV_ASM_Parser* parser) {
     program->codePool = codePool;
     program->codePoolSize = parser->codePoolSize;
 
+
     return program;
 }
 
@@ -1683,3 +1729,12 @@ void debug_program(TypeV_ASM_Program* program) {
     table_print(&t, 400, stdout);
     table_free(&t);
 }
+
+
+void free_program(TypeV_ASM_Program* program){
+    free(program->codePool);
+    free(program->constPool);
+    free(program->globalPool);
+    free(program);
+}
+

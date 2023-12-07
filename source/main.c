@@ -35,7 +35,12 @@ int main() {
     parser_init(&parser, &lexer);
     parse(&lexer, &parser);
     TypeV_ASM_Program* program = assemble(&parser);
+    free(source);
+    lexer_free(&lexer);
+    parser_free(&parser);
+
     LOG_INFO("Program assembled successfully, running.");
+
 
     debug_program(program);
 
@@ -46,4 +51,6 @@ int main() {
     engine_run(&engine);
 
     engine_deallocate(&engine);
+    free_program(program);
+    //free(program);
 }

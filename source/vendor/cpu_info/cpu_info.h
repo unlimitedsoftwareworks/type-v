@@ -164,9 +164,10 @@ cpui_error_t cpui_get_info(cpui_result* result)
         return err;
     }
 
-    len = sizeof(result->vendor_string);
+    /*len = sizeof(result->vendor_string);
     if ( cpui_sysctlbyname("machdep.cpu.vendor", &result->vendor_string, &len, &err) ) {
-    }
+
+    }*/
 
     len = sizeof(result->cache_line_size);
     if ( cpui_sysctlbyname("hw.cachelinesize", &result->cache_line_size, &len, &err) ) {

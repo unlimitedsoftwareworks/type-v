@@ -26,8 +26,17 @@ void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLeng
 }
 
 void engine_deallocate(TypeV_Engine *engine) {
-    //TODO: free cores first
-
+    // free cores
+    TypeV_CoreIterator* iterator = engine->coreIterator;
+    while(iterator != NULL) {
+        TypeV_CoreIterator* next = iterator->next;
+        core_deallocate(iterator->core);
+        free(iterator->core);
+        free(iterator);
+        iterator = next;
+    }
+    engine->coreIterator = NULL;
+    engine->coreCount = 0;
 }
 
 void engine_run(TypeV_Engine *engine) {
@@ -183,8 +192,12 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
             } else {
                 prevIterator->next = iterator->next;
             }
-            //TODO: Free iterator here
-            //free(iterator);
+            // Free iterator here
+            free(iterator);
+
+            // free the core
+            core_deallocate(core);
+            free(core);
             break;
         }
         prevIterator = iterator;

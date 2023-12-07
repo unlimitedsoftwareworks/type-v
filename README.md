@@ -1,24 +1,24 @@
-
-<table>
-    <tr>
-        <td>
-            <p align="center">
-                <img align="center" src='assets/logo.png' width='250'>
-            </p>
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <center>
-Type-V is a virtual machine and runtime environment for type-c programs. 
-While the VM can be used for generic purposes, 
-its instructions are heavily optimized for type-c source code, 
-such as offset-based data types (structs, arrays, classes, interfaces, shadow structs, etc), 
-built-in concurrency, etc.
-            </center>
-        </td>
-    </tr>
-</table>
+    
+    <table>
+        <tr>
+            <td>
+                <p align="center">
+                    <img align="center" src='assets/logo.png' width='250'>
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <center>
+    Type-V is a virtual machine and runtime environment for type-c programs. 
+    While the VM can be used for generic purposes, 
+    its instructions are heavily optimized for type-c source code, 
+    such as offset-based data types (structs, arrays, classes, interfaces, shadow structs, etc), 
+    built-in concurrency, etc.
+                </center>
+            </td>
+        </tr>
+    </table>
 
 
 

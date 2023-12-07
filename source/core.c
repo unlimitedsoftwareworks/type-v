@@ -79,8 +79,44 @@ void core_deallocate(TypeV_Core *core) {
 
     queue_deallocate(&(core->messageInputQueue));
 
-    free(core->constantPool.pool);
+    // free all memory objects
+    for(size_t i = 0; i < core->memTracker.classCount; i++){
+        free(core->memTracker.classes[i]);
+    }
+    if(core->memTracker.classes != NULL)
+        free(core->memTracker.classes);
+
+    for(size_t i = 0; i < core->memTracker.interfaceCount; i++){
+        free(core->memTracker.interfaces[i]);
+    }
+    if(core->memTracker.interfaces != NULL)
+        free(core->memTracker.interfaces);
+
+    for(size_t i = 0; i < core->memTracker.structCount; i++){
+        free(core->memTracker.structs[i]->fieldOffsets);
+        free(core->memTracker.structs[i]);
+    }
+    if(core->memTracker.structs != NULL)
+        free(core->memTracker.structs);
+
+    for(size_t i = 0; i < core->memTracker.arrayCount; i++){
+        free(core->memTracker.arrays[i]);
+    }
+    if(core->memTracker.arrays != NULL)
+        free(core->memTracker.arrays);
+
+    for(size_t i = 0; i < core->memTracker.memObjectCount; i++){
+        free(core->memTracker.memObjects[i]);
+    }
+    if(core->memTracker.memObjects != NULL)
+        free(core->memTracker.memObjects);
+
+
+    // the constant pool is part of the program, we have no ownership over it
     core->constantPool.pool = NULL;
+
+    // free stack
+    stack_free(core);
 
     // Note: Program deallocation depends on how programs are loaded and managed
 }
@@ -106,6 +142,10 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
     struct_ptr->data = calloc(1, totalsize);
     struct_ptr->originalStruct = NULL;
+
+    // add to gc
+    core->memTracker.structs = realloc(core->memTracker.structs, sizeof(size_t)*(core->memTracker.structCount+1));
+    core->memTracker.structs[core->memTracker.structCount++] = struct_ptr;
     return (size_t)struct_ptr;
 }
 
