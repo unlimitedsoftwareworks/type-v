@@ -126,6 +126,15 @@ typedef enum TypeV_OpCode {
     OP_S_ALLOC,
 
     /**
+     * OP_S_SETF_PTR fieldIndex: I
+     * marks of the field at index I as a pointer
+     * for the GC. This might be inefficient, and replace with
+     * struct definitions in the future
+     * (structs defined in bytecode)
+     */
+    //OP_S_MARKF_PTR,
+
+    /**
      * OP_S_ALLOC_SHADOW fieldOffsets-count: I
      * Creates a shadow copy of a struct (who's address is stored in R16),
      * a shadow copy is a copy that points to the same data but with different
@@ -141,8 +150,18 @@ typedef enum TypeV_OpCode {
     OP_S_SET_OFFSET,
 
     /**
+     * OP_S_SET_OFFSET_SHADOW fieldIndexSrc: I, fieldIndexTarget: I
+     * Sets the offset value of field index fieldIndexSrc, of the struct
+     * stored in R16 to the offset value of field index fieldIndexTarget,
+     * of the original struct referenced by the shadow copy
+     * ie. shadow_copy.offsets[fieldIndexSrc] = original.offsets[fieldIndexTarget]
+     */
+    OP_S_SET_OFFSET_SHADOW,
+
+    /**
      * OP_S_LOADF dest: R, fieldIndex: I, size: S
-     * Loads S bytes from field I of struct stored at R16 to register R
+     * Loads
+     * bytes from field I of struct stored at R16 to register R
      */
     OP_S_LOADF,
 
@@ -164,18 +183,11 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG,
 
     /**
-     * OP_C_ALLOCF fields-count: I, class-fields-size-size: Z, class-fields-size: I
+     * OP_C_ALLOCF   num-methods: I, class-fields-size-size: Z, class-fields-size: I
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into R17.
      */
-    OP_C_ALLOCF,
-
-    /**
-     * OP_C_ALLOCM num_methods: I
-     * Allocates new class method table of given total methods count (arg1),
-     * Class address must be stored in R17
-     */
-    OP_C_ALLOCM,
+    OP_C_ALLOC,
 
     /**
      * OP_C_STOREM methodIndex: I, methodAddress: I
@@ -190,27 +202,26 @@ typedef enum TypeV_OpCode {
     OP_C_LOADM,
 
     /**
-     * OP_CSTOREF fieldIndex: I, R: source register, size: S
+     * OP_CSTOREF_REG_[size] fieldIndex: I, R: source register
      * Stores [size] bytes from register R to field I of class stored at R17
      */
-    OP_C_STOREF_REG,
+    OP_C_STOREF_REG_8,
+    OP_C_STOREF_REG_16,
+    OP_C_STOREF_REG_32,
+    OP_C_STOREF_REG_64,
+    OP_C_STOREF_REG_PTR,
+
 
     /**
-     * OP_C_STOREF_CONST_[size] fieldIndex: I, offset-size : Z, offset-: I
-     * Stores [size] bytes from constant pool address offset to field I of
-     * class stored at R17
-     */
-    OP_C_STOREF_CONST_8,
-    OP_C_STOREF_CONST_16,
-    OP_C_STOREF_CONST_32,
-    OP_C_STOREF_CONST_64,
-    OP_C_STOREF_CONST_PTR,
-
-    /**
-     * OP_C_LOADF_[size] dest: R, fieldIndex: I, size: S
+     * OP_C_LOADF_[size] dest: R, fieldIndex: I
      * Loads [size] bytes from field I of class stored at R17 to register R
      */
-    OP_C_LOADF,
+    OP_C_LOADF_8,
+    OP_C_LOADF_16,
+    OP_C_LOADF_32,
+    OP_C_LOADF_64,
+    OP_C_LOADF_PTR,
+
 
     /**
      * OP_I_ALLOC num_methods: I
@@ -231,6 +242,21 @@ typedef enum TypeV_OpCode {
      * Loads method address from method table of interface stored in R18 to register R
      */
     OP_I_LOADM,
+
+    /**
+     * OP_C_IS_C dest: R, classId: I (8 bytes)
+     * Checks if the given interface who's stored in R18' class id is the
+     * same as the given id. Stores the result in R
+     */
+    OP_I_IS_C,
+
+    /**
+     * OP_IS_I method_id: I (8 bytes), jump-address-offset: Z, jump-address: I
+     * Checks if the base class of the interface which is stored in R18 has
+     * a method with the same given ID. If a method with the same ID is found,
+     * it continues. Otherwise, it jumps to the given address.
+     */
+    OP_I_IS_I,
 
     /**
      * OP_A_ALLOC num_elements_size: Z, num_elements: I, element_size: Z
@@ -290,6 +316,8 @@ typedef enum TypeV_OpCode {
      * Creates a stack-frame of the given size.
      * The stack frame is initialized with the specified size
      * that is already stored in the constant pool.
+     * from type-c args are pushed in reverse order,
+     * meaning bottom of the stack is the first argument
      */
     OP_FRAME_INIT_ARGS,
 
@@ -356,6 +384,8 @@ typedef enum TypeV_OpCode {
      * to the given type. Overrides the value in R.
      * OP_CAST is used to cast between types of the same
      * size
+     * example: OP_CAST_I8_U8 R0
+     *
      */
     OP_CAST_I8_U8,
     OP_CAST_U8_I8,
@@ -372,34 +402,30 @@ typedef enum TypeV_OpCode {
     OP_CAST_F64_I64,
 
     /**
-     * OP_UPCAST_[d1]_[d2] dest: R
-     * casts the value in register R from the given type
-     * to the given type. Overrides the value in R.
+     * OP_UPCAST_[I|U|F] dest: R, from: S, to: S
+     * up casts the value in register R from given bytes
+     * to target bytes. Overrides the value in R.
+     * Example: OP_UPCAST_I R0, 4, 8
+     * upcasts the value in R0 from 4 bytes to 8 bytes
      */
-    OP_UPCAST_I8_I16,
-    OP_UPCAST_U8_U16,
-    OP_UPCAST_I16_I32,
-    OP_UPCAST_U16_U32,
-    OP_UPCAST_I32_I64,
-    OP_UPCAST_U32_U64,
-    OP_UPCAST_F32_F64,
+    OP_UPCAST_I,
+    OP_UPCAST_U,
+    OP_UPCAST_F,
 
     /**
-     * OP_DCAST_[d1]_[d2] dest: R
-     * down casts the value in register R from the given type
-     * to the given type. Overrides the value in R.
+     * OP_UPCAST_[I|U|F] dest: R, from: S, to: S
+     * down casts the value in register R from given bytes
+     * to target bytes. Overrides the value in R.
+     * Example: OP_DOWNCAST_I R0, 8, 4
+     * downcasts the value in R0 from 8 bytes to 4 bytes
      */
-    OP_DCAST_I16_I8,
-    OP_DCAST_U16_U8,
-    OP_DCAST_I32_I16,
-    OP_DCAST_U32_U16,
-    OP_DCAST_I64_I32,
-    OP_DCAST_U64_U32,
-    OP_DCAST_F64_F32,
+    OP_DCAST_I,
+    OP_DCAST_U,
+    OP_DCAST_F,
 
     /***
      * Math operations
-     * OP_[math]_[type] op1: R, op2: R, dest: R
+     * OP_[math]_[type] dest: R, op1: R, op2: R
      * performs the given math operation on op1 and op2
      * and stores the result in dest
      */

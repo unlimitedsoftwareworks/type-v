@@ -262,6 +262,8 @@ void s_alloc(TypeV_Core* core){
     core->registers.regs[16].ptr = mem;
 }
 
+
+
 void s_alloc_shadow(TypeV_Core* core){
     const uint8_t fields_count = core->program.bytecode[core->registers.ip++];
 
@@ -284,6 +286,15 @@ void s_set_offset(TypeV_Core* core){
     struct_ptr->fieldOffsets[field_index] = offset;
 }
 
+void s_set_offset_shadow(TypeV_Core* core){
+    const uint8_t field_source_index = core->program.bytecode[core->registers.ip++];
+    const uint8_t field_target_index = core->program.bytecode[core->registers.ip++];
+
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)core->registers.regs[16].ptr;
+    ASSERT(struct_ptr->originalStruct != NULL, "Cannot set offset of shadow struct without original struct");
+    struct_ptr->fieldOffsets[field_target_index] = struct_ptr->originalStruct->fieldOffsets[field_source_index];
+}
+
 void s_loadf(TypeV_Core* core){
     const uint8_t target = core->program.bytecode[core->registers.ip++];
     const uint8_t field_index = core->program.bytecode[core->registers.ip++];
@@ -291,7 +302,7 @@ void s_loadf(TypeV_Core* core){
     if(bytesize == 0) bytesize = PTR_SIZE;
     ASSERT(target < MAX_REG, "Invalid register index");
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->registers.regs[16].ptr;
-    memcpy(&core->registers.regs[target], struct_ptr->data+struct_ptr->fieldOffsets[field_index], bytesize);
+    memcpy(&core->registers.regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], bytesize);
 }
 
 
@@ -304,7 +315,7 @@ void s_storef_const_##bits(TypeV_Core* core){\
     core->registers.ip += offset_length;\
     ASSERT(offset < core->constantPool.length, "Invalid constant offset");\
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->registers.regs[16].ptr;\
-    memcpy(struct_ptr->data+struct_ptr->fieldOffsets[field_index], &core->constantPool.pool[offset], size);\
+    memcpy(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constantPool.pool[offset], size);\
 }
 
 S_STOREF_CONST(8, 1)
@@ -324,27 +335,20 @@ void s_storef_reg(TypeV_Core* core){
     ASSERT(bytesize <= 8, "Invalid byte size");
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->registers.regs[16].ptr;
-    memcpy(struct_ptr->data+struct_ptr->fieldOffsets[field_index], &core->registers.regs[source], bytesize);
+    memcpy(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->registers.regs[source], bytesize);
 }
 
-void c_allocf(TypeV_Core* core){
-    const uint8_t fields_count = core->program.bytecode[core->registers.ip++];
-    const uint8_t struct_size_length = core->program.bytecode[core->registers.ip++];
-    size_t struct_size = 0; /* we do not increment offset here*/
-    memcpy(&struct_size, &core->program.bytecode[core->registers.ip],  struct_size_length);
-    core->registers.ip += struct_size_length;
+void c_alloc(TypeV_Core* core){
+    const uint8_t methods_count = core->program.bytecode[core->registers.ip++];
+    const uint8_t fields_size_length = core->program.bytecode[core->registers.ip++];
+    size_t fields_size = 0; /* we do not increment offset here*/
+    memcpy(&fields_size, &core->program.bytecode[core->registers.ip],  fields_size_length);
+    core->registers.ip += fields_size_length;
 
-    // allocate memory for struct
-    size_t mem = core_class_alloc_fields(core, fields_count, struct_size);
+    // allocate memory for class
+    size_t mem = core_class_alloc(core, methods_count, fields_size);
     // move the pointer to R17
     core->registers.regs[17].ptr = mem;
-}
-
-void c_allocm(TypeV_Core* core){
-    const uint8_t methods_count = core->program.bytecode[core->registers.ip++];
-    // allocate memory for struct
-    TypeV_Class* c = (TypeV_Class*)core->registers.regs[17].ptr;
-    core_class_alloc_methods(core, methods_count, c);
 }
 
 void c_storem(TypeV_Core* core){
@@ -373,47 +377,47 @@ void c_loadm(TypeV_Core* core){
     core->registers.regs[target].ptr = offset;
 }
 
-void c_storef_reg(TypeV_Core* core){
-    const uint8_t field_index = core->program.bytecode[core->registers.ip++];
-    const uint8_t source = core->program.bytecode[core->registers.ip++];
-    uint8_t bytesize = core->program.bytecode[core->registers.ip++];
-    if(bytesize == 0) bytesize = PTR_SIZE;
-    ASSERT(source < MAX_REG, "Invalid register index");
-    ASSERT(bytesize <= 8, "Invalid byte size");
-    TypeV_Class* c = (TypeV_Class*)core->registers.regs[17].ptr;
-    memcpy(c->data+c->fieldsOffset[field_index], &core->registers.regs[source], bytesize);
+#define C_STOREF_REG(bits, size) \
+void c_storef_reg_##bits(TypeV_Core* core){\
+    const uint8_t field_offset_size = core->program.bytecode[core->registers.ip++];\
+    size_t field_offset = 0;\
+    memcpy(&field_offset, &core->program.bytecode[core->registers.ip], field_offset_size);\
+    core->registers.ip += field_offset_size;\
+    const uint8_t source = core->program.bytecode[core->registers.ip++];\
+\
+    ASSERT(source < MAX_REG, "Invalid register index");\
+\
+    TypeV_Class* c = (TypeV_Class*)core->registers.regs[17].ptr;\
+    memcpy(c->data+field_offset, &core->registers.regs[source], size);\
 }
 
+C_STOREF_REG(8, 1)
+C_STOREF_REG(16, 2)
+C_STOREF_REG(32, 4)
+C_STOREF_REG(64, 8)
+C_STOREF_REG(ptr, PTR_SIZE)
+#undef C_STOREF_REG
 
-#define C_STOREF_CONST(bits, size) \
-void c_storef_const_##bits(TypeV_Core* core){\
-    const uint8_t field_index = core->program.bytecode[core->registers.ip++];\
-    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];\
-    size_t offset = 0; /* we do not increment offset here */\
-    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);\
-    core->registers.ip += offset_length;\
-    ASSERT(offset < core->constantPool.length, "Invalid constant offset");\
-    TypeV_Class* c = (TypeV_Class*)core->registers.regs[17].ptr;             \
-    memcpy(c->data+c->fieldsOffset[field_index], &core->constantPool.pool[offset], size);\
+#define C_LOADF(bits, size) \
+void c_loadf_##bits(TypeV_Core* core){ \
+    const uint8_t target = core->program.bytecode[core->registers.ip++];\
+    ASSERT(target < MAX_REG, "Invalid register index");\
+\
+    const uint8_t offset_size = core->program.bytecode[core->registers.ip++];\
+    size_t offset = 0;\
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_size);\
+    core->registers.ip += offset_size;\
+\
+    TypeV_Class* c = (TypeV_Class*)core->registers.regs[17].ptr;\
+    memcpy(&core->registers.regs[target], c->data+offset, size);\
 }
 
-C_STOREF_CONST(8, 1)
-C_STOREF_CONST(16, 2)
-C_STOREF_CONST(32, 4)
-C_STOREF_CONST(64, 8)
-C_STOREF_CONST(ptr, PTR_SIZE)
-#undef C_STOREF_CONST
-
-void c_loadf(TypeV_Core* core){
-    const uint8_t target = core->program.bytecode[core->registers.ip++];
-    const uint8_t field_index = core->program.bytecode[core->registers.ip++];
-    uint8_t bytesize = core->program.bytecode[core->registers.ip++];
-    if(bytesize == 0) bytesize = PTR_SIZE;
-    ASSERT(target < MAX_REG, "Invalid register index");
-    TypeV_Class* c = (TypeV_Class*)core->registers.regs[17].ptr;
-    memcpy(&core->registers.regs[target], c->data+c->fieldsOffset[field_index], bytesize);
-}
-
+C_LOADF(8, 1)
+C_LOADF(16, 2)
+C_LOADF(32, 4)
+C_LOADF(64, 8)
+C_LOADF(ptr, PTR_SIZE)
+#undef C_LOADF
 
 void i_alloc(TypeV_Core* core){
     const uint8_t fields_count = core->program.bytecode[core->registers.ip++];
@@ -450,6 +454,47 @@ void i_loadm(TypeV_Core* core){
     size_t offset = i->methodsOffset[method_index];
 
     core->registers.regs[target].ptr = i->classPtr->methods[offset];
+}
+
+void i_is_c(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint64_t classId = 0;
+    memcpy(&classId, &core->program.bytecode[core->registers.ip],  8);
+    core->registers.ip += 8;
+
+    TypeV_Interface* interface = (TypeV_Interface*)core->registers.regs[18].ptr;
+    TypeV_Class * class_ = interface->classPtr;
+
+    core->registers.regs[target].u8 = class_->uid == classId;
+}
+
+void i_is_i(TypeV_Core* core){
+    const uint64_t lookUpMethodId = 0;
+    memcpy(&lookUpMethodId, &core->program.bytecode[core->registers.ip],  8);
+    core->registers.ip += 8;
+
+    const uint8_t offsetSize = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offsetSize);
+    core->registers.ip += offsetSize;
+
+    TypeV_Interface* interface = (TypeV_Interface*)core->registers.regs[18].ptr;
+    TypeV_Class * class_ = interface->classPtr;
+
+    uint8_t found = 0;
+    for(size_t i = 0; i < class_->num_methods; i++) {
+        const uint64_t methodId = 0;
+        memcpy(&methodId, &core->program.bytecode[class_->methods[i]],  8);
+        if(lookUpMethodId == methodId) {
+            found = 1;
+            break;
+        }
+    }
+
+    if(!found){
+        core->registers.ip = offset;
+    }
 }
 
 void a_alloc(TypeV_Core* core){
@@ -709,41 +754,126 @@ OP_CAST(i64, f64, double)
 OP_CAST(f64, i64, int64_t)
 #undef OP_CAST
 
-#define OP_UPCAST(d1, d2, type) \
-void upcast_##d1##_##d2(TypeV_Core* core){ \
-    uint8_t op1 = core->program.bytecode[core->registers.ip++];\
-    core->registers.regs[op1].d2 = (type) core->registers.regs[op1].d1;\
+void upcast_i(TypeV_Core* core) {
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    uint8_t from = core->program.bytecode[core->registers.ip++];
+    uint8_t to = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(reg < MAX_REG, "Invalid register index");
+    ASSERT(from <= 8 && to <= 8 && from < to, "Invalid byte sizes for upcasting");
+
+    // Extract the value from the register
+    int64_t value = 0;
+    memcpy(&value, &core->registers.regs[reg], from);
+
+    // Perform sign extension without branching
+    if (from < 8) {
+        int64_t signExtMask = (value & (1LL << (from * 8 - 1))) ? (-1LL << (from * 8)) : 0;
+        value |= signExtMask;
+    }
+
+    // Store the result back in the register
+    memcpy(&core->registers.regs[reg], &value, to);
 }
 
-OP_UPCAST(i8, i16, int16_t)
-OP_UPCAST(u8, u16, uint16_t)
-OP_UPCAST(i16, i32, int32_t)
-OP_UPCAST(u16, u32, uint32_t)
-OP_UPCAST(i32, i64, int64_t)
-OP_UPCAST(u32, u64, uint64_t)
-OP_UPCAST(f32, f64, double)
-#undef OP_UPCAST
+void upcast_u(TypeV_Core* core) {
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    uint8_t from = core->program.bytecode[core->registers.ip++];
+    uint8_t to = core->program.bytecode[core->registers.ip++];
 
-#define OP_DOWNCAST(d1, d2, type) \
-void dcast_##d1##_##d2(TypeV_Core* core){ \
-    uint8_t op1 = core->program.bytecode[core->registers.ip++];\
-    core->registers.regs[op1].d2 = (type) core->registers.regs[op1].d1;\
+    ASSERT(reg < MAX_REG, "Invalid register index");
+    ASSERT(from <= 8 && to <= 8 && from < to, "Invalid byte sizes for upcasting");
+
+    // Extract the value from the register
+    uint64_t value = 0;
+    memcpy(&value, &core->registers.regs[reg], from);
+
+    // Store the result back in the register
+    memcpy(&core->registers.regs[reg], &value, to);
 }
 
-OP_DOWNCAST(i16, i8, int8_t)
-OP_DOWNCAST(u16, u8, uint8_t)
-OP_DOWNCAST(i32, i16, int16_t)
-OP_DOWNCAST(u32, u16, uint16_t)
-OP_DOWNCAST(i64, i32, int32_t)
-OP_DOWNCAST(u64, u32, uint32_t)
-OP_DOWNCAST(f64, f32, float)
-#undef OP_DOWNCAST
+void upcast_f(TypeV_Core* core) {
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    uint8_t from = core->program.bytecode[core->registers.ip++];
+    uint8_t to = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(reg < MAX_REG, "Invalid register index");
+    ASSERT((from == 4 && to == 8), "Invalid byte sizes for floating-point upcasting");
+
+    // Extract the float value from the register
+    float floatValue = 0.0f;
+    memcpy(&floatValue, &core->registers.regs[reg], from);
+
+    // Convert to double
+    double doubleValue = (double)floatValue;
+
+    // Store the result back in the register
+    memcpy(&core->registers.regs[reg], &doubleValue, to);
+}
+
+
+void dcast_i(TypeV_Core* core) {
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    uint8_t from = core->program.bytecode[core->registers.ip++];
+    uint8_t to = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(reg < MAX_REG, "Invalid register index");
+    ASSERT(from <= 8 && to <= 8 && from > to, "Invalid byte sizes for downcasting");
+
+    // We simply need to copy the lower 'to' bytes from the register
+    int64_t value = 0;
+    memcpy(&value, &core->registers.regs[reg], to);
+
+    // Store the result back in the register (overwriting only 'to' bytes)
+    memcpy(&core->registers.regs[reg], &value, to);
+}
+
+void dcast_u(TypeV_Core* core) {
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    uint8_t from = core->program.bytecode[core->registers.ip++];
+    uint8_t to = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(reg < MAX_REG, "Invalid register index");
+    ASSERT(from <= 8 && to <= 8 && from > to, "Invalid byte sizes for downcasting");
+
+    // Extract the value from the register
+    uint64_t value = 0;
+    memcpy(&value, &core->registers.regs[reg], from);
+
+    // Truncate the value to the smaller size
+    uint64_t truncatedValue = 0;
+    memcpy(&truncatedValue, &value, to);
+
+    // Store the truncated value back in the register
+    memcpy(&core->registers.regs[reg], &truncatedValue, to);
+}
+
+void dcast_f(TypeV_Core* core) {
+    uint8_t reg = core->program.bytecode[core->registers.ip++];
+    uint8_t from = core->program.bytecode[core->registers.ip++];
+    uint8_t to = core->program.bytecode[core->registers.ip++];
+
+    ASSERT(reg < MAX_REG, "Invalid register index");
+    ASSERT((from == 8 && to == 4), "Invalid byte sizes for floating-point downcasting");
+
+    // Extract the double value from the register
+    double doubleValue = 0.0;
+    memcpy(&doubleValue, &core->registers.regs[reg], from);
+
+    // Convert to float
+    float floatValue = (float)doubleValue;
+
+    // Store the result back in the register
+    memcpy(&core->registers.regs[reg], &floatValue, to);
+}
+
+
 
 #define OP_BINARY(name, type, op)\
 void name##_##type(TypeV_Core* core){\
+    uint8_t target = core->program.bytecode[core->registers.ip++];\
     uint8_t op1 = core->program.bytecode[core->registers.ip++];\
     uint8_t op2 = core->program.bytecode[core->registers.ip++];\
-    uint8_t target = core->program.bytecode[core->registers.ip++];\
     core->registers.regs[target].type = core->registers.regs[op1].type op core->registers.regs[op2].type;\
 }
 
@@ -759,30 +889,30 @@ OP_BINARY(add, f32, +)
 OP_BINARY(add, f64, +)
 
 void add_ptr_u8(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
     core->registers.regs[target].ptr = core->registers.regs[op1].ptr + core->registers.regs[op2].u8;
 }
 
 void add_ptr_u16(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
     core->registers.regs[target].ptr = core->registers.regs[op1].ptr + core->registers.regs[op2].u16;
 }
 
 void add_ptr_u32(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
     core->registers.regs[target].ptr = core->registers.regs[op1].ptr + core->registers.regs[op2].u32;
 }
 
 void add_ptr_u64(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
     core->registers.regs[target].ptr = core->registers.regs[op1].ptr + core->registers.regs[op2].u64;
 }
 
@@ -798,30 +928,30 @@ OP_BINARY(sub, f32, -)
 OP_BINARY(sub, f64, -)
 
 void sub_ptr_u8(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
     core->registers.regs[target].ptr = core->registers.regs[op1].ptr - core->registers.regs[op2].u8;
 }
 
 void sub_ptr_u16(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
     core->registers.regs[target].ptr = core->registers.regs[op1].ptr - core->registers.regs[op2].u16;
 }
 
 void sub_ptr_u32(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
     core->registers.regs[target].ptr = core->registers.regs[op1].ptr - core->registers.regs[op2].u32;
 }
 
 void sub_ptr_u64(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
     core->registers.regs[target].ptr = core->registers.regs[op1].ptr - core->registers.regs[op2].u64;
 }
 
@@ -1181,139 +1311,146 @@ void cmp_ptr(TypeV_Core* core) {
 }
 
 void band_8(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u8 = core->registers.regs[op1].u8 & core->registers.regs[op2].u8;
 }
 
 void band_16(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u16 = core->registers.regs[op1].u16 & core->registers.regs[op2].u16;
 }
 
 void band_32(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u32 = core->registers.regs[op1].u32 & core->registers.regs[op2].u32;
 }
 
 void band_64(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u64 = core->registers.regs[op1].u64 & core->registers.regs[op2].u64;
 }
 
 void bor_8(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u8 = core->registers.regs[op1].u8 | core->registers.regs[op2].u8;
 }
 
 void bor_16(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u16 = core->registers.regs[op1].u16 | core->registers.regs[op2].u16;
 }
 
 void bor_32(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u32 = core->registers.regs[op1].u32 | core->registers.regs[op2].u32;
 }
 
 void bor_64(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u64 = core->registers.regs[op1].u64 | core->registers.regs[op2].u64;
 }
 
 void bxor_8(TypeV_Core* core){
-    uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u8 = core->registers.regs[op1].u8 ^ core->registers.regs[target].u8;
 }
 
 void bxor_16(TypeV_Core* core){
-    uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u16 = core->registers.regs[op1].u16 ^ core->registers.regs[target].u16;
 }
 
 void bxor_32(TypeV_Core* core){
-    uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u32 = core->registers.regs[op1].u32 ^ core->registers.regs[target].u32;
 }
 
 void bxor_64(TypeV_Core* core){
-    uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u64 = core->registers.regs[op1].u64 ^ core->registers.regs[target].u64;
 }
 
 void bnot_8(TypeV_Core* core){
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
-    core->registers.regs[target].u8 = ~core->registers.regs[target].u8;
+    core->registers.regs[target].u8 = ~core->registers.regs[op1].u8;
 }
 
 void bnot_16(TypeV_Core* core){
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
-    core->registers.regs[target].u16 = ~core->registers.regs[target].u16;
+    core->registers.regs[target].u16 = ~core->registers.regs[op1].u16;
 }
 
 void bnot_32(TypeV_Core* core){
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
-    core->registers.regs[target].u32 = ~core->registers.regs[target].u32;
+    core->registers.regs[target].u32 = ~core->registers.regs[op1].u32;
 }
 
 void bnot_64(TypeV_Core* core){
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
-    core->registers.regs[target].u64 = ~core->registers.regs[target].u64;
+    core->registers.regs[target].u64 = ~core->registers.regs[op1].u64;
 }
 
 void and(TypeV_Core* core){
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
     uint8_t target = core->program.bytecode[core->registers.ip++];
 
-    core->registers.regs[target].u8 = core->registers.regs[op1].u8 && core->registers.regs[target].u8;
+    core->registers.regs[target].u8 = core->registers.regs[op1].u8 && core->registers.regs[op2].u8;
 }
 
 void or(TypeV_Core* core){
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
+    uint8_t op2 = core->program.bytecode[core->registers.ip++];
     uint8_t target = core->program.bytecode[core->registers.ip++];
 
-    core->registers.regs[target].u8 = core->registers.regs[op1].u8 || core->registers.regs[target].u8;
+    core->registers.regs[target].u8 = core->registers.regs[op1].u8 || core->registers.regs[op2].u8;
 }
 
 void not(TypeV_Core* core){
     uint8_t target = core->program.bytecode[core->registers.ip++];
+    uint8_t op1 = core->program.bytecode[core->registers.ip++];
 
-    core->registers.regs[target].u8 = !core->registers.regs[target].u8;
+    core->registers.regs[target].u8 = !core->registers.regs[op1].u8;
 }
 
 void jmp(TypeV_Core* core){

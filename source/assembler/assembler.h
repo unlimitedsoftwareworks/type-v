@@ -41,16 +41,15 @@ static char* instructions[] = {
         "mv_reg_global_8", "mv_reg_global_16", "mv_reg_global_32", "mv_reg_global_64", "mv_reg_global_ptr",
         "mv_reg_arg_8", "mv_reg_arg_16", "mv_reg_arg_32", "mv_reg_arg_64", "mv_reg_arg_ptr",
         "mv_arg_reg_8", "mv_arg_reg_16", "mv_arg_reg_32", "mv_arg_reg_64", "mv_arg_reg_ptr",
-        "s_alloc", "s_alloc_shadow", "s_set_offset",
+        "s_alloc", "s_alloc_shadow", "s_set_offset", "s_set_offset_shadow",
         "s_loadf",
         "s_storef_const_8", "s_storef_const_16", "s_storef_const_32", "s_storef_const_64", "s_storef_const_ptr",
         "s_storef_reg",
-        "c_allocf", "c_allocm",
+        "c_alloc",
         "c_storem", "c_loadm",
-        "c_storef_reg",
-        "c_storef_const_8", "c_storef_const_16", "c_storef_const_32", "c_storef_const_64", "c_storef_const_ptr",
-        "c_loadf",
-        "i_alloc", "i_set_offset", "i_loadm",
+        "c_storef_reg_8", "c_storef_reg_16", "c_storef_reg_32", "c_storef_reg_64", "c_storef_reg_ptr",
+        "c_loadf_8", "c_loadf_16", "c_loadf_32", "c_loadf_64", "c_loadf_ptr",
+        "i_alloc", "i_set_offset", "i_loadm", "i_is_c", "i_is_i",
         "a_alloc", "a_extend",
         "a_storef_reg",
         "a_storef_const_8", "a_storef_const_16", "a_storef_const_32", "a_storef_const_64", "a_storef_const_ptr",
@@ -64,13 +63,8 @@ static char* instructions[] = {
         "cast_i64_u64","cast_u64_i64","cast_i32_f32",
         "cast_f32_i32","cast_i64_f64","cast_f64_i64",
 
-        "upcast_i8_i16","upcast_u8_u16","upcast_i16_i32",
-        "upcast_u16_u32","upcast_i32_i64","upcast_u32_u64",
-        "upcast_f32_f64",
-
-        "dcast_i16_i8","dcast_u16_u8","dcast_i32_i16",
-        "dcast_u32_u16","dcast_i64_i32","dcast_u64_u32",
-        "dcast_f64_f32",
+        "upcast_i","upcast_u","upcast_f",
+        "dcast_i","dcast_u","dcast_f",
 
         "add_i8","add_u8","add_i16","add_u16",
         "add_i32","add_u32","add_i64","add_u64",
@@ -150,7 +144,7 @@ static char* instructions[] = {
         "ld_std",
         "vm_health"
 };
-#define MAX_INSTRUCTION 241
+#define MAX_INSTRUCTION 238
 
 typedef enum TokenType {
     TOK_INSTRUCTION=0,

@@ -940,6 +940,15 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 parser->codePoolSize += 2 + fieldOffsetSize;
                 break;
             }
+            case OP_S_SET_OFFSET_SHADOW: {
+                // OP_S_SET_OFFSET_SHADOW field-index-shadow: I, field-index-source: I
+                uint8_t fieldIndexShadow = getShortNumber(parser);
+                uint8_t fieldIndexSource = getShortNumber(parser);
+
+                create_instruction(parser, OP_S_SET_OFFSET_SHADOW, fieldIndexShadow, fieldIndexSource, 0, 2);
+                parser->codePoolSize += 2;
+                break;
+            }
             case OP_S_LOADF: {
                 // OP_S_LOADF_8 dest: R, field-index: I
                 TypeV_ASM_Reg dest = getRegister(parser);
@@ -977,23 +986,14 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 break;
             }
             // OP_C_ALLOCF fields-count: I, size: BigOffset
-            case OP_C_ALLOCF: {
+            case OP_C_ALLOC: {
                 // OP_C_ALLOCF fields-count: I, size: BigOffset
-                uint8_t fieldsCount = getShortNumber(parser);
+                uint8_t methodsCount = getShortNumber(parser);
                 size_t size = getLongNumber(parser);
                 uint8_t sizeSize = bytes_needed(size);
 
-                create_instruction(parser, OP_C_ALLOCF, fieldsCount, sizeSize, size, 3);
+                create_instruction(parser, OP_C_ALLOC, methodsCount, sizeSize, size, 3);
                 parser->codePoolSize += 2 + sizeSize;
-                break;
-            }
-            // OP_C_ALLOCM num_methods: Short number
-            case OP_C_ALLOCM: {
-                // OP_C_ALLOCM num_methods: Short number
-                uint8_t numMethods = getShortNumber(parser);
-
-                create_instruction(parser, OP_C_ALLOCM, numMethods, 0, 0, 1);
-                parser->codePoolSize += 1;
                 break;
             }
 
@@ -1018,40 +1018,34 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 parser->codePoolSize += 2;
                 break;
             }
-            case OP_C_STOREF_REG: // OP_CSTOREF_[size] fieldIndex: I, R: source register, size: S
+            case OP_C_STOREF_REG_8:
+            case OP_C_STOREF_REG_16:
+            case OP_C_STOREF_REG_32:
+            case OP_C_STOREF_REG_64:
+            case OP_C_STOREF_REG_PTR:// OP_CSTOREF_[size] fieldIndex: I, R: source register, size: S
             {
                 // OP_C_STOREF_8 fieldIndex: I, R: source register, size: S
-                uint8_t fieldIndex = getShortNumber(parser);
+                uint64_t fieldOffset = getLongNumber(parser);
+                uint8_t fieldOffsetSize = bytes_needed(fieldOffset);
                 TypeV_ASM_Reg source = getRegister(parser);
-                uint8_t byteSize = getByteSize(parser);
+                uint8_t offsetSize = bytes_needed(fieldOffset);
 
-                create_instruction(parser, OP_C_STOREF_REG, fieldIndex, source, byteSize, 3);
-                parser->codePoolSize += 3;
+                create_instruction(parser, idx, offsetSize, fieldOffset, source, 3);
+                parser->codePoolSize += 2+offsetSize;
                 break;
             }
-            case OP_C_STOREF_CONST_8:
-            case OP_C_STOREF_CONST_16:
-            case OP_C_STOREF_CONST_32:
-            case OP_C_STOREF_CONST_64:
-            case OP_C_STOREF_CONST_PTR: // OP_C_STOREF_CONST_PTR fieldIndex: I, offset-size: Z, offset: I
-            {
-                // OP_C_STOREF_CONST_PTR fieldIndex: I, offset-size: Z, offset: I
-                uint8_t fieldIndex = getShortNumber(parser);
-                TypeV_ASM_Const *c = getConst(parser);
-                uint8_t offsetSize = c->offsetSize;
-                size_t offset = c->offset;
-
-                create_instruction(parser, OP_C_STOREF_CONST_PTR, fieldIndex, offsetSize, offset, 3);
-                parser->codePoolSize += 2 + offsetSize;
-                break;
-            }
-            case OP_C_LOADF: {
+            case OP_C_LOADF_8:
+            case OP_C_LOADF_16:
+            case OP_C_LOADF_32:
+            case OP_C_LOADF_64:
+            case OP_C_LOADF_PTR:{
                 TypeV_ASM_Reg dest = getRegister(parser);
-                uint8_t fieldIndex = getShortNumber(parser);
-                uint8_t byteSize = getByteSize(parser);
 
-                create_instruction(parser, OP_C_LOADF, dest, fieldIndex, byteSize, 3);
-                parser->codePoolSize += 3;
+                uint64_t fieldOffset = getLongNumber(parser);
+                uint8_t offsetSize = bytes_needed(fieldOffset);
+
+                create_instruction(parser, idx, dest, offsetSize, fieldOffset, 3);
+                parser->codePoolSize += 2 + offsetSize;
                 break;
             }
 
@@ -1085,6 +1079,27 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 parser->codePoolSize += 2;
                 break;
             }
+
+            case OP_I_IS_C: {
+                // OP_I_IS_C dest: R, ClassID: I (8 bytes)
+                TypeV_ASM_Reg dest = getRegister(parser);
+                uint64_t classId = getLongNumber(parser);
+
+                create_instruction(parser, OP_I_IS_C, dest, classId, 0, 2);
+                parser->codePoolSize += 9;
+                break;
+            }
+
+            case OP_I_IS_I: {
+                // method_id: I (8 bytes), jump-address-offset: Z, jump-address: I
+                uint64_t methodId = getLongNumber(parser);
+                TypeV_Label *label = getLabel(parser); // labels are stored as 8 bytes for now
+
+                create_instruction(parser, OP_I_IS_I, methodId, (size_t)label, 0, 2);
+                parser->codePoolSize += 17; // 8 for method index, 8 for label and 1 for label size which will be 8
+                break;
+            }
+
             case OP_PUSH: {
                 // OP_PUSH reg: R, size: S
                 TypeV_ASM_Reg reg = getRegister(parser);
@@ -1209,25 +1224,26 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
             case OP_CAST_I32_F32:
             case OP_CAST_F32_I32:
             case OP_CAST_I64_F64:
-            case OP_CAST_F64_I64:
-            case OP_UPCAST_I8_I16:
-            case OP_UPCAST_U8_U16:
-            case OP_UPCAST_I16_I32:
-            case OP_UPCAST_U16_U32:
-            case OP_UPCAST_I32_I64:
-            case OP_UPCAST_U32_U64:
-            case OP_UPCAST_F32_F64:
-            case OP_DCAST_I16_I8:
-            case OP_DCAST_U16_U8:
-            case OP_DCAST_I32_I16:
-            case OP_DCAST_U32_U16:
-            case OP_DCAST_I64_I32:
-            case OP_DCAST_U64_U32:
-            case OP_DCAST_F64_F32: {
+            case OP_CAST_F64_I64: {
                 TypeV_ASM_Reg dest = getRegister(parser);
 
                 create_instruction(parser, idx, dest, 0, 0, 1);
                 parser->codePoolSize++;
+                break;
+            }
+
+            case OP_UPCAST_I:
+            case OP_UPCAST_U:
+            case OP_UPCAST_F:
+            case OP_DCAST_I:
+            case OP_DCAST_U:
+            case OP_DCAST_F:{
+                TypeV_ASM_Reg dest = getRegister(parser);
+                uint8_t from_byte = getByteSize(parser);
+                uint8_t to_byte = getByteSize(parser);
+
+                create_instruction(parser, idx, dest, from_byte, to_byte, 3);
+                parser->codePoolSize += 3;
                 break;
             }
 
@@ -1689,6 +1705,45 @@ TypeV_ASM_Program* assemble(TypeV_ASM_Parser* parser) {
 
 
         uint64_t abs_offset = inst->offset + 1;
+
+        // since the class id is hardcoded 8 bytes need to override
+        if (inst->opcode == OP_I_IS_C) {
+            // cpy reg
+            memcpy(codePool + abs_offset, &inst->arg1, 1);
+            abs_offset ++;
+            // cpy id
+            memcpy(codePool + abs_offset, &inst->arg2, 8);
+            abs_offset += 8;
+            continue;
+
+        }
+
+        if(inst->opcode == OP_I_IS_I) {
+            // cpy method id
+            memcpy(codePool + abs_offset, &inst->arg1, 8);
+            abs_offset += 8;
+
+            TypeV_Label* label = (TypeV_Label*)inst->arg2;
+            TypeV_Label* original = find_label(parser, label->name);
+            // if original is null, fail.
+            if(original == NULL){
+                LOG_ERROR("Label %s not found", label->name);
+                exit(1);
+            }
+
+            uint64_t offset = original->primaryCodeOffset;
+            uint64_t length = 8;
+
+            memcpy(codePool + abs_offset, &length, 1);
+            abs_offset ++;
+            memcpy(codePool + abs_offset, &offset, 8);
+            abs_offset += 8;
+
+            continue;
+        }
+
+
+
         if(inst->num_args > 0){
             memcpy(codePool + abs_offset, &inst->arg1, bytes_needed(inst->arg1));
             abs_offset += bytes_needed(inst->arg1);

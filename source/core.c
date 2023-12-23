@@ -83,33 +83,38 @@ void core_deallocate(TypeV_Core *core) {
     for(size_t i = 0; i < core->memTracker.classCount; i++){
         free(core->memTracker.classes[i]);
     }
-    if(core->memTracker.classes != NULL)
+    if(core->memTracker.classes != NULL) {
         free(core->memTracker.classes);
+    }
 
     for(size_t i = 0; i < core->memTracker.interfaceCount; i++){
         free(core->memTracker.interfaces[i]);
     }
-    if(core->memTracker.interfaces != NULL)
+    if(core->memTracker.interfaces != NULL) {
         free(core->memTracker.interfaces);
+    }
 
     for(size_t i = 0; i < core->memTracker.structCount; i++){
         free(core->memTracker.structs[i]->fieldOffsets);
         free(core->memTracker.structs[i]);
     }
-    if(core->memTracker.structs != NULL)
+    if(core->memTracker.structs != NULL) {
         free(core->memTracker.structs);
+    }
 
     for(size_t i = 0; i < core->memTracker.arrayCount; i++){
         free(core->memTracker.arrays[i]);
     }
-    if(core->memTracker.arrays != NULL)
+    if(core->memTracker.arrays != NULL) {
         free(core->memTracker.arrays);
+    }
 
     for(size_t i = 0; i < core->memTracker.memObjectCount; i++){
         free(core->memTracker.memObjects[i]);
     }
-    if(core->memTracker.memObjects != NULL)
+    if(core->memTracker.memObjects != NULL) {
         free(core->memTracker.memObjects);
+    }
 
 
     // the constant pool is part of the program, we have no ownership over it
@@ -138,10 +143,10 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     // we want to data to have the following structure
     // [offset_pointer (size_t), data_block (totalsize)]
     LOG_INFO("CORE[%d]: Allocating struct with %d fields and %d bytes, total allocated size: %d", core->id, numfields, totalsize, sizeof(size_t)+totalsize);
-    TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof(TypeV_Struct));
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof(TypeV_Struct)+totalsize);
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
-    struct_ptr->data = calloc(1, totalsize);
     struct_ptr->originalStruct = NULL;
+    struct_ptr->dataPointer = struct_ptr->data;
 
     // add to gc
     core->memTracker.structs = realloc(core->memTracker.structs, sizeof(size_t)*(core->memTracker.structCount+1));
@@ -159,7 +164,7 @@ size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
     LOG_INFO("CORE[%d]: Allocating struct shadow of %p with %d fields, total allocated size: %d", core->id, (void*)originalStruct, numfields, 2*sizeof(size_t));
     // we allocated 2 pointers, one for the offset table, and one for the data segment
     TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof (TypeV_Struct));
-    struct_ptr->data = original->data;
+    struct_ptr->dataPointer = original->data;
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
     struct_ptr->originalStruct = original;
 
@@ -170,38 +175,25 @@ size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
     return (size_t)struct_ptr;
 }
 
-size_t core_class_alloc_fields(TypeV_Core *core, uint8_t numfields, size_t total_fields_size) {
-    /**
-     * Class layout in type-v
-     * struct {uint16* methodsOffset, size_t* methods, uint16* fieldsOffset, void* data}
-     * meaning that the first 2 pointers are for the method table, and the second 2 are for the field table
-     * struct + two pointers distance, is equivalent to struct, hence we can theoretically create
-     * a struct that shadows a class. Maybe for the future
-     */
 
-    // we allocate 3 pointers for methods offset, methods table pointer and fields offset
-    // + the total fields size
-    LOG_INFO("CORE[%d]: Allocating class with %d fields and %d bytes, total allocated size: %d", core->id, numfields, total_fields_size, (3*sizeof(size_t))+total_fields_size);
-    TypeV_Class* class_ptr = (TypeV_Class*)calloc(1, (3*sizeof(size_t))+total_fields_size);
-    class_ptr->fieldsOffset = calloc(numfields, sizeof(uint16_t));
+size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size) {
+    LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, total allocated size: %d", core->id, num_methods, total_fields_size, (3*sizeof(size_t))+total_fields_size);
+    TypeV_Class* class_ptr = (TypeV_Class*)calloc(1, sizeof(TypeV_Class)+total_fields_size);
+    class_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t));
+    // class methods offset table is sequential, since class objects are primitive entities
+    // and cannot be a shadow copy of another class
+    for(size_t i = 0; i < num_methods; i++){
+        // TODO: Replace size_t with 8?
+        class_ptr->methodsOffset[i] = i*sizeof(size_t);
+    }
+
+    class_ptr->methods = calloc(num_methods, sizeof(size_t));
 
     // add to gc
     core->memTracker.classes = realloc(core->memTracker.classes, sizeof(size_t)*(core->memTracker.classCount+1));
     core->memTracker.classes[core->memTracker.classCount++] = class_ptr;
 
     return (size_t)class_ptr;
-}
-
-
-void core_class_alloc_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr){
-    LOG_INFO("CORE[%d]: Allocating class methods with %d methods, total allocated size: %d", core->id, num_methods, num_methods*sizeof(size_t));
-    class_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t));
-    // class methods offset table is sequential, since class objects are primitive entities
-    // and cannot be a shadow copy of another class
-    for(size_t i = 0; i < num_methods; i++){
-        class_ptr->methodsOffset[i] = i*sizeof(size_t);
-    }
-    class_ptr->methods = calloc(num_methods, sizeof(size_t));
 }
 
 size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class * class_ptr){

@@ -126,8 +126,6 @@ void stack_frame_alloc_args(TypeV_Core *core, size_t size) {
     LOG_INFO("Allocating stack frame args for %zu bytes", size);
     // point fp to current sp
     core->registers.fp = core->registers.sp;
-    // allocate space for args
-    //core->registers.sp += size;
     // point fe to end of args
     core->registers.fe = core->registers.fp + size;
 }
@@ -135,10 +133,8 @@ void stack_frame_alloc_args(TypeV_Core *core, size_t size) {
 
 void stack_frame_alloc_locals(TypeV_Core *core, size_t size){
     LOG_INFO("Allocating stack frame locals for %zu bytes", size);
-    // allocate space for locals
-    //core->registers.sp += size;
     // point fe to end of locals
-    core->registers.fe = core->registers.fp + size;
+    core->registers.fe += size;
 }
 
 

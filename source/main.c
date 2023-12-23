@@ -28,7 +28,7 @@ int main() {
     TypeV_Engine engine;
     engine_init(&engine);
 
-    char* source = read_file("../samples/sample1.tv");
+    char* source = read_file("../samples/sample2.tv");
     TypeV_ASM_Lexer lexer;
     lexer_init(&lexer, source);
     TypeV_ASM_Parser parser;

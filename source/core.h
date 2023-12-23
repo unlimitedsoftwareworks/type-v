@@ -17,18 +17,21 @@
 
 
 typedef struct TypeV_Struct {
-    uint16_t* fieldOffsets;
-    struct TypeV_Struct* originalStruct;
-    uint8_t* data;
+    uint16_t* fieldOffsets;                 //< Field offsets table
+    struct TypeV_Struct* originalStruct;    //< Pointer to the original struct, NULL if this is not a shadow struct
+    uint8_t* dataPointer;                   //< Pointer to the data
+    uint8_t data[];                         //< Data block, if this is a shadow struct,
+                                            // this is a pointer to the original struct's data
 }TypeV_Struct;
 
 typedef struct TypeV_Class{
+    uint64_t uid;             ///< Unique ID
+    uint8_t num_methods;      ///< number of methods
     /** methods */
     uint16_t* methodsOffset;  ///< method offset table
     size_t* methods;          ///< A pointer to the method table
-    /** fields */
-    uint16_t* fieldsOffset;     ///< field offset table
-    uint8_t* data;           ///< Fields start from here, direct access
+    /** data */
+    uint8_t data[];            ///< Fields start from here, direct access
 }TypeV_Class;
 
 typedef struct TypeV_Interface {
@@ -40,6 +43,8 @@ typedef struct TypeV_Array {
     uint8_t elementSize;      ///< Size of each element
     uint64_t length;          ///< Array length
     uint64_t capacity;        ///< Array capacity
+    // TODO: check the benefit of having the data as
+    // part of the struct
     uint8_t* data;            ///< Array data
 }TypeV_Array;
 
@@ -273,19 +278,11 @@ size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
 /**
  * Allocates a class object
  * @param core
- * @param numfields number of class fields/attributes
+ * @param num_methods Number of methods
  * @param total_fields_size  total size of fields in bytes
- * @return new Class object, half initialized, methods must be initialized after this call
+ * @return new Class object initialized.
  */
-size_t core_class_alloc_fields(TypeV_Core *core, uint8_t numfields, size_t total_fields_size);
-
-/**
- * Allocates a class method table
- * @param core
- * @param num_methods number of methods
- * @param class_ptr class reference
- */
-void core_class_alloc_methods(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
+size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size);
 
 /**
  * Allocates an interface object
