@@ -94,6 +94,7 @@ VM_INSTRUCTION(c_loadf_ptr)
 
 VM_INSTRUCTION(i_alloc)
 VM_INSTRUCTION(i_set_offset)
+VM_INSTRUCTION(i_set_offset_i)
 VM_INSTRUCTION(i_loadm)
 
 VM_INSTRUCTION(i_is_c)

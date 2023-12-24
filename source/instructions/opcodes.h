@@ -238,6 +238,13 @@ typedef enum TypeV_OpCode {
     OP_I_SET_OFFSET,
 
     /**
+     * OP_I_SET_OFFSET_I methodIndexSrc: I, methodIndexTarget: I, src interface: R
+     * Updates the offset value of method index methodIndexSrc, of the interface src in
+     * to the offset value of method index methodIndexTarget, of the interface stored in R18
+     */
+    OP_I_SET_OFFSET_I,
+
+    /**
      * OP_I_LOADM dest: R, methodIndex: I
      * Loads method address from method table of interface stored in R18 to register R
      */

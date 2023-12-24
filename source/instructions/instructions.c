@@ -444,6 +444,18 @@ void i_set_offset(TypeV_Core* core){
     i->methodsOffset[field_index] = offset;
 }
 
+void i_set_offset_i(TypeV_Core* core) {
+    const uint8_t field_source = core->program.bytecode[core->registers.ip++];
+    const uint8_t field_target = core->program.bytecode[core->registers.ip++];
+    const uint8_t interface_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(interface_reg < MAX_REG, "Invalid register index");
+
+    TypeV_Interface* i = (TypeV_Interface*)core->registers.regs[18].ptr;
+    TypeV_Interface* v = (TypeV_Interface*)core->registers.regs[interface_reg].ptr;
+
+    i->methodsOffset[field_target] = v->methodsOffset[field_source];
+}
+
 void i_loadm(TypeV_Core* core){
     const uint8_t target = core->program.bytecode[core->registers.ip++];
     const uint8_t method_index = core->program.bytecode[core->registers.ip++];
@@ -459,7 +471,7 @@ void i_loadm(TypeV_Core* core){
 void i_is_c(TypeV_Core* core){
     const uint8_t target = core->program.bytecode[core->registers.ip++];
     ASSERT(target < MAX_REG, "Invalid register index");
-    const uint64_t classId = 0;
+    uint64_t classId = 0;
     memcpy(&classId, &core->program.bytecode[core->registers.ip],  8);
     core->registers.ip += 8;
 
@@ -470,7 +482,7 @@ void i_is_c(TypeV_Core* core){
 }
 
 void i_is_i(TypeV_Core* core){
-    const uint64_t lookUpMethodId = 0;
+    uint64_t lookUpMethodId = 0;
     memcpy(&lookUpMethodId, &core->program.bytecode[core->registers.ip],  8);
     core->registers.ip += 8;
 
@@ -484,7 +496,7 @@ void i_is_i(TypeV_Core* core){
 
     uint8_t found = 0;
     for(size_t i = 0; i < class_->num_methods; i++) {
-        const uint64_t methodId = 0;
+        uint64_t methodId = 0;
         memcpy(&methodId, &core->program.bytecode[class_->methods[i]],  8);
         if(lookUpMethodId == methodId) {
             found = 1;

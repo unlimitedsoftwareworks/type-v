@@ -11,7 +11,7 @@
 void engine_init(TypeV_Engine *engine) {
     // we will allocate memory for cores later
     engine->coreCount = 0;
-    engine->runningCoresCount;
+    engine->runningCoresCount = 0;
     engine->health = EH_OK;
     engine->coreIterator = calloc(1, sizeof(TypeV_CoreIterator));
     engine->coreIterator->core = calloc(1, sizeof(TypeV_Core));

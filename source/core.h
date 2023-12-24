@@ -413,7 +413,7 @@ void core_promise_check_resume(TypeV_Core* core);
 typedef void (*TypeV_FFIFunc)(TypeV_Core* core);
 typedef struct TypeV_FFI {
     uint8_t isInitialized;   ///< Is the FFI initialized
-    TypeV_FFIFunc* functions;///< FFI functions
+    const TypeV_FFIFunc* functions;///< FFI functions
     uint8_t functionCount;   ///< FFI function count
 }TypeV_FFI;
 

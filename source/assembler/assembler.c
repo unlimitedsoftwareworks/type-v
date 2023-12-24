@@ -554,6 +554,8 @@ TypeV_ASM_Reg getRegister(TypeV_ASM_Parser* parser){
     else {
         fail(tok, "Expected register");
     }
+
+    return 0;
 }
 
 TypeV_ASM_Const* getConst(TypeV_ASM_Parser* parser){
@@ -569,6 +571,8 @@ TypeV_ASM_Const* getConst(TypeV_ASM_Parser* parser){
     else {
         fail(tok, "Expected const");
     }
+
+    return NULL;
 }
 
 TypeV_ASM_Global * getGlobal(TypeV_ASM_Parser* parser){
@@ -584,6 +588,8 @@ TypeV_ASM_Global * getGlobal(TypeV_ASM_Parser* parser){
     else {
         fail(tok, "Expected global");
     }
+
+    return NULL;
 }
 
 uint8_t getShortNumber(TypeV_ASM_Parser* parser){
@@ -592,6 +598,8 @@ uint8_t getShortNumber(TypeV_ASM_Parser* parser){
         return (uint8_t)atoi(tok->value);
     else
         fail(tok, "Expected number");
+
+    return 0;
 }
 
 size_t getLongNumber(TypeV_ASM_Parser* parser){
@@ -600,6 +608,8 @@ size_t getLongNumber(TypeV_ASM_Parser* parser){
         return (size_t)atoll(tok->value);
     else
         fail(tok, "Expected number");
+
+    return 0;
 }
 
 u_int8_t getByteSize(TypeV_ASM_Parser* parser){
@@ -610,6 +620,8 @@ u_int8_t getByteSize(TypeV_ASM_Parser* parser){
         return 0;
     else
         fail(tok, "Expected byte size (ptr, 1, 2, 4, 8");
+
+    return 0;
 }
 
 TypeV_Label* find_label(TypeV_ASM_Parser* parser, char* name){
@@ -641,6 +653,8 @@ TypeV_Label* getLabel(TypeV_ASM_Parser* parser){
     else {
         fail(tok, "Expected label");
     }
+
+    return NULL;
 }
 
 
@@ -1067,6 +1081,17 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
 
                 create_instruction(parser, OP_I_SET_OFFSET, methodIndex, offsetSize, offset, 3);
                 parser->codePoolSize += 2 + offsetSize;
+                break;
+            }
+            case OP_I_SET_OFFSET_I:
+            {
+                // OP_I_SET_OFFSET method-index: I, offset-size: Z, offset: I
+                uint8_t methodIndex_src = getShortNumber(parser);
+                uint8_t methodIndex_dest = getShortNumber(parser);
+                uint8_t interface_reg = getRegister(parser);
+
+                create_instruction(parser, OP_I_SET_OFFSET, methodIndex_dest, methodIndex_src, interface_reg, 3);
+                parser->codePoolSize += 3;
                 break;
             }
 
