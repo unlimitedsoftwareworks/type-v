@@ -293,6 +293,15 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
 size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
 
 /**
+ * Allocates an interface object from another interface
+ * inheriting its parent class
+ * @param core
+ * @param num_methods
+ * @param interface_ptr
+ * @return
+ */
+size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* interface_ptr);
+/**
  * Allocates an array object
  * @param core
  * @param num_elements

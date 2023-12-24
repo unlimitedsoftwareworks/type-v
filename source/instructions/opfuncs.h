@@ -93,6 +93,7 @@ static op_func op_funcs[] = {
         &c_loadf_ptr,
 
         &i_alloc,
+        &i_alloc_i,
         &i_set_offset,
         &i_set_offset_i,
         &i_loadm,

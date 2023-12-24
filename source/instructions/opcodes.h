@@ -232,6 +232,14 @@ typedef enum TypeV_OpCode {
     OP_I_ALLOC,
 
     /**
+     * OP_I_ALLOC_I num_methods: I, interface: R
+     * Allocates new interface from another interface,
+     * inheriting its parent class, and storing the new interface
+     * address in R18
+     */
+    OP_I_ALLOC_I,
+
+    /**
      * OP_I_SET_OFFSET methodIndex: I, offset-size: Z, offset-value: I
      * Sets the offset value of method I, of the interface stored in R18
      */

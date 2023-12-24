@@ -209,6 +209,19 @@ size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class *
     return (size_t)interface_ptr;
 }
 
+size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* interface_ptr){
+    LOG_INFO("CORE[%d]: Allocating interface from interface %p with %d methods, total allocated size: %d", core->id, (size_t)interface_ptr, num_methods*sizeof(size_t));
+    TypeV_Interface* interface_ptr_new = (TypeV_Interface*)calloc(1, sizeof(size_t)*2);
+    interface_ptr_new->methodsOffset = calloc(num_methods, sizeof(uint16_t)*num_methods);
+    interface_ptr_new->classPtr = interface_ptr_new->classPtr;
+
+    // add to gc
+    core->memTracker.interfaces = realloc(core->memTracker.interfaces, sizeof(size_t)*(core->memTracker.interfaceCount+1));
+    core->memTracker.interfaces[core->memTracker.interfaceCount++] = interface_ptr_new;
+
+    return (size_t)interface_ptr_new;
+}
+
 size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
     LOG_INFO("CORE[%d]: Allocating array with %d elements of size %d, total allocated size: %d", core->id, num_elements, element_size, sizeof(size_t)+num_elements*element_size);
     TypeV_Array* array_ptr = (TypeV_Array*)calloc(1, sizeof(TypeV_Array));

@@ -1072,6 +1072,14 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 parser->codePoolSize += 1;
                 break;
             }
+            case OP_I_ALLOC_I: {
+                uint8_t numMethods = getShortNumber(parser);
+                uint8_t interface_reg = getRegister(parser);
+
+                create_instruction(parser, OP_I_ALLOC_I, numMethods, interface_reg, 0, 2);
+                parser->codePoolSize += 2;
+                break;
+            }
             case OP_I_SET_OFFSET: // OP_I_SET_OFFSET method-index: I, offset-size: Z, offset: I
             {
                 // OP_I_SET_OFFSET method-index: I, offset-size: Z, offset: I

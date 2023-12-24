@@ -433,6 +433,16 @@ void i_alloc(TypeV_Core* core){
     core->registers.regs[18].ptr = mem;
 }
 
+void i_alloc_i(TypeV_Core* core){
+    const uint8_t methods_count = core->program.bytecode[core->registers.ip++];
+    const uint8_t interface_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(interface_reg < MAX_REG, "Invalid register index");
+
+    TypeV_Interface* i = (TypeV_Interface*)core->registers.regs[18].ptr;
+    size_t interface_new = core_interface_alloc_i(core, methods_count, i);
+    core->registers.regs[18].ptr = interface_new;
+}
+
 void i_set_offset(TypeV_Core* core){
     const uint8_t field_index = core->program.bytecode[core->registers.ip++];
     const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
