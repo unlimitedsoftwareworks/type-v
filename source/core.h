@@ -35,8 +35,8 @@ typedef struct TypeV_Class{
 }TypeV_Class;
 
 typedef struct TypeV_Interface {
-    uint16_t* methodsOffset;  ///< method offset table
     TypeV_Class* classPtr;    ///< Pointer to the class that implements this interface
+    uint16_t methodsOffset[];  ///< method offset table
 }TypeV_Interface;
 
 typedef struct TypeV_Array {

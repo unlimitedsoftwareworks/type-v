@@ -198,8 +198,7 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
 
 size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class * class_ptr){
     LOG_INFO("CORE[%d]: Allocating interface from class %p with %d methods, total allocated size: %d", core->id, (size_t)num_methods, num_methods*sizeof(size_t));
-    TypeV_Interface* interface_ptr = (TypeV_Interface*)calloc(1, sizeof(size_t)*2);
-    interface_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t)*num_methods);
+    TypeV_Interface* interface_ptr = (TypeV_Interface*)calloc(1, sizeof(TypeV_Interface)+(sizeof(uint16_t)*num_methods));
     interface_ptr->classPtr = class_ptr;
 
     // add to gc
@@ -211,8 +210,7 @@ size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class *
 
 size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* interface_ptr){
     LOG_INFO("CORE[%d]: Allocating interface from interface %p with %d methods, total allocated size: %d", core->id, (size_t)interface_ptr, num_methods*sizeof(size_t));
-    TypeV_Interface* interface_ptr_new = (TypeV_Interface*)calloc(1, sizeof(size_t)*2);
-    interface_ptr_new->methodsOffset = calloc(num_methods, sizeof(uint16_t)*num_methods);
+    TypeV_Interface* interface_ptr_new = (TypeV_Interface*)calloc(1, sizeof(TypeV_Interface)+(sizeof(uint16_t)*num_methods));
     interface_ptr_new->classPtr = interface_ptr_new->classPtr;
 
     // add to gc
