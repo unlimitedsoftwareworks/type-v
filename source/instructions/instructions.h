@@ -100,6 +100,7 @@ VM_INSTRUCTION(i_loadm)
 
 VM_INSTRUCTION(i_is_c)
 VM_INSTRUCTION(i_is_i)
+VM_INSTRUCTION(i_get_c)
 
 VM_INSTRUCTION(a_alloc)
 VM_INSTRUCTION(a_extend)

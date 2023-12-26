@@ -519,6 +519,16 @@ void i_is_i(TypeV_Core* core){
     }
 }
 
+void i_get_c(TypeV_Core* core) {
+    const uint8_t dest_reg = core->program.bytecode[core->registers.ip++];
+    const uint8_t src_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(dest_reg < MAX_REG, "Invalid register index");
+    ASSERT(src_reg < MAX_REG, "Invalid register index");
+
+    TypeV_Interface* interface = (TypeV_Interface*)core->registers.regs[src_reg].ptr;
+    core->registers.regs[src_reg].ptr = interface->classPtr;
+}
+
 void a_alloc(TypeV_Core* core){
     const uint8_t num_elements_size = core->program.bytecode[core->registers.ip++];
     size_t num_elements = 0; /* we do not increment offset here*/

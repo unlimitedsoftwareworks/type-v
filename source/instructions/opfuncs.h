@@ -99,6 +99,7 @@ static op_func op_funcs[] = {
         &i_loadm,
         &i_is_c,
         &i_is_i,
+        &i_get_c,
 
         &a_alloc,
         &a_extend,

@@ -274,6 +274,12 @@ typedef enum TypeV_OpCode {
     OP_I_IS_I,
 
     /**
+     * OP_I_GET_C dest: R, interface: R
+     * Gets the class of the given interface, stores the address of the class in R
+     */
+    OP_I_GET_C,
+
+    /**
      * OP_A_ALLOC num_elements_size: Z, num_elements: I, element_size: Z
      * allocate array of num_elements of size element_size
      * stores the address of the array in R19

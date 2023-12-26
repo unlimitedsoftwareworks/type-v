@@ -1133,6 +1133,15 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 break;
             }
 
+            case OP_I_GET_C: {
+                uint8_t dest_reg = getRegister(parser);
+                uint8_t interface_reg = getRegister(parser);
+
+                create_instruction(parser, OP_I_GET_C, dest_reg, interface_reg, 0, 2);
+                parser->codePoolSize += 2;
+                break;
+            }
+
             case OP_PUSH: {
                 // OP_PUSH reg: R, size: S
                 TypeV_ASM_Reg reg = getRegister(parser);
