@@ -466,6 +466,40 @@ void i_set_offset_i(TypeV_Core* core) {
     i->methodsOffset[field_target] = v->methodsOffset[field_source];
 }
 
+
+void i_set_offset_m(TypeV_Core* core){
+    uint64_t lookUpMethodId = 0;
+    memcpy(&lookUpMethodId, &core->program.bytecode[core->registers.ip],  8);
+    core->registers.ip += 8;
+
+    uint16_t field_number = 0;
+    memcpy(&field_number, &core->program.bytecode[core->registers.ip],  2);
+    core->registers.ip += 2;
+
+    uint64_t jumpFailureAddress = 0;
+    memcpy(&jumpFailureAddress, &core->program.bytecode[core->registers.ip],  8);
+    core->registers.ip += 8;
+
+    TypeV_Interface* interface = (TypeV_Interface*)core->registers.regs[18].ptr;
+    TypeV_Class * class_ = interface->classPtr;
+
+    uint8_t found = 0;
+    for(size_t i = 0; i < class_->num_methods; i++) {
+        uint64_t methodId = 0;
+        memcpy(&methodId, &core->program.bytecode[class_->methods[i]],  8);
+        if(lookUpMethodId == methodId) {
+            found = 1;
+            uint16_t offset = i;
+            memcpy(&interface->methodsOffset[field_number], &offset, 2);
+            break;
+        }
+    }
+
+    if(!found){
+        core->registers.ip = jumpFailureAddress;
+    }
+}
+
 void i_loadm(TypeV_Core* core){
     const uint8_t target = core->program.bytecode[core->registers.ip++];
     const uint8_t method_index = core->program.bytecode[core->registers.ip++];

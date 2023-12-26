@@ -50,7 +50,7 @@ static char* instructions[] = {
         "c_storef_reg_8", "c_storef_reg_16", "c_storef_reg_32", "c_storef_reg_64", "c_storef_reg_ptr",
         "c_loadf_8", "c_loadf_16", "c_loadf_32", "c_loadf_64", "c_loadf_ptr",
         "i_alloc", "i_alloc_i",
-        "i_set_offset", "i_set_offset_i", "i_loadm",
+        "i_set_offset", "i_set_offset_i", "i_set_offset_m", "i_loadm",
         "i_is_c", "i_is_i", "i_get_c",
         "a_alloc", "a_extend",
         "a_storef_reg",
@@ -146,7 +146,7 @@ static char* instructions[] = {
         "ld_std",
         "vm_health"
 };
-#define MAX_INSTRUCTION 241
+#define MAX_INSTRUCTION 242
 
 typedef enum TokenType {
     TOK_INSTRUCTION=0,

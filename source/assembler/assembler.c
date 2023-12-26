@@ -1103,6 +1103,18 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 break;
             }
 
+            case OP_I_SET_OFFSET_M:
+            {
+                // OP_I_SET_OFFSET method-index: I, offset-size: Z, offset: I
+                uint64_t methodID = getLongNumber(parser);
+                uint16_t methodIndex = (uint16_t)getLongNumber(parser);
+                TypeV_Label *label = getLabel(parser); // labels are stored as 8 bytes for now
+
+                create_instruction(parser, OP_I_SET_OFFSET, methodID, methodIndex, (size_t)label, 3);
+                parser->codePoolSize += 18 ;// we dont add one for label-size because  OP_I_SET_OFFSET_M requires label in 8 bytes only without size
+                break;
+            }
+
             case OP_I_LOADM: {
                 // OP_I_LOADM dest: R, method-index: I
                 TypeV_ASM_Reg dest = getRegister(parser);
@@ -1782,6 +1794,31 @@ TypeV_ASM_Program* assemble(TypeV_ASM_Parser* parser) {
             abs_offset += 8;
 
             continue;
+        }
+        else if (inst->opcode == OP_I_SET_OFFSET_M) {
+            memcpy(codePool + abs_offset, &inst->arg1, 8);
+            abs_offset += 8;
+
+            memcpy(codePool + abs_offset, &inst->arg2, 2);
+            abs_offset += 2;
+
+            TypeV_Label* label = (TypeV_Label*)inst->arg3;
+            TypeV_Label* original = find_label(parser, label->name);
+            // if original is null, fail.
+            if(original == NULL){
+                LOG_ERROR("Label %s not found", label->name);
+                exit(1);
+            }
+
+            uint64_t offset = original->primaryCodeOffset;
+            uint64_t length = 8;
+
+            // OP_I_SET_OFFSET_M requires label in 8 bytes only without size
+            //memcpy(codePool + abs_offset, &length, 1);
+            //abs_offset ++;
+
+            memcpy(codePool + abs_offset, &offset, 8);
+            abs_offset += 8;
         }
 
 

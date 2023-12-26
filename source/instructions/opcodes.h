@@ -253,6 +253,14 @@ typedef enum TypeV_OpCode {
     OP_I_SET_OFFSET_I,
 
     /**
+     * OP_I_SET_OFFSET_M methodID: I (8bytes), methodIndex: I (2 bytes) jumpFailure: I (8 bytes)
+     * find the method methodID from the base class of the interface stored in R18,
+     * sets its offset in the current interface's methodIndex to the given offset value. If the methodID
+     * is not found, it jumps to the given address
+     */
+    OP_I_SET_OFFSET_M,
+
+    /**
      * OP_I_LOADM dest: R, methodIndex: I
      * Loads method address from method table of interface stored in R18 to register R
      */
@@ -266,7 +274,7 @@ typedef enum TypeV_OpCode {
     OP_I_IS_C,
 
     /**
-     * OP_IS_I method_id: I (8 bytes), jump-address-offset: Z, jump-address: I
+     * OP_I_IS_I method_id: I (8 bytes), jump-address-offset: Z, jump-address: I
      * Checks if the base class of the interface which is stored in R18 has
      * a method with the same given ID. If a method with the same ID is found,
      * it continues. Otherwise, it jumps to the given address.

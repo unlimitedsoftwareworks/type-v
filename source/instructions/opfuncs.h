@@ -96,6 +96,7 @@ static op_func op_funcs[] = {
         &i_alloc_i,
         &i_set_offset,
         &i_set_offset_i,
+        &i_set_offset_m,
         &i_loadm,
         &i_is_c,
         &i_is_i,
