@@ -183,7 +183,7 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG,
 
     /**
-     * OP_C_ALLOCF   num-methods: I, class-fields-size-size: Z, class-fields-size: I
+     * OP_C_ALLOC  num-methods: I, class-fields-size-size: Z, class-fields-size: I
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into R17.
      */
