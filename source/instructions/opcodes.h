@@ -295,10 +295,16 @@ typedef enum TypeV_OpCode {
     OP_A_ALLOC,
 
     /**
-     * OP_A_EXTEND num_elements_size: Z, num_elements: I
+     * OP_A_EXTEND array: R, num_elements_size: Z, num_elements: I
      * extends the array stored in R19 by num_elements
      */
     OP_A_EXTEND,
+
+    /**
+     * OP_A_LEN dest: R, array: R
+     * stores the length of the array stored in R19 in R
+     */
+    OP_A_LEN,
 
     /**
      * OP_A_STOREF_REG index: R, source: R, size: S

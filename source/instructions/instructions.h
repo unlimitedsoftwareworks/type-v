@@ -105,6 +105,7 @@ VM_INSTRUCTION(i_get_c)
 
 VM_INSTRUCTION(a_alloc)
 VM_INSTRUCTION(a_extend)
+VM_INSTRUCTION(a_len)
 
 VM_INSTRUCTION(a_storef_reg)
 VM_INSTRUCTION(a_storef_const_8)

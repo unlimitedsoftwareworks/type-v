@@ -104,6 +104,7 @@ static op_func op_funcs[] = {
 
         &a_alloc,
         &a_extend,
+        &a_len,
         &a_storef_reg,
         &a_storef_const_8,
         &a_storef_const_16,

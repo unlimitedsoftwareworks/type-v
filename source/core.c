@@ -228,7 +228,6 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
     core->memTracker.arrays = realloc(core->memTracker.arrays, sizeof(size_t)*(core->memTracker.arrayCount+1));
     core->memTracker.arrays[core->memTracker.arrayCount++] = array_ptr;
 
-    array_ptr->capacity = num_elements;
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
     array_ptr->data = calloc(num_elements, element_size);
@@ -239,9 +238,8 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
 size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
     LOG_INFO("Extending array %p with %d elements, total allocated size: %d", core->id, (void*)array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
-    array->data = realloc(array->data, num_elements);
+    array->data = realloc(array->data, num_elements*array->elementSize);
     array->length = num_elements;
-    array->capacity = num_elements*2;
     return array_ptr;
 }
 

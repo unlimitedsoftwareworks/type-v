@@ -42,9 +42,6 @@ typedef struct TypeV_Interface {
 typedef struct TypeV_Array {
     uint8_t elementSize;      ///< Size of each element
     uint64_t length;          ///< Array length
-    uint64_t capacity;        ///< Array capacity
-    // TODO: check the benefit of having the data as
-    // part of the struct
     uint8_t* data;            ///< Array data
 }TypeV_Array;
 

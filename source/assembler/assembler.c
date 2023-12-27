@@ -1225,12 +1225,21 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 break;
             }
             case OP_A_EXTEND: {
-                // OP_A_EXTEND num_elements_size: Z, num_elements: I
+                uint8_t target_array = getRegister(parser);
                 size_t numElements = getLongNumber(parser);
                 uint8_t numElementsSize = bytes_needed(numElements);
 
                 create_instruction(parser, OP_A_EXTEND, numElementsSize, numElements, 0, 2);
-                parser->codePoolSize += 1 + numElementsSize;
+                parser->codePoolSize += 2 + numElementsSize;
+                break;
+            }
+            case OP_A_LEN: {
+                // OP_A_LEN dest: R, array: R
+                TypeV_ASM_Reg dest = getRegister(parser);
+                TypeV_ASM_Reg array = getRegister(parser);
+
+                create_instruction(parser, OP_A_LEN, dest, array, 0, 2);
+                parser->codePoolSize += 2;
                 break;
             }
             case OP_A_STOREF_REG: {

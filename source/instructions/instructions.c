@@ -560,7 +560,7 @@ void i_get_c(TypeV_Core* core) {
     ASSERT(src_reg < MAX_REG, "Invalid register index");
 
     TypeV_Interface* interface = (TypeV_Interface*)core->registers.regs[src_reg].ptr;
-    core->registers.regs[src_reg].ptr = interface->classPtr;
+    core->registers.regs[src_reg].ptr = (size_t)interface->classPtr;
 }
 
 void a_alloc(TypeV_Core* core){
@@ -580,13 +580,22 @@ void a_alloc(TypeV_Core* core){
 }
 
 void a_extend(TypeV_Core* core){
+    const uint8_t target_array = core->program.bytecode[core->registers.ip++];
+    ASSERT(target_array < MAX_REG, "Invalid register index");
     const uint8_t num_elements_size = core->program.bytecode[core->registers.ip++];
     size_t num_elements = 0; /* we do not increment offset here*/
     memcpy(&num_elements, &core->program.bytecode[core->registers.ip],  num_elements_size);
     core->registers.ip += num_elements_size;
 
-    size_t mem = core_array_extend(core, core->registers.regs[19].ptr, num_elements);
+    size_t mem = core_array_extend(core, core->registers.regs[target_array].ptr, num_elements);
     core->registers.regs[19].ptr = mem;
+}
+
+void a_len(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[19].ptr;
+    core->registers.regs[target].u64 = array->length;
 }
 
 void a_storef_reg(TypeV_Core* core){
