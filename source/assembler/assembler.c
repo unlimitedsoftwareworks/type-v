@@ -897,35 +897,6 @@ void parse(TypeV_ASM_Lexer* lexer, TypeV_ASM_Parser* parser){
                 parser->codePoolSize += 2 + offsetSize;
                 break;
             }
-            case OP_MV_REG_ARG_8:
-            case OP_MV_REG_ARG_16:
-            case OP_MV_REG_ARG_32:
-            case OP_MV_REG_ARG_64:
-            case OP_MV_REG_ARG_PTR: {
-                // OP_MV_REG_ARG_PTR dest: R, offset-size: Z, offset: I
-                TypeV_ASM_Reg dest = getRegister(parser);
-                size_t offset = getLongNumber(parser);
-                uint8_t offsetSize = bytes_needed(offset);
-
-                create_instruction(parser, idx, dest, offsetSize, offset, 3);
-                parser->codePoolSize += 2 + offsetSize;
-                break;
-            }
-
-            case OP_MV_ARG_REG_8:
-            case OP_MV_ARG_REG_16:
-            case OP_MV_ARG_REG_32:
-            case OP_MV_ARG_REG_64:
-            case OP_MV_ARG_REG_PTR: {
-                // OP_MV_ARG_REG_PTR offset-size: Z, offset: I, src: R
-                size_t offset = getLongNumber(parser);
-                uint8_t offsetSize = bytes_needed(offset);
-                TypeV_ASM_Reg src = getRegister(parser);
-
-                create_instruction(parser, idx, offsetSize, offset, src, 3);
-                parser->codePoolSize += 2 + offsetSize;
-                break;
-            }
             case OP_S_ALLOC: {
                 // OP_S_ALLOC fieldOffsets-count: I, struct-size-size: Z, struct-size: I
                 uint8_t fieldOffsetsCount = getShortNumber(parser);

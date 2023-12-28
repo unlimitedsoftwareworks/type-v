@@ -49,18 +49,6 @@ static op_func op_funcs[] = {
         &mv_reg_global_64,
         &mv_reg_global_ptr,
 
-        &mv_reg_arg_8,
-        &mv_reg_arg_16,
-        &mv_reg_arg_32,
-        &mv_reg_arg_64,
-        &mv_reg_arg_ptr,
-
-        &mv_arg_reg_8,
-        &mv_arg_reg_16,
-        &mv_arg_reg_32,
-        &mv_arg_reg_64,
-        &mv_arg_reg_ptr,
-
         &s_alloc,
         &s_alloc_shadow,
         &s_set_offset,

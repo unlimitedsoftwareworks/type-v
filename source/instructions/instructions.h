@@ -47,18 +47,6 @@ VM_INSTRUCTION(mv_reg_global_32)
 VM_INSTRUCTION(mv_reg_global_64)
 VM_INSTRUCTION(mv_reg_global_ptr)
 
-VM_INSTRUCTION(mv_reg_arg_8)
-VM_INSTRUCTION(mv_reg_arg_16)
-VM_INSTRUCTION(mv_reg_arg_32)
-VM_INSTRUCTION(mv_reg_arg_64)
-VM_INSTRUCTION(mv_reg_arg_ptr)
-
-VM_INSTRUCTION(mv_arg_reg_8)
-VM_INSTRUCTION(mv_arg_reg_16)
-VM_INSTRUCTION(mv_arg_reg_32)
-VM_INSTRUCTION(mv_arg_reg_64)
-VM_INSTRUCTION(mv_arg_reg_ptr)
-
 VM_INSTRUCTION(s_alloc)
 VM_INSTRUCTION(s_alloc_shadow)
 VM_INSTRUCTION(s_set_offset)

@@ -39,8 +39,6 @@ static char* instructions[] = {
         "mv_local_reg_8", "mv_local_reg_16", "mv_local_reg_32", "mv_local_reg_64", "mv_local_reg_ptr",
         "mv_global_reg_8", "mv_global_reg_16", "mv_global_reg_32", "mv_global_reg_64", "mv_global_reg_ptr",
         "mv_reg_global_8", "mv_reg_global_16", "mv_reg_global_32", "mv_reg_global_64", "mv_reg_global_ptr",
-        "mv_reg_arg_8", "mv_reg_arg_16", "mv_reg_arg_32", "mv_reg_arg_64", "mv_reg_arg_ptr",
-        "mv_arg_reg_8", "mv_arg_reg_16", "mv_arg_reg_32", "mv_arg_reg_64", "mv_arg_reg_ptr",
         "s_alloc", "s_alloc_shadow", "s_set_offset", "s_set_offset_shadow",
         "s_loadf",
         "s_storef_const_8", "s_storef_const_16", "s_storef_const_32", "s_storef_const_64", "s_storef_const_ptr",
@@ -146,7 +144,7 @@ static char* instructions[] = {
         "ld_std",
         "vm_health"
 };
-#define MAX_INSTRUCTION 243
+#define MAX_INSTRUCTION 233
 
 typedef enum TokenType {
     TOK_INSTRUCTION=0,

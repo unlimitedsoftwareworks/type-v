@@ -99,26 +99,6 @@ typedef enum TypeV_OpCode {
     OP_MV_REG_GLOBAL_PTR,
 
     /**
-     * OP_MV_REG_ARG_[size] dest: R, arg: offset-size: Z, offset: I
-     * moves [size] bytes from argument stack address frame-pointer + offset to register R
-     */
-    OP_MV_REG_ARG_8,
-    OP_MV_REG_ARG_16,
-    OP_MV_REG_ARG_32,
-    OP_MV_REG_ARG_64,
-    OP_MV_REG_ARG_PTR,
-
-    /**
-     * OP_MV_ARG_REG_[size] arg: offset-size: Z, offset: I, source: R
-     * moves [size] bytes from register R to argument stack address frame-pointer + offset
-     */
-    OP_MV_ARG_REG_8,
-    OP_MV_ARG_REG_16,
-    OP_MV_ARG_REG_32,
-    OP_MV_ARG_REG_64,
-    OP_MV_ARG_REG_PTR,
-
-    /**
      * OP_S_ALLOC fieldOffsets-count: I, struct-size-size: Z, struct-size: I
      * Creates new struct of given total ﬁelds count (arg1) and total memory
      * (arg2 and arg3), stores the address of the new struct into R16.

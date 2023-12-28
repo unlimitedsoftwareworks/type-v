@@ -199,56 +199,6 @@ void mv_reg_global_64(TypeV_Core* core){
 MV_REG_GLOBAL(ptr, PTR_SIZE)
 #undef MV_REG_GLOBAL
 
-#define MV_REG_ARG(bits, size) \
-void mv_reg_arg_##bits(TypeV_Core* core){\
-    const uint8_t target = core->program.bytecode[core->registers.ip++];\
-    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];\
-    size_t offset = 0; /* we do not increment offset here*/\
-    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);\
-    core->registers.ip += offset_length;\
-    ASSERT(target < MAX_REG, "Invalid register index");\
-    ASSERT(offset < core->stack.capacity, "Invalid stack offset");\
-    memcpy(&core->registers.regs[target], &core->stack.stack[core->registers.fp+offset], size);\
-}
-
-void mv_reg_arg_16(TypeV_Core* core){
-    const uint8_t target = core->program.bytecode[core->registers.ip++];
-    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
-    size_t offset = 0; /* we do not increment offset here*/
-    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
-    core->registers.ip += offset_length;
-    ASSERT(target < MAX_REG, "Invalid register index");
-    ASSERT(offset < core->stack.capacity, "Invalid stack offset");
-    memcpy(&core->registers.regs[target], &core->stack.stack[core->registers.fp+offset], 2);
-}
-
-
-MV_REG_ARG(8, 1)
-//MV_REG_ARG(16, 2)
-MV_REG_ARG(32, 4)
-MV_REG_ARG(64, 8)
-MV_REG_ARG(ptr, PTR_SIZE)
-#undef MV_REG_ARG
-
-#define MV_ARG_REG(bits, size) \
-void mv_arg_reg_##bits(TypeV_Core* core){\
-    const uint8_t source = core->program.bytecode[core->registers.ip++];\
-    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];\
-    size_t offset = 0; /* we do not increment offset here*/\
-    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);\
-    core->registers.ip += offset_length;\
-    ASSERT(source < MAX_REG, "Invalid register index");\
-    ASSERT(offset < core->stack.capacity, "Invalid stack offset");\
-    memcpy(&core->stack.stack[core->registers.fp+offset], &core->registers.regs[source], size);\
-}
-
-MV_ARG_REG(8, 1)
-MV_ARG_REG(16, 2)
-MV_ARG_REG(32, 4)
-MV_ARG_REG(64, 8)
-MV_ARG_REG(ptr, PTR_SIZE)
-#undef MV_ARG_REG
-
 void s_alloc(TypeV_Core* core){
     const uint8_t fields_count = core->program.bytecode[core->registers.ip++];
     const uint8_t struct_size_length = core->program.bytecode[core->registers.ip++];
