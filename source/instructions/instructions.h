@@ -52,7 +52,11 @@ VM_INSTRUCTION(s_alloc_shadow)
 VM_INSTRUCTION(s_set_offset)
 VM_INSTRUCTION(s_set_offset_shadow)
 
-VM_INSTRUCTION(s_loadf)
+VM_INSTRUCTION(s_loadf_8)
+VM_INSTRUCTION(s_loadf_16)
+VM_INSTRUCTION(s_loadf_32)
+VM_INSTRUCTION(s_loadf_64)
+VM_INSTRUCTION(s_loadf_ptr)
 
 VM_INSTRUCTION(s_storef_const_8)
 VM_INSTRUCTION(s_storef_const_16)
@@ -61,7 +65,12 @@ VM_INSTRUCTION(s_storef_const_64)
 VM_INSTRUCTION(s_storef_const_ptr)
 
 
-VM_INSTRUCTION(s_storef_reg)
+VM_INSTRUCTION(s_storef_reg_8)
+VM_INSTRUCTION(s_storef_reg_16)
+VM_INSTRUCTION(s_storef_reg_32)
+VM_INSTRUCTION(s_storef_reg_64)
+VM_INSTRUCTION(s_storef_reg_ptr)
+
 
 VM_INSTRUCTION(c_alloc)
 VM_INSTRUCTION(c_storem)
@@ -95,14 +104,23 @@ VM_INSTRUCTION(a_alloc)
 VM_INSTRUCTION(a_extend)
 VM_INSTRUCTION(a_len)
 
-VM_INSTRUCTION(a_storef_reg)
+VM_INSTRUCTION(a_storef_reg_8)
+VM_INSTRUCTION(a_storef_reg_16)
+VM_INSTRUCTION(a_storef_reg_32)
+VM_INSTRUCTION(a_storef_reg_64)
+VM_INSTRUCTION(a_storef_reg_ptr)
+
 VM_INSTRUCTION(a_storef_const_8)
 VM_INSTRUCTION(a_storef_const_16)
 VM_INSTRUCTION(a_storef_const_32)
 VM_INSTRUCTION(a_storef_const_64)
 VM_INSTRUCTION(a_storef_const_ptr)
 
-VM_INSTRUCTION(a_loadf)
+VM_INSTRUCTION(a_loadf_8)
+VM_INSTRUCTION(a_loadf_16)
+VM_INSTRUCTION(a_loadf_32)
+VM_INSTRUCTION(a_loadf_64)
+VM_INSTRUCTION(a_loadf_ptr)
 
 VM_INSTRUCTION(push)
 VM_INSTRUCTION(push_const)

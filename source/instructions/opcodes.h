@@ -99,56 +99,50 @@ typedef enum TypeV_OpCode {
     OP_MV_REG_GLOBAL_PTR,
 
     /**
-     * OP_S_ALLOC fieldOffsets-count: I, struct-size-size: Z, struct-size: I
+     * OP_S_ALLOC dest: R, fields-count: I, struct-size: I (2bytes)
      * Creates new struct of given total ﬁelds count (arg1) and total memory
-     * (arg2 and arg3), stores the address of the new struct into R16.
+     * (arg2 and arg3), stores the address of the new struct into dest.
      */
     OP_S_ALLOC,
 
     /**
-     * OP_S_SETF_PTR fieldIndex: I
-     * marks of the field at index I as a pointer
-     * for the GC. This might be inefficient, and replace with
-     * struct definitions in the future
-     * (structs defined in bytecode)
-     */
-    //OP_S_MARKF_PTR,
-
-    /**
-     * OP_S_ALLOC_SHADOW fieldOffsets-count: I
-     * Creates a shadow copy of a struct (who's address is stored in R16),
+     * OP_S_ALLOC_SHADOW Dest: R, copy: R fields-count: I
+     * Creates a shadow copy of a struct (who's address is stored in copy),
      * a shadow copy is a copy that points to the same data but with different
-     * offset table. Copy address is stored in (and overrides) R16
+     * offset table. Copy address is stored given register
      */
     OP_S_ALLOC_SHADOW,
 
     /**
-     * OP_S_SET_OFFSET fieldIndex: I, offset-size: Z, offset-value: I
-     * Sets the offset value of field I, of the struct stored in R16
+     * OP_S_SET_OFFSET dest: R, fieldIndex: I, offset-value: I (2 bytes)
+     * Sets the offset value of field I, of the struct stored in dest
      * to the given offset value
      */
     OP_S_SET_OFFSET,
 
     /**
-     * OP_S_SET_OFFSET_SHADOW fieldIndexSrc: I, fieldIndexTarget: I
+     * OP_S_SET_OFFSET_SHADOW src: R, fieldIndexSrc: I, fieldIndexTarget: I
      * Sets the offset value of field index fieldIndexSrc, of the struct
-     * stored in R16 to the offset value of field index fieldIndexTarget,
+     * stored in src to the offset value of field index fieldIndexTarget,
      * of the original struct referenced by the shadow copy
      * ie. shadow_copy.offsets[fieldIndexSrc] = original.offsets[fieldIndexTarget]
      */
     OP_S_SET_OFFSET_SHADOW,
 
     /**
-     * OP_S_LOADF dest: R, fieldIndex: I, size: S
-     * Loads
-     * bytes from field I of struct stored at R16 to register R
+     * OP_S_LOADF_[size] dest: R, src: R fieldIndex: I
+     * Loads size bytes from field I of struct stored at src to register dest
      */
-    OP_S_LOADF,
+    OP_S_LOADF_8,
+    OP_S_LOADF_16,
+    OP_S_LOADF_32,
+    OP_S_LOADF_64,
+    OP_S_LOADF_PTR,
 
     /**
-     * OP_S_STOREF_CONST_[size] fieldIndex: I, offset-size : Z, offset-: I
+     * OP_S_STOREF_CONST_[size] dest: R, fieldIndex: I, constant-offset: I (8 bytes)
      * Stores [size] bytes from constant pool address offset to field I of
-     * struct stored at R16
+     * struct stored at dest
      */
     OP_S_STOREF_CONST_8,
     OP_S_STOREF_CONST_16,
@@ -157,33 +151,37 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_CONST_PTR,
 
     /**
-     * OP_S_STOREF_REG fieldIndex: I, source: R, size: S
-     * Stores [size] bytes from register R to field I of struct stored at R16
+     * OP_S_STOREF_REG_[size] dest: R, fieldIndex: I, source: R
+     * Stores [size] bytes from register R to field I of struct stored at dest
      */
-    OP_S_STOREF_REG,
+    OP_S_STOREF_REG_8,
+    OP_S_STOREF_REG_16,
+    OP_S_STOREF_REG_32,
+    OP_S_STOREF_REG_64,
+    OP_S_STOREF_REG_PTR,
 
     /**
-     * OP_C_ALLOC  num-methods: I, class-fields-size-size: Z, class-fields-size: I
+     * OP_C_ALLOC dest: R num-methods: I, class-fields-size: I (2 bytes)
      * Allocates new class of given total ﬁelds count (arg1) and total fields
-     * size of (arg2 and arg3), stores the address of the new class into R17.
+     * size of (arg2 and arg3), stores the address of the new class into dest.
      */
     OP_C_ALLOC,
 
     /**
-     * OP_C_STOREM methodIndex: I, methodAddress: I
-     * Stores method address (arg2) into method table of class stored in R17
+     * OP_C_STOREM destReg: R, methodIndex: I, methodAddress: I(8 bytes)
+     * Stores methodAddress into method table index methodIndex of class stored in destReg
      */
     OP_C_STOREM,
 
     /**
-     * OP_C_LOADM dest: R, methodIndex: I
-     * Loads method address from method table of class stored in R17 to register R
+     * OP_C_LOADM dest: R, classReg: R methodIndex: I
+     * Loads method address from method table of class stored in classReg to register R
      */
     OP_C_LOADM,
 
     /**
-     * OP_CSTOREF_REG_[size] fieldIndex: I, R: source register
-     * Stores [size] bytes from register R to field I of class stored at R17
+     * OP_CSTOREF_REG_[size] classReg: R, fieldOffset: I (2 bytes), R: source register
+     * Stores [size] bytes from register R to field I of class stored at classReg
      */
     OP_C_STOREF_REG_8,
     OP_C_STOREF_REG_16,
@@ -193,8 +191,8 @@ typedef enum TypeV_OpCode {
 
 
     /**
-     * OP_C_LOADF_[size] dest: R, fieldIndex: I
-     * Loads [size] bytes from field I of class stored at R17 to register R
+     * OP_C_LOADF_[size] dest: R, classReg: R, fieldOffset: I (2 bytes)
+     * Loads [size] bytes from field I of class stored at classReg to register R
      */
     OP_C_LOADF_8,
     OP_C_LOADF_16,
@@ -204,58 +202,58 @@ typedef enum TypeV_OpCode {
 
 
     /**
-     * OP_I_ALLOC num_methods: I
+     * OP_I_ALLOC dest: R, num_methods: I, class: R
      * Allocates new interface method table of given total methods count (arg1),
-     * interface is based on class stored in R17. Interface address is
-     * stored in R18
+     * interface is based on class stored in dest. Interface address is
+     * stored in class
      */
     OP_I_ALLOC,
 
     /**
-     * OP_I_ALLOC_I num_methods: I, interface: R
+     * OP_I_ALLOC_I dest: R, num_methods: I, interface: R
      * Allocates new interface from another interface,
      * inheriting its parent class, and storing the new interface
-     * address in R18
+     * address in dest
      */
     OP_I_ALLOC_I,
 
     /**
-     * OP_I_SET_OFFSET methodIndex: I, offset-size: Z, offset-value: I
-     * Sets the offset value of method I, of the interface stored in R18
+     * OP_I_SET_OFFSET dest: R, methodIndex: I, offset-value: I (2bytes)
+     * Sets the offset value of method I, of the interface stored in dest
      */
     OP_I_SET_OFFSET,
 
     /**
      * OP_I_SET_OFFSET_I methodIndexSrc: I, methodIndexTarget: I, src interface: R
      * Updates the offset value of method index methodIndexSrc, of the interface src in
-     * to the offset value of method index methodIndexTarget, of the interface stored in R18
+     * to the offset value of method index methodIndexTarget, of the interface stored in R16
      */
     OP_I_SET_OFFSET_I,
 
     /**
      * OP_I_SET_OFFSET_M methodID: I (8bytes), methodIndex: I (2 bytes) jumpFailure: I (8 bytes)
-     * find the method methodID from the base class of the interface stored in R18,
+     * find the method methodID from the base class of the interface stored in R16,
      * sets its offset in the current interface's methodIndex to the given offset value. If the methodID
      * is not found, it jumps to the given address
      */
     OP_I_SET_OFFSET_M,
 
     /**
-     * OP_I_LOADM dest: R, methodIndex: I
-     * Loads method address from method table of interface stored in R18 to register R
+     * OP_I_LOADM dest: R, src: R methodIndex: I
+     * Loads method address from method table of interface stored in src to register dest
      */
     OP_I_LOADM,
 
     /**
-     * OP_C_IS_C dest: R, classId: I (8 bytes)
-     * Checks if the given interface who's stored in R18' class id is the
+     * OP_C_IS_C dest: R, src: R, classId: I (8 bytes)
+     * Checks if the given interface who's stored in src class id is the
      * same as the given id. Stores the result in R
      */
     OP_I_IS_C,
 
     /**
-     * OP_I_IS_I method_id: I (8 bytes), jump-address-offset: Z, jump-address: I
-     * Checks if the base class of the interface which is stored in R18 has
+     * OP_I_IS_I method_id: I (8 bytes), src: R, jump-address: I (8 bytes)
+     * Checks if the base class of the interface which is stored in src has
      * a method with the same given ID. If a method with the same ID is found,
      * it continues. Otherwise, it jumps to the given address.
      */
@@ -268,35 +266,39 @@ typedef enum TypeV_OpCode {
     OP_I_GET_C,
 
     /**
-     * OP_A_ALLOC num_elements_size: Z, num_elements: I, element_size: Z
+     * OP_A_ALLOC dest: R, num_elements: I (8 bytes), element_size: Z
      * allocate array of num_elements of size element_size
-     * stores the address of the array in R19
+     * stores the address of the array in dest
      */
     OP_A_ALLOC,
 
     /**
-     * OP_A_EXTEND array: R, num_elements_size: Z, num_elements: I
-     * extends the array stored in R19 by num_elements
+     * OP_A_EXTEND array: R, num_elements-size: Z, num_elements: I
+     * extends the array stored in R by num_elements
      */
     OP_A_EXTEND,
 
     /**
      * OP_A_LEN dest: R, array: R
-     * stores the length of the array stored in R19 in R
+     * stores the length of the array stored in array in dest
      */
     OP_A_LEN,
 
     /**
-     * OP_A_STOREF_REG index: R, source: R, size: S
-     * Stores [size] bytes from register R to field
-     * value stored in register index of array stored at R19
+     * OP_A_STOREF_REG_[size] dest: R, index: R, source: R
+     * Stores [size] bytes from register src to field
+     * index of array dest
      */
-    OP_A_STOREF_REG,
+    OP_A_STOREF_REG_8,
+    OP_A_STOREF_REG_16,
+    OP_A_STOREF_REG_32,
+    OP_A_STOREF_REG_64,
+    OP_A_STOREF_REG_PTR,
 
     /**
-     * OP_A_STOREF_CONST_[size] index: R, offset-size : Z, offset-: I
+     * OP_A_STOREF_CONST_[size] dest: R, index: R, offset: I (8 bytes)
      * Stores [size] bytes from constant pool address offset to field
-     * value stored in register index of array stored at R19
+     * value stored in register index of array stored at dest
      */
     OP_A_STOREF_CONST_8,
     OP_A_STOREF_CONST_16,
@@ -305,11 +307,16 @@ typedef enum TypeV_OpCode {
     OP_A_STOREF_CONST_PTR,
 
     /**
-     * OP_A_LOADF dest: R, index: R, size: S
+     * OP_A_LOADF dest: R, index: R, src: R
      * Loads [size] bytes from field value stored in register index
-     * of array stored at R19 to register R
+     * of array stored at src to register dest
      */
-    OP_A_LOADF,
+    OP_A_LOADF_8,
+    OP_A_LOADF_16,
+    OP_A_LOADF_32,
+    OP_A_LOADF_64,
+    OP_A_LOADF_PTR,
+
 
     /**
      * OP_PUSH register: R, bytes: S

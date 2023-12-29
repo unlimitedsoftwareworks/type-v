@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include "queue/queue.h"
 
-#define PTR_SIZE sizeof(void*)
+#define PTR_SIZE 8
 #define MAX_REG 21
 
 

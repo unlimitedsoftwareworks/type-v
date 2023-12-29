@@ -54,7 +54,11 @@ static op_func op_funcs[] = {
         &s_set_offset,
         &s_set_offset_shadow,
 
-        &s_loadf,
+        &s_loadf_8,
+        &s_loadf_16,
+        &s_loadf_32,
+        &s_loadf_64,
+        &s_loadf_ptr,
 
         &s_storef_const_8,
         &s_storef_const_16,
@@ -62,7 +66,11 @@ static op_func op_funcs[] = {
         &s_storef_const_64,
         &s_storef_const_ptr,
 
-        &s_storef_reg,
+        &s_storef_reg_8,
+        &s_storef_reg_16,
+        &s_storef_reg_32,
+        &s_storef_reg_64,
+        &s_storef_reg_ptr,
 
         &c_alloc,
         &c_storem,
@@ -93,14 +101,24 @@ static op_func op_funcs[] = {
         &a_alloc,
         &a_extend,
         &a_len,
-        &a_storef_reg,
+
+        &a_storef_reg_8,
+        &a_storef_reg_16,
+        &a_storef_reg_32,
+        &a_storef_reg_64,
+        &a_storef_reg_ptr,
+
         &a_storef_const_8,
         &a_storef_const_16,
         &a_storef_const_32,
         &a_storef_const_64,
         &a_storef_const_ptr,
-        &a_loadf,
 
+        &a_loadf_8,
+        &a_loadf_16,
+        &a_loadf_32,
+        &a_loadf_64,
+        &a_loadf_ptr,
 
         &push,
         &push_const,
