@@ -135,10 +135,20 @@ void mv_reg_local_32(TypeV_Core* core){
     core->registers.ip += offset_length;
     ASSERT(target < MAX_REG, "Invalid register index");
     ASSERT(offset < core->stack.capacity, "Invalid stack offset");
-    memcpy(&core->registers.regs[target], &core->stack.stack[core->registers.fp+offset], 4);
+    memcpy(&core->registers.regs[target].i32, &core->stack.stack[core->registers.fp+offset], 4);
 }
 MV_REG_LOCAL(64, 8)
-MV_REG_LOCAL(ptr, PTR_SIZE)
+//MV_REG_LOCAL(ptr, PTR_SIZE)
+void mv_reg_local_ptr(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(offset < core->stack.capacity, "Invalid stack offset");
+    memcpy(&core->registers.regs[target], &core->stack.stack[core->registers.fp+offset], 8);
+}
 #undef MV_REG_LOCAL
 
 #define MV_LOCAL_REG(bits, size) \
@@ -392,7 +402,18 @@ C_STOREF_REG(8, 1)
 C_STOREF_REG(16, 2)
 C_STOREF_REG(32, 4)
 C_STOREF_REG(64, 8)
-C_STOREF_REG(ptr, PTR_SIZE)
+//C_STOREF_REG(ptr, PTR_SIZE)
+void c_storef_reg_ptr(TypeV_Core* core){
+    const uint8_t class_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(class_reg < MAX_REG, "Invalid register index");
+    size_t field_offset = 0;
+    memcpy(&field_offset, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    TypeV_Class* c = (TypeV_Class*)core->registers.regs[class_reg].ptr;
+    memcpy(c->data+field_offset, &core->registers.regs[source].ptr, 8);
+}
 #undef C_STOREF_REG
 
 void c_loadf_8(TypeV_Core* core){
@@ -636,7 +657,7 @@ void a_extend(TypeV_Core* core){
     uint64_t num_elements = core->registers.regs[size_reg].u64;
 
     size_t mem = core_array_extend(core, core->registers.regs[target_array].ptr, num_elements);
-    core->registers.regs[target_array].ptr = mem;
+    //core->registers.regs[target_array].ptr = mem;
 }
 
 void a_len(TypeV_Core* core){
