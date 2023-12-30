@@ -161,7 +161,8 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG_PTR,
 
     /**
-     * OP_C_ALLOC dest: R num-methods: I, class-fields-size: I (2 bytes)
+     * OP_C_ALLOC dest:
+     * R num-methods: I, class-fields-size: I (2 bytes), classId-size: Z, classId: I
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into dest.
      */
@@ -224,15 +225,15 @@ typedef enum TypeV_OpCode {
     OP_I_SET_OFFSET,
 
     /**
-     * OP_I_SET_OFFSET_I methodIndexSrc: I, methodIndexTarget: I, src interface: R
+     * OP_I_SET_OFFSET_I dest: R, methodIndexSrc: I, methodIndexTarget: I, src interface: R
      * Updates the offset value of method index methodIndexSrc, of the interface src in
-     * to the offset value of method index methodIndexTarget, of the interface stored in R16
+     * to the offset value of method index methodIndexTarget, of the interface stored in dest
      */
     OP_I_SET_OFFSET_I,
 
     /**
-     * OP_I_SET_OFFSET_M methodID: I (8bytes), methodIndex: I (2 bytes) jumpFailure: I (8 bytes)
-     * find the method methodID from the base class of the interface stored in R16,
+     * OP_I_SET_OFFSET_M dest: R, methodID: I (8bytes), methodIndex: I (2 bytes) jumpFailure: I (8 bytes)
+     * find the method methodID from the base class of the interface stored in dest,
      * sets its offset in the current interface's methodIndex to the given offset value. If the methodID
      * is not found, it jumps to the given address
      */

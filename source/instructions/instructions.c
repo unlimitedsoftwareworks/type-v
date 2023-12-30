@@ -349,8 +349,14 @@ void c_alloc(TypeV_Core* core){
     memcpy(&fields_size, &core->program.bytecode[core->registers.ip],  2);
     core->registers.ip += 2;
 
+    uint8_t classId_size = core->program.bytecode[core->registers.ip++];
+    uint64_t classId = 0;
+    memcpy(&classId, &core->program.bytecode[core->registers.ip],  classId_size);
+    core->registers.ip += classId_size;
+
+
     // allocate memory for class
-    size_t mem = core_class_alloc(core, methods_count, fields_size);
+    size_t mem = core_class_alloc(core, methods_count, fields_size, classId);
     // move the pointer to R17
     core->registers.regs[dest_reg].ptr = mem;
 }

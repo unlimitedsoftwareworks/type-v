@@ -281,7 +281,7 @@ size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
  * @param total_fields_size  total size of fields in bytes
  * @return new Class object initialized.
  */
-size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size);
+size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId);
 
 /**
  * Allocates an interface object
