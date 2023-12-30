@@ -40,9 +40,9 @@ static char* instructions[] = {
         "mv_global_reg_8", "mv_global_reg_16", "mv_global_reg_32", "mv_global_reg_64", "mv_global_reg_ptr",
         "mv_reg_global_8", "mv_reg_global_16", "mv_reg_global_32", "mv_reg_global_64", "mv_reg_global_ptr",
         "s_alloc", "s_alloc_shadow", "s_set_offset", "s_set_offset_shadow",
-        "s_loadf",
+        "s_loadf_8", "s_loadf_16", "s_loadf_32", "s_loadf_64", "s_loadf_ptr",
         "s_storef_const_8", "s_storef_const_16", "s_storef_const_32", "s_storef_const_64", "s_storef_const_ptr",
-        "s_storef_reg",
+        "s_storef_reg_8", "s_storef_reg_16", "s_storef_reg_32", "s_storef_reg_64", "s_storef_reg_ptr",
         "c_alloc",
         "c_storem", "c_loadm",
         "c_storef_reg_8", "c_storef_reg_16", "c_storef_reg_32", "c_storef_reg_64", "c_storef_reg_ptr",
@@ -51,9 +51,9 @@ static char* instructions[] = {
         "i_set_offset", "i_set_offset_i", "i_set_offset_m", "i_loadm",
         "i_is_c", "i_is_i", "i_get_c",
         "a_alloc", "a_extend", "a_len",
-        "a_storef_reg",
+        "a_storef_reg_8", "a_storef_reg_16", "a_storef_reg_32", "a_storef_reg_64", "a_storef_reg_ptr",
         "a_storef_const_8", "a_storef_const_16", "a_storef_const_32", "a_storef_const_64", "a_storef_const_ptr",
-        "a_loadf",
+        "a_loadf_8", "a_loadf_16", "a_loadf_32", "a_loadf_64", "a_loadf_ptr",
         "push", "push_const", "pop",
         "frame_init_args", "frame_init_locals", "frame_rm", "frame_precall",
         "fn_main", "fn_ret", "fn_call", "fn_calli",
@@ -144,7 +144,7 @@ static char* instructions[] = {
         "ld_std",
         "vm_health"
 };
-#define MAX_INSTRUCTION 233
+#define MAX_INSTRUCTION 249
 
 typedef enum TokenType {
     TOK_INSTRUCTION=0,

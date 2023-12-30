@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "engine.h"
+#include "assembler/assembler.h"
 #include "core.h"
 #include "instructions/opfuncs.h"
 #include "utils/log.h"
@@ -91,6 +92,7 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
     while((core->state == CS_RUNNING) && (iter->currentInstructions != iter->maxInstructions) && !engine->interruptNextLoop){
         iter->currentInstructions += 1-runInf;
         TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
+        fprintf(stdout, "I[%d] %s\n", core->registers.ip-1, instructions[opcode]);
         op_funcs[opcode](core);
     }
 

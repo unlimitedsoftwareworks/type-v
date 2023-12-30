@@ -72,7 +72,16 @@ void mv_reg_const_32(TypeV_Core* core){
     memcpy(&core->registers.regs[target], &core->constantPool.pool[constant_offset], 4);
 }
 
-mv_reg_const(64, 8)
+void mv_reg_const_64(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t constant_offset = 0; /* we do not increment offset here*/
+    memcpy(&constant_offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    memcpy(&core->registers.regs[target], &core->constantPool.pool[constant_offset], 8);
+}
+
 mv_reg_const(ptr, PTR_SIZE)
 #undef mv_reg_const
 
@@ -117,7 +126,17 @@ void mv_reg_local_##bits(TypeV_Core* core){\
 
 MV_REG_LOCAL(8, 1)
 MV_REG_LOCAL(16, 2)
-MV_REG_LOCAL(32, 4)
+//MV_REG_LOCAL(32, 4)
+void mv_reg_local_32(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(offset < core->stack.capacity, "Invalid stack offset");
+    memcpy(&core->registers.regs[target], &core->stack.stack[core->registers.fp+offset], 4);
+}
 MV_REG_LOCAL(64, 8)
 MV_REG_LOCAL(ptr, PTR_SIZE)
 #undef MV_REG_LOCAL
@@ -376,25 +395,65 @@ C_STOREF_REG(64, 8)
 C_STOREF_REG(ptr, PTR_SIZE)
 #undef C_STOREF_REG
 
-#define C_LOADF(bits, size) \
-void c_loadf_##bits(TypeV_Core* core){ \
-    const uint8_t target = core->program.bytecode[core->registers.ip++];\
-    ASSERT(target < MAX_REG, "Invalid register index");\
-    const uint8_t class_reg = core->program.bytecode[core->registers.ip++];\
-    ASSERT(class_reg < MAX_REG, "Invalid register index");\
-    size_t offset = 0;\
-    memcpy(&offset, &core->program.bytecode[core->registers.ip], 2);\
-    core->registers.ip += 2;\
-    TypeV_Class* c = (TypeV_Class*)core->registers.regs[class_reg].ptr;\
-    memcpy(&core->registers.regs[target], c->data+offset, size);\
+void c_loadf_8(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint8_t class_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(class_reg < MAX_REG, "Invalid register index");
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+    TypeV_Class* c = (TypeV_Class*)core->registers.regs[class_reg].ptr;
+    memcpy(&core->registers.regs[target], c->data+offset, 1);
 }
 
-C_LOADF(8, 1)
-C_LOADF(16, 2)
-C_LOADF(32, 4)
-C_LOADF(64, 8)
-C_LOADF(ptr, PTR_SIZE)
-#undef C_LOADF
+void c_loadf_16(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint8_t class_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(class_reg < MAX_REG, "Invalid register index");
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+    TypeV_Class* c = (TypeV_Class*)core->registers.regs[class_reg].ptr;
+    memcpy(&core->registers.regs[target], c->data+offset, 2);
+}
+
+void c_loadf_32(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint8_t class_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(class_reg < MAX_REG, "Invalid register index");
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+    TypeV_Class* c = (TypeV_Class*)core->registers.regs[class_reg].ptr;
+    memcpy(&core->registers.regs[target], c->data+offset, 4);
+}
+
+void c_loadf_64(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint8_t class_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(class_reg < MAX_REG, "Invalid register index");
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+    TypeV_Class* c = (TypeV_Class*)core->registers.regs[class_reg].ptr;
+    memcpy(&core->registers.regs[target], c->data+offset, 8);
+}
+
+void c_loadf_ptr(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint8_t class_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(class_reg < MAX_REG, "Invalid register index");
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+    TypeV_Class* c = (TypeV_Class*)core->registers.regs[class_reg].ptr;
+    memcpy(&core->registers.regs[target], c->data+offset, PTR_SIZE);
+}
 
 void i_alloc(TypeV_Core* core){
     const uint8_t dest_reg = core->program.bytecode[core->registers.ip++];
@@ -572,10 +631,9 @@ void a_alloc(TypeV_Core* core){
 void a_extend(TypeV_Core* core){
     const uint8_t target_array = core->program.bytecode[core->registers.ip++];
     ASSERT(target_array < MAX_REG, "Invalid register index");
-    const uint8_t num_elements_size = core->program.bytecode[core->registers.ip++];
-    size_t num_elements = 0; /* we do not increment offset here*/
-    memcpy(&num_elements, &core->program.bytecode[core->registers.ip],  num_elements_size);
-    core->registers.ip += num_elements_size;
+    const uint8_t size_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(size_reg < MAX_REG, "Invalid register index");
+    uint64_t num_elements = core->registers.regs[size_reg].u64;
 
     size_t mem = core_array_extend(core, core->registers.regs[target_array].ptr, num_elements);
     core->registers.regs[target_array].ptr = mem;
@@ -589,25 +647,60 @@ void a_len(TypeV_Core* core){
     TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
     core->registers.regs[target].u64 = array->length;
 }
-
-#define A_STOREF_REG(bits, size) \
-void a_storef_reg_##bits(TypeV_Core* core){\
-    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];\
-    ASSERT(array_reg < MAX_REG, "Invalid register index");\
-    const uint8_t source = core->program.bytecode[core->registers.ip++];\
-    ASSERT(source < MAX_REG, "Invalid register index");\
-    const uint8_t index = core->program.bytecode[core->registers.ip++];\
-    ASSERT(index < MAX_REG, "Invalid register index");\
-    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;\
-    memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], size);\
+void a_storef_reg_8(TypeV_Core* core){
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(array_reg < MAX_REG, "Invalid register index");
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    ASSERT(index < MAX_REG, "Invalid register index");
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], 1);
 }
 
-A_STOREF_REG(8, 1)
-A_STOREF_REG(16, 2)
-A_STOREF_REG(32, 4)
-A_STOREF_REG(64, 8)
-A_STOREF_REG(ptr, PTR_SIZE)
-#undef A_STOREF_REG
+void a_storef_reg_16(TypeV_Core* core){
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(array_reg < MAX_REG, "Invalid register index");
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    ASSERT(index < MAX_REG, "Invalid register index");
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], 2);
+}
+
+void a_storef_reg_32(TypeV_Core* core){
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(array_reg < MAX_REG, "Invalid register index");
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    ASSERT(index < MAX_REG, "Invalid register index");
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], 4);
+}
+
+void a_storef_reg_64(TypeV_Core* core){
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(array_reg < MAX_REG, "Invalid register index");
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    ASSERT(index < MAX_REG, "Invalid register index");
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], 8);
+}
+
+void a_storef_reg_ptr(TypeV_Core* core){
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(array_reg < MAX_REG, "Invalid register index");
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    ASSERT(index < MAX_REG, "Invalid register index");
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], PTR_SIZE);
+}
 
 #define A_STOREF_CONST(bits, size) \
 void a_storef_const_##bits(TypeV_Core* core){\
@@ -628,24 +721,61 @@ A_STOREF_CONST(64, 8)
 A_STOREF_CONST(ptr, PTR_SIZE)
 #undef A_STOREF_CONST
 
-#define A_LOAD_F(bits, size)\
-void a_loadf_##bits(TypeV_Core* core){\
-    const uint8_t target = core->program.bytecode[core->registers.ip++];\
-    const uint8_t index = core->program.bytecode[core->registers.ip++];\
-    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];\
-    ASSERT(target < MAX_REG, "Invalid register index");\
-    ASSERT(index < MAX_REG, "Invalid register index");\
-    ASSERT(array_reg <= 8, "Invalid byte size");\
-    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;\
-    memcpy(&core->registers.regs[target], array->data+(core->registers.regs[index].u64*array->elementSize), size);\
+void a_loadf_8(TypeV_Core* core) {
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(index < MAX_REG, "Invalid register index");
+    ASSERT(array_reg <= 8, "Invalid byte size");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(&core->registers.regs[target], array->data + (core->registers.regs[index].u64 * array->elementSize), 1);
 }
 
-A_LOAD_F(8, 1)
-A_LOAD_F(16, 2)
-A_LOAD_F(32, 4)
-A_LOAD_F(64, 8)
-A_LOAD_F(ptr, PTR_SIZE)
-#undef A_LOAD_F
+void a_loadf_16(TypeV_Core* core) {
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(index < MAX_REG, "Invalid register index");
+    ASSERT(array_reg <= 8, "Invalid byte size");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(&core->registers.regs[target], array->data + (core->registers.regs[index].u64 * array->elementSize), 2);
+}
+
+void a_loadf_32(TypeV_Core* core) {
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(index < MAX_REG, "Invalid register index");
+    ASSERT(array_reg <= 8, "Invalid byte size");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(&core->registers.regs[target], array->data + (core->registers.regs[index].u64 * array->elementSize), 4);
+}
+
+void a_loadf_64(TypeV_Core* core) {
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(index < MAX_REG, "Invalid register index");
+    ASSERT(array_reg <= 8, "Invalid byte size");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(&core->registers.regs[target], array->data + (core->registers.regs[index].u64 * array->elementSize), 8);
+}
+
+void a_loadf_ptr(TypeV_Core* core) {
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    const uint8_t index = core->program.bytecode[core->registers.ip++];
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    ASSERT(index < MAX_REG, "Invalid register index");
+    ASSERT(array_reg <= 8, "Invalid byte size");
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    memcpy(&core->registers.regs[target], array->data + (core->registers.regs[index].u64 * array->elementSize), PTR_SIZE);
+}
+
 
 
 void push(TypeV_Core* core){
@@ -1608,11 +1738,6 @@ void jmp_ge(TypeV_Core* core){
         // Unsigned comparison
         // Jump if CF is clear (no borrow occurred)
         can_jump = !FLAG_CHECK(core->registers.flags, FLAG_CF);
-    }
-
-    if (can_jump) {
-        // Perform the jump
-        core->registers.ip = can_jump;
     }
 
     if(can_jump){

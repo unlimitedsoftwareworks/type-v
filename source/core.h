@@ -28,6 +28,8 @@ typedef struct TypeV_Class{
     uint64_t uid;             ///< Unique ID
     uint8_t num_methods;      ///< number of methods
     /** methods */
+    // maybe remove offsets from class,
+    // oly needed in interfaces
     uint16_t* methodsOffset;  ///< method offset table
     size_t* methods;          ///< A pointer to the method table
     /** data */

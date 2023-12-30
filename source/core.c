@@ -179,12 +179,13 @@ size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
 size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size) {
     LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, total allocated size: %d", core->id, num_methods, total_fields_size, (3*sizeof(size_t))+total_fields_size);
     TypeV_Class* class_ptr = (TypeV_Class*)calloc(1, sizeof(TypeV_Class)+total_fields_size);
+    class_ptr->num_methods = num_methods;
     class_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t));
     // class methods offset table is sequential, since class objects are primitive entities
     // and cannot be a shadow copy of another class
     for(size_t i = 0; i < num_methods; i++){
         // TODO: Replace size_t with 8?
-        class_ptr->methodsOffset[i] = i*sizeof(size_t);
+        class_ptr->methodsOffset[i] = i*sizeof(uint16_t);
     }
 
     class_ptr->methods = calloc(num_methods, sizeof(size_t));

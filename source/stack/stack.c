@@ -133,6 +133,9 @@ void stack_frame_alloc_args(TypeV_Core *core, size_t size) {
 
 void stack_frame_alloc_locals(TypeV_Core *core, size_t size){
     LOG_INFO("Allocating stack frame locals for %zu bytes", size);
+    // push size bytes to stack
+    core->registers.sp += size;
+
     // point fe to end of locals
     core->registers.fe += size;
 }
