@@ -278,6 +278,8 @@ static op_func op_funcs[] = {
         &jmp_l,
         &jmp_le,
 
+        &reg_ffi,
+        &open_ffi,
         &ld_ffi,
         &call_ffi,
         &close_ffi,

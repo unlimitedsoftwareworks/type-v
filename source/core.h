@@ -30,7 +30,7 @@ typedef struct TypeV_Class{
     /** methods */
     // maybe remove offsets from class,
     // oly needed in interfaces
-    uint16_t* methodsOffset;  ///< method offset table
+    //uint16_t* methodsOffset;  ///< method offset table
     size_t* methods;          ///< A pointer to the method table
     /** data */
     uint8_t data[];            ///< Fields start from here, direct access
@@ -418,9 +418,11 @@ void core_promise_await(TypeV_Core* core, TypeV_Promise* promise);
 void core_promise_check_resume(TypeV_Core* core);
 
 
+
+
+
 typedef void (*TypeV_FFIFunc)(TypeV_Core* core);
 typedef struct TypeV_FFI {
-    uint8_t isInitialized;   ///< Is the FFI initialized
     const TypeV_FFIFunc* functions;///< FFI functions
     uint8_t functionCount;   ///< FFI function count
 }TypeV_FFI;

@@ -15,7 +15,6 @@
 #endif
 
 char* ffi_find_dynlib(const char* dynlib_name) {
-
     char buffer[1024];
     TypeV_ENV env = get_env();
     snprintf(buffer, 1024, "%s/%s/lib%s%s", env.cwd, dynlib_name, dynlib_name, env.dynlib_ext);

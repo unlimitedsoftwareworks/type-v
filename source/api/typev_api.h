@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include "../core.h"
 
-size_t typev_api_register_lib(struct TypeV_Core* core, const TypeV_FFIFunc lib[]);
+size_t typev_api_register_lib(const TypeV_FFIFunc lib[]);
 
 size_t typev_api_get_const_address(struct TypeV_Core* core, size_t vm_adr);
 

@@ -20,8 +20,8 @@ static TypeV_FFIFunc stdio_lib[] = {
         (TypeV_FFIFunc)stdio_print, NULL
 };
 
-size_t typev_ffi_open(TypeV_Core* core){
-    return typev_api_register_lib(core, stdio_lib);
+size_t typev_ffi_open(){
+    return typev_api_register_lib(stdio_lib);
 }
 
 

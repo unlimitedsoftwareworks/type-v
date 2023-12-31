@@ -82,7 +82,16 @@ void mv_reg_const_64(TypeV_Core* core){
     memcpy(&core->registers.regs[target], &core->constantPool.pool[constant_offset], 8);
 }
 
-mv_reg_const(ptr, PTR_SIZE)
+void mv_reg_const_ptr(TypeV_Core* core){
+    const uint8_t target = core->program.bytecode[core->registers.ip++];
+    ASSERT(target < MAX_REG, "Invalid register index");
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t constant_offset = 0; /* we do not increment offset here*/
+    memcpy(&constant_offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    memcpy(&core->registers.regs[target], &core->constantPool.pool[constant_offset], 8);
+}
+
 #undef mv_reg_const
 
 void mv_reg_mem(TypeV_Core* core){
@@ -187,7 +196,18 @@ MV_LOCAL_REG(8, 1)
 MV_LOCAL_REG(16, 2)
 MV_LOCAL_REG(32, 4)
 MV_LOCAL_REG(64, 8)
-MV_LOCAL_REG(ptr, PTR_SIZE)
+
+void mv_local_reg_ptr(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    ASSERT(offset < core->stack.capacity, "Invalid stack offset");
+    memcpy(&core->stack.stack[core->registers.fp+offset], &core->registers.regs[source], 8);
+}
+
 #undef MV_LOCAL_REG
 
 #define MV_GLOBAL_REG(bits, size) \
@@ -452,7 +472,7 @@ void c_storem(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->registers.regs[dest_reg].ptr;
     LOG_INFO("Storing method %d at methd_address %d in class %p", method_index, methd_address, (void*)c);
-    c->methodsOffset[method_index] = methd_address;
+    c->methods[method_index] = methd_address;
 }
 
 void c_loadm(TypeV_Core* core){
@@ -468,7 +488,7 @@ void c_loadm(TypeV_Core* core){
 
     LOG_INFO("Loading method %d from class %p", method_index, (void*)c);
 
-    size_t offset = c->methodsOffset[method_index];
+    size_t offset = c->methods[method_index];
     core->registers.regs[target].ptr = offset;
 }
 
@@ -569,7 +589,6 @@ void i_alloc(TypeV_Core* core){
     const uint8_t fields_count = core->program.bytecode[core->registers.ip++];
     const uint8_t class_reg = core->program.bytecode[core->registers.ip++];
     ASSERT(class_reg < MAX_REG, "Invalid register index");
-
 
     TypeV_Class* c = (TypeV_Class*)core->registers.regs[class_reg].ptr;
     // allocate memory for struct
@@ -696,7 +715,7 @@ void i_is_i(TypeV_Core* core){
     uint8_t found = 0;
     for(size_t i = 0; i < class_->num_methods; i++) {
         uint64_t methodId = 0;
-        memcpy(&methodId, &core->program.bytecode[class_->methods[i]],  8);
+        memcpy(&methodId, &core->program.bytecode[class_->methods[i]]-8,  8);
         if(lookUpMethodId == methodId) {
             found = 1;
             break;
@@ -715,7 +734,7 @@ void i_get_c(TypeV_Core* core) {
     ASSERT(src_reg < MAX_REG, "Invalid register index");
 
     TypeV_Interface* interface = (TypeV_Interface*)core->registers.regs[src_reg].ptr;
-    core->registers.regs[src_reg].ptr = (size_t)interface->classPtr;
+    core->registers.regs[dest_reg].ptr = (size_t)interface->classPtr;
 }
 
 void a_alloc(TypeV_Core* core){
@@ -1029,7 +1048,7 @@ void fn_main(TypeV_Core* core){
 void fn_ret(TypeV_Core* core){
     stack_frame_postcall_pop(core);
     LOG_INFO("Returning from function towards %p", (void*)core->registers.ip);
-}
+    }
 
 void fn_call(TypeV_Core* core){
     // get the register
@@ -1921,27 +1940,46 @@ void jmp_le(TypeV_Core* core){
     }
 }
 
+void reg_ffi(TypeV_Core* core){
+    uint8_t offsetSize = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], offsetSize);
+    core->registers.ip += offsetSize;
+
+    uint16_t id = 0;
+    memcpy(&id, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+
+    char* namePtr = &core->constantPool.pool[offset];
+
+    engine_ffi_register(core->engineRef, namePtr, id);
+}
+
+void open_ffi(TypeV_Core* core){
+    uint16_t ffi_id = 0;
+    memcpy(&ffi_id, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+
+    engine_ffi_open(core->engineRef, ffi_id);
+}
+
 void ld_ffi(TypeV_Core* core){
     uint8_t dest = core->program.bytecode[core->registers.ip++];
-    uint8_t offset_length = core->program.bytecode[core->registers.ip++];
-    size_t offset = 0;
-    memcpy(&offset, &core->program.bytecode[core->registers.ip], offset_length);
-    core->registers.ip += offset_length;
-    size_t namePtr = (size_t)(core->constantPool.pool + offset);
-    core->registers.regs[dest].ptr = core_ffi_load(core, namePtr);
+    ASSERT(dest < MAX_REG, "Invalid register index");
+
+    uint16_t id = 0;
+    memcpy(&id, &core->program.bytecode[core->registers.ip], 2);
+    core->registers.ip += 2;
+
+    uint8_t methodId = core->program.bytecode[core->registers.ip++];
+
+    core->registers.regs[dest].ptr = (size_t)engine_ffi_get(core->engineRef, id, methodId);
 }
 
 void call_ffi(TypeV_Core* core){
     uint8_t reg = core->program.bytecode[core->registers.ip++];
-    uint8_t index_length = core->program.bytecode[core->registers.ip++];
-    size_t index = 0;
-    memcpy(&index, &core->program.bytecode[core->registers.ip], index_length);
 
-    core->registers.ip += index_length;
-
-    TypeV_FFI * module = (TypeV_FFI *)core->registers.regs[reg].ptr;
-
-    TypeV_FFIFunc ffi_fn = module->functions[index];
+    TypeV_FFIFunc ffi_fn = (TypeV_FFIFunc)(core->registers.regs[reg].ptr);
     ffi_fn(core);
 }
 

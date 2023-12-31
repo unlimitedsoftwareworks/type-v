@@ -11,7 +11,7 @@
 #include "../stack/stack.h"
 
 
-size_t typev_api_register_lib(TypeV_Core* core, const TypeV_FFIFunc methods[]) {
+size_t typev_api_register_lib(const TypeV_FFIFunc methods[]) {
     // get the number of methods
     uint8_t methodCount = 0;
     while(methods[methodCount] != NULL) {
@@ -21,7 +21,6 @@ size_t typev_api_register_lib(TypeV_Core* core, const TypeV_FFIFunc methods[]) {
     TypeV_FFI *ffi = malloc(sizeof(TypeV_FFI));
     ffi->functions = methods;
     ffi->functionCount = methodCount;
-    ffi->isInitialized = 1;
 
     return (size_t)ffi;
 }

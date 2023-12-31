@@ -68,5 +68,5 @@ static TypeV_FFIFunc string_lib[] = {
 };
 
 size_t typev_ffi_open(TypeV_Core* core){
-    return typev_api_register_lib(core, string_lib);
+    return typev_api_register_lib(string_lib);
 }

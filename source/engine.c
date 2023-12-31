@@ -8,6 +8,7 @@
 #include "core.h"
 #include "instructions/opfuncs.h"
 #include "utils/log.h"
+#include "utils/utils.h"
 
 void engine_init(TypeV_Engine *engine) {
     // we will allocate memory for cores later
@@ -208,4 +209,53 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
 
     engine->coreCount--;
     engine_update_scheduler(engine);
+}
+
+void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlibID) {
+    engine->ffi[dynlibID].dynlibName = dynlibName;
+    engine->ffi[dynlibID].dynlibHandle = NULL;
+
+    // load the library
+    engine_ffi_open(engine, dynlibID);
+}
+
+void engine_ffi_open(TypeV_Engine *engine, uint16_t dynlibID) {
+    TypeV_EngineFFI ffi = engine->ffi[dynlibID];
+    if(ffi.dynlibHandle != NULL) {
+        return;
+    }
+
+    char* name = engine->ffi[dynlibID].dynlibName;
+
+    TV_LibraryHandle lib = ffi_dynlib_load(name);
+    ASSERT(lib != NULL, "Failed to load library %s", ffi_find_dynlib(name));
+
+    void* openLib = ffi_dynlib_getsym(lib, "typev_ffi_open");
+    ASSERT(openLib != NULL, "Failed to open library %s", ffi_find_dynlib(name));
+    size_t (*openFunc)() = openLib;
+    ffi.ffi = (TypeV_FFI*)openFunc();
+    ffi.dynlibHandle = lib;
+    engine->ffi[dynlibID] = ffi;
+}
+
+size_t engine_ffi_get(TypeV_Engine *engine, uint16_t dynlibID, uint8_t methodId){
+    TypeV_EngineFFI ffi = engine->ffi[dynlibID];
+
+    ASSERT(ffi.dynlibHandle != NULL, "Library %s not loaded", ffi_find_dynlib(ffi.dynlibName));
+    ASSERT(ffi.ffi != NULL, "Library %s not opened", ffi_find_dynlib(ffi.dynlibName));
+    ASSERT(methodId < ffi.ffi->functionCount, "Method %d not found in library %s", methodId, ffi_find_dynlib(ffi.dynlibName));
+
+    return (size_t)ffi.ffi->functions[methodId];
+}
+
+void engine_ffi_close(TypeV_Engine *engine, uint16_t dynlibID) {
+    TypeV_EngineFFI ffi = engine->ffi[dynlibID];
+    if(ffi.dynlibHandle == NULL) {
+        return;
+    }
+
+    ffi_dynlib_unload(ffi.dynlibHandle);
+    ffi.dynlibHandle = NULL;
+    ffi.ffi = NULL;
+    engine->ffi[dynlibID] = ffi;
 }

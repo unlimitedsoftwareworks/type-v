@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "core.h"
+#include "dynlib/dynlib.h"
 
 // Hard limit on the number of cores
 #define MAX_CORES 256
@@ -34,6 +35,12 @@ typedef struct TypeV_CoreIterator {
     struct TypeV_CoreIterator* next;
 }TypeV_CoreIterator;
 
+typedef struct TypeV_EngineFFI{
+    char* dynlibName;
+    TV_LibraryHandle dynlibHandle;
+    TypeV_FFI* ffi;
+}TypeV_EngineFFI;
+
 /**
  * @brief: TypeV_Engine: The execution engine: Array of cores
  */
@@ -43,6 +50,7 @@ typedef struct TypeV_Engine {
     uint32_t coreCount;                         ///< number of living cores
     uint32_t runningCoresCount;                 ///< number of running cores
     uint8_t interruptNextLoop;                  ///< interrupt the next loop, set to true when cores are spawned/killed
+    TypeV_EngineFFI ffi[];                      ///< FFI libraries
 } TypeV_Engine;
 
 /**
@@ -113,5 +121,12 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
  * @param coreID
  */
 void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core);
+
+
+void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlibID);
+void engine_ffi_open(TypeV_Engine *engine, uint16_t dynlibID);
+size_t engine_ffi_get(TypeV_Engine *engine, uint16_t dynlibID, uint8_t methodId);
+void engine_ffi_close(TypeV_Engine *engine, uint16_t dynlibID);
+
 
 #endif //TYPE_V_ENGINE_H

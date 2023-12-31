@@ -578,16 +578,26 @@ typedef enum TypeV_OpCode {
     OP_JLE,
 
     /**
-     * OP_LD_FFI dest: R, const-offset-size: Z, const-offset: I
-     * Load a FFI shared object library, stores
-     * its memory address into R, the name is
-     * stored in the constant pool at the given offset
+     * OP_REG_FFI nnameconst-offset-size: I, nameconst-offset: I, ID: I (2 bytes),
+     * registers an FFI of the given name at code offset and with the given ID
+     */
+    OP_REG_FFI,
+
+    /**
+     * OP_OPEN_FFI ffi-id: I (2 bytes)
+     * Opens the FFI with the given ID
+     */
+    OP_OPEN_FFI,
+
+    /**
+     * OP_LD_FFI dest: R, ffi-id I (2 bytes), fn-id: I (1b)
+     * Load an FFI method into dest register, from ffi-id and fn-id
      */
     OP_LD_FFI,
 
     /**
-     * OP_CALL_FFI FFI-address: R, function-name-offset-size: Z, function-name-offset: I
-     * calls a FFI based on its index
+     * OP_CALL_FFI reg: R
+     * calls a FFI stored in reg
      */
     OP_CALL_FFI,
 
