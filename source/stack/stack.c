@@ -124,10 +124,15 @@ void stack_pop_ptr(TypeV_Core * core, size_t * value) {
 
 void stack_frame_alloc_args(TypeV_Core *core, size_t size) {
     LOG_INFO("Allocating stack frame args for %zu bytes", size);
+    /**
+     * [e1, e2, e3, e4, e5, e6, e7, e8, e9, e10]
+     * ^ frame pointer                         ^ stack pointer
+     * all whats above frame end is args and locals for next frame (if any)
+     */
     // point fp to current sp
-    core->registers.fp = core->registers.sp;
+    core->registers.fp = core->registers.sp - size;
     // point fe to end of args
-    core->registers.fe = core->registers.fp + size;
+    core->registers.fe = core->registers.sp;
 }
 
 
