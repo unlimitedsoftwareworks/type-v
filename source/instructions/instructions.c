@@ -847,7 +847,18 @@ void a_storef_const_##bits(TypeV_Core* core){\
     memcpy(array->data+(core->registers.regs[indexReg].u64*array->elementSize), &core->constantPool.pool[offset], size);\
 }
 
-A_STOREF_CONST(8, 1)
+void a_storef_const_8(TypeV_Core* core){
+    const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(array_reg < MAX_REG, "Invalid register index");
+    uint8_t indexReg = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0;
+    memcpy(&offset, &core->program.bytecode[core->registers.ip], 8);
+    core->registers.ip += 8;
+    TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
+    ASSERT(core->registers.regs[indexReg].u64 < array->length, "Index out of bounds");
+    memcpy(array->data+(core->registers.regs[indexReg].u64*array->elementSize), &core->constantPool.pool[offset], 1);
+}
+
 A_STOREF_CONST(16, 2)
 A_STOREF_CONST(32, 4)
 A_STOREF_CONST(64, 8)
@@ -1137,8 +1148,22 @@ void upcast_u(TypeV_Core* core) {
     uint64_t value = 0;
     memcpy(&value, &core->registers.regs[reg], from);
 
+    if(to == 2){
+        core->registers.regs[reg].u16 = (uint16_t) value;
+    }
+    else if(to == 4){
+        core->registers.regs[reg].u32 = (uint32_t) value;
+    }
+    else if(to == 8){
+        core->registers.regs[reg].u64 = (uint64_t) value;
+    }
+    else{
+        LOG_ERROR("Invalid byte size %d", to);
+        exit(-1);
+    }
+
     // Store the result back in the register
-    memcpy(&core->registers.regs[reg], &value, to);
+    //memcpy(&core->registers.regs[reg], &value, to);
 }
 
 void upcast_f(TypeV_Core* core) {

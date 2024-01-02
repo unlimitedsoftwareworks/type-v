@@ -238,7 +238,7 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
 }
 
 size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
-    LOG_INFO("Extending array %p with %d elements, total allocated size: %d", array_ptr, (void*)array_ptr, num_elements, num_elements*sizeof(size_t));
+    LOG_INFO("Extending array %p with %zu elements, total allocated size: %d", array_ptr, (void*)array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
     array->data = realloc(array->data, num_elements*array->elementSize);
     array->length = num_elements;

@@ -116,9 +116,9 @@ int main() {
 
     // Use the segment pointers...
     // Remember to free them after use
-    free(constantSegment);
-    free(globalSegment);
-    free(codeSegment);
+    //free(constantSegment);
+    //free(globalSegment);
+    //free(codeSegment);
 
     return 0;
 }

@@ -93,7 +93,7 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
     while((core->state == CS_RUNNING) && (iter->currentInstructions != iter->maxInstructions) && !engine->interruptNextLoop){
         iter->currentInstructions += 1-runInf;
         TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
-        fprintf(stdout, "I[%d] %s\n", core->registers.ip-1, instructions[opcode]);
+        //fprintf(stdout, "I[%d] %s\n", core->registers.ip-1, instructions[opcode]);
         op_funcs[opcode](core);
     }
 
