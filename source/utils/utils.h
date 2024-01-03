@@ -30,6 +30,6 @@
 #endif
 
 void typev_assert(int cond, const char * rawcond, const char* func_name, const char * fmt, ...);
-
+int get_source_map_line_content(const char* sourceMapFile, uint64_t position, char* file, uint64_t* line, uint64_t* pos);
 
 #endif //TYPE_V_UTILS_H

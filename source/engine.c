@@ -83,6 +83,12 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         return;
     }
 
+    if(core->state == CS_CRASHED){
+        LOG_INFO("Core[%d] Crashed");
+        engine_detach_core(engine, core);
+        return;
+    }
+
     if(core->state == CS_AWAITING_PROMISE) {
         core_promise_check_resume(core);
         if(core->state == CS_AWAITING_PROMISE) {
@@ -182,7 +188,7 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
 }
 
 void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
-    LOG_INFO("Core[%d] detached", core->id);
+    LOG_INFO("Core[%d] detached with status %d", core->id, core->state);
     // find the core in the iterator list
     TypeV_CoreIterator* iterator = engine->coreIterator;
     TypeV_CoreIterator* prevIterator = NULL;

@@ -1,11 +1,12 @@
 //
 // Created by praisethemoon on 21.11.23.
 //
-
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "engine.h"
 #include "core.h"
 #include "queue/queue.h"
 #include "utils/log.h"
@@ -238,7 +239,7 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
 }
 
 size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
-    LOG_INFO("Extending array %p with %zu elements, total allocated size: %d", array_ptr, (void*)array_ptr, num_elements, num_elements*sizeof(size_t));
+    LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated size: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
     array->data = realloc(array->data, num_elements*array->elementSize);
     array->length = num_elements;
@@ -367,3 +368,20 @@ void core_lock_release(TypeV_Core* core, TypeV_Lock* lock) {
     lock->promise = NULL;
 }
 
+void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
+    char message[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsprintf(message, fmt, args);
+    va_end(args);
+
+    LOG_ERROR("CORE[%d]: PANIC: ErrorID: %d, Message %s", core->id, errorId, message);
+
+    TypeV_ENV env = get_env();
+    if(env_sourcemap_has(env)){
+        TypeV_SourcePoint point = env_sourcemap_get(env, core->registers.ip);
+        LOG_ERROR("CORE[%d]: Runtime Error ID: %d: %s\nSource: %s:%d:%d", core->id, errorId, message, point.file, point.line+1, point.column);
+    }
+
+    core->state = CS_CRASHED;
+}

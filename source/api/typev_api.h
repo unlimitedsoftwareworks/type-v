@@ -78,6 +78,6 @@ void typev_api_struct_set_offset(struct TypeV_Core *core, TypeV_Struct *structPt
  */
 void typev_api_struct_set_field(struct TypeV_Core *core, TypeV_Struct *structPtr, uint16_t fieldIndex, void *value, size_t valueSize);
 
-
+void typev_api_core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...);
 
 #endif //TYPE_V_TYPEV_API_H

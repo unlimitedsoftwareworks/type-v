@@ -213,3 +213,7 @@ void typev_api_struct_set_offset(TypeV_Core *core, TypeV_Struct *structPtr, uint
 void typev_api_struct_set_field(TypeV_Core *core, TypeV_Struct *structPtr, uint16_t fieldIndex, void *value, size_t valueSize) {
     memcpy(structPtr->data + structPtr->fieldOffsets[fieldIndex], value, valueSize);
 }
+
+void typev_api_core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...){
+    core_panic(core, errorId, fmt);
+};

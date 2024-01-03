@@ -15,8 +15,8 @@ void stack_init(TypeV_Core * core, size_t capacity) {
 void stack_push_8(TypeV_Core * core, uint8_t value) {
     // check if we have space
     if (core->registers.sp + 1 >= core->stack.capacity) {
-        LOG_ERROR("Stack overflow, failed to allocated 1byte, stack-size: %zu", core->stack.capacity);
-        assert(0);
+        //LOG_ERROR("Stack overflow, failed to allocated 1byte, stack-size: %zu", core->stack.capacity);
+        //assert(0);
     }
 
     core->stack.stack[core->registers.sp] = value;

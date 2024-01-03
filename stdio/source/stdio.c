@@ -13,14 +13,14 @@
 void stdio_print(TypeV_Core *core) {
     size_t ptr = typev_api_stack_pop_u64(core);
     TypeV_Array* arr = (TypeV_Array*)(ptr);
-    fwrite(arr->data, 1, arr->length, stdout);
+    //fwrite(arr->data, 1, arr->length, stdout);
+    printf("%.*s", arr->length, arr->data);
 }
 
 void stdio_println(TypeV_Core *core) {
     size_t ptr = typev_api_stack_pop_u64(core);
     TypeV_Array* arr = (TypeV_Array*)(ptr);
-    fwrite(arr->data, 1, arr->length, stdout);
-    fwrite("\n", 1, 1, stdout);
+    printf("%.*s\n", arr->length, arr->data);
 }
 
 void stdio_print_u64(TypeV_Core *core) {

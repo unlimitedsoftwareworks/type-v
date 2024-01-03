@@ -45,6 +45,7 @@ typedef struct TypeV_EngineFFI{
  * @brief: TypeV_Engine: The execution engine: Array of cores
  */
 typedef struct TypeV_Engine {
+    char* srcFileMap;                           ///< Source file map
     TypeV_EngineHealth health;
     TypeV_CoreIterator* coreIterator;
     uint32_t coreCount;                         ///< number of living cores
@@ -52,6 +53,7 @@ typedef struct TypeV_Engine {
     uint8_t interruptNextLoop;                  ///< interrupt the next loop, set to true when cores are spawned/killed
     TypeV_EngineFFI ffi[];                      ///< FFI libraries
 } TypeV_Engine;
+
 
 /**
  * @brief engine_init Initialize the engine
@@ -127,6 +129,5 @@ void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlib
 void engine_ffi_open(TypeV_Engine *engine, uint16_t dynlibID);
 size_t engine_ffi_get(TypeV_Engine *engine, uint16_t dynlibID, uint8_t methodId);
 void engine_ffi_close(TypeV_Engine *engine, uint16_t dynlibID);
-
 
 #endif //TYPE_V_ENGINE_H

@@ -91,7 +91,8 @@ typedef enum {
     CS_RUNNING,           ///< Process is Running
     CS_FINISHING,         ///< Process has received terminate signal and is no longer accepting messages
     CS_TERMINATED,        ///< Process has been gracefully terminated
-    CS_KILLED             ///< Process has been killed
+    CS_KILLED   ,          ///< Process has been killed
+    CS_CRASHED            ///< Process has crashed
 }TypeV_CoreState;
 
 typedef enum {
@@ -206,6 +207,8 @@ typedef struct TypeV_Core {
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
     TypeV_CoreSignal lastSignal;              ///< Last signal received
     TypeV_Promise* awaitingPromise;           ///< Promise that the core is awaiting, NULL if none
+
+    uint64_t lastRanInstruction;              ///< Last instruction ran
 }TypeV_Core;
 
 /**
@@ -417,8 +420,13 @@ void core_promise_await(TypeV_Core* core, TypeV_Promise* promise);
  */
 void core_promise_check_resume(TypeV_Core* core);
 
-
-
+/**
+ * Throws an error and terminates the core
+ * @param core
+ * @param errorId
+ * @param fmt Message printf style format, followed by arguments
+ */
+void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...);
 
 
 typedef void (*TypeV_FFIFunc)(TypeV_Core* core);

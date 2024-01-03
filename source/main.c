@@ -59,8 +59,17 @@ int main() {
 // Function prototypes
 uint8_t *readSegment(FILE *file, uint64_t offset, size_t size);
 
-int main() {
-    const char *filePath = "/Users/praisethemoon/projects/type-c/output/hello.tv"; // Change to your file's path
+int main(int argc, char **argv) {
+
+    char *filePath = "/Users/praisethemoon/projects/type-c/output/bin.tcv"; // Change to your file's path
+    char *srcMapFile = "/Users/praisethemoon/projects/type-c/output/src_map.map.txt";
+    if (argc > 1){
+        filePath = argv[1];
+    }
+    if (argc > 2){
+        srcMapFile = argv[2];
+    }
+
     FILE *file = fopen(filePath, "rb");
     if (file == NULL) {
         perror("Error opening file");
@@ -86,7 +95,7 @@ int main() {
 
     fclose(file);
 
-    typev_env_init();
+    typev_env_init(srcMapFile);
     typev_env_log();
 
     TypeV_Engine engine;
@@ -102,7 +111,7 @@ int main() {
             .version = 0
     };
 
-    debug_program(&program);
+    //debug_program(&program);
 
     engine_setmain(&engine, program.codePool, program.codePoolSize,
                    program.constPool, program.constPoolSize,

@@ -146,9 +146,9 @@ void int64_to_str(TypeV_Core *core) {
 }
 
 void string_append_f64(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    double value = typev_api_stack_pop_f64(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    double value = typev_api_stack_pop_f64(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_NUM_STR_SIZE){
@@ -159,8 +159,7 @@ void string_append_f64(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_NUM_STR_SIZE, "%f", value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert double to string\n");
-        exit(-1);
+        typev_api_core_panic(core, 1, "Failed to convert double to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -169,9 +168,9 @@ void string_append_f64(TypeV_Core* core){
 #define MAX_FLOAT_STR_SIZE 20
 
 void string_append_f32(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    float value = typev_api_stack_pop_f32(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    float value = typev_api_stack_pop_f32(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_FLOAT_STR_SIZE ){
@@ -182,8 +181,8 @@ void string_append_f32(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_FLOAT_STR_SIZE, "%f", value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert float to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert float to string, snprintf returned %d\n", gap);
+
     }
 
     typev_api_return_u32(core, gap);
@@ -192,9 +191,9 @@ void string_append_f32(TypeV_Core* core){
 #define MAX_UINT64_STR_SIZE 20
 
 void string_append_u64(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    uint64_t value = typev_api_stack_pop_u64(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    uint64_t value = typev_api_stack_pop_u64(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_UINT64_STR_SIZE){
@@ -205,8 +204,7 @@ void string_append_u64(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_UINT64_STR_SIZE, "%" PRIu64, value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert uint64_t to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert uint64_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -214,9 +212,9 @@ void string_append_u64(TypeV_Core* core){
 
 #define MAX_INT64_STR_SIZE 20
 void string_append_i64(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    int64_t value = typev_api_stack_pop_i64(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    int64_t value = typev_api_stack_pop_i64(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_INT64_STR_SIZE){
@@ -227,8 +225,7 @@ void string_append_i64(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_INT64_STR_SIZE, "%" PRId64, value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert int64_t to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert int64_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -236,9 +233,9 @@ void string_append_i64(TypeV_Core* core){
 
 #define MAX_UINT32_STR_SIZE 12
 void string_append_u32(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    uint32_t value = typev_api_stack_pop_u32(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    uint32_t value = typev_api_stack_pop_u32(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_UINT32_STR_SIZE){
@@ -249,8 +246,7 @@ void string_append_u32(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_UINT32_STR_SIZE, "%" PRIu32, value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert uint32_t to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert uint32_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -258,9 +254,9 @@ void string_append_u32(TypeV_Core* core){
 
 #define MAX_INT32_STR_SIZE 12
 void string_append_i32(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    int32_t value = typev_api_stack_pop_i32(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    int32_t value = typev_api_stack_pop_i32(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_INT32_STR_SIZE){
@@ -271,8 +267,7 @@ void string_append_i32(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_INT32_STR_SIZE, "%" PRId32, value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert int32_t to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert int32_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -281,9 +276,9 @@ void string_append_i32(TypeV_Core* core){
 #define MAX_UINT16_STR_SIZE 6
 
 void string_append_u16(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    uint16_t value = typev_api_stack_pop_u16(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    uint16_t value = typev_api_stack_pop_u16(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_UINT16_STR_SIZE){
@@ -294,8 +289,7 @@ void string_append_u16(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_UINT16_STR_SIZE, "%" PRIu16, value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert uint16_t to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert uint16_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -303,9 +297,9 @@ void string_append_u16(TypeV_Core* core){
 
 #define MAX_INT16_STR_SIZE 7
 void string_append_i16(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    int16_t value = typev_api_stack_pop_i16(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    int16_t value = typev_api_stack_pop_i16(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_INT16_STR_SIZE){
@@ -316,8 +310,7 @@ void string_append_i16(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_INT16_STR_SIZE, "%" PRId16, value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert int16_t to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert int16_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -325,9 +318,9 @@ void string_append_i16(TypeV_Core* core){
 
 #define MAX_UINT8_STR_SIZE 4
 void string_append_u8(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    uint8_t value = typev_api_stack_pop_u8(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    uint8_t value = typev_api_stack_pop_u8(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_UINT8_STR_SIZE){
@@ -338,8 +331,7 @@ void string_append_u8(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_UINT8_STR_SIZE, "%" PRIu8, value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert uint8_t to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert uint8_t to string, snprintf returned %d\n");
     }
 
     typev_api_return_u32(core, gap);
@@ -347,9 +339,9 @@ void string_append_u8(TypeV_Core* core){
 
 #define MAX_INT8_STR_SIZE 5
 void string_append_i8(TypeV_Core* core){
-    uint32_t pos = typev_api_stack_pop_u32(core);
-    int8_t value = typev_api_stack_pop_i8(core);
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    int8_t value = typev_api_stack_pop_i8(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
 
     // check if the array has enough capacity starting from pos
     if(str->length < pos + MAX_INT8_STR_SIZE){
@@ -360,8 +352,21 @@ void string_append_i8(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf(str->data+pos, MAX_INT8_STR_SIZE, "%" PRId8, value);
     if(gap < 0){
-        fprintf(stderr, "Failed to convert int8_t to string\n");
-        exit(-1);
+        core_panic(core, 1, "Failed to convert int8_t to string, snprintf returned %d\n", gap);
+    }
+
+    typev_api_return_u32(core, gap);
+}
+
+void string_append_bool(TypeV_Core* core){
+    TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    uint8_t value = typev_api_stack_pop_u8(core);
+    uint32_t pos = typev_api_stack_pop_u32(core);
+
+    char* bool_str = value?"true":"false";
+    int32_t gap = snprintf(str->data+pos, 5, "%s", bool_str);
+    if(gap < 0){
+        core_panic(core, 1, "Failed to convert bool to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -391,6 +396,7 @@ static TypeV_FFIFunc stdcore_lib[] = {
         string_append_i16,
         string_append_u8,
         string_append_i8,
+        string_append_bool,
         NULL
 };
 

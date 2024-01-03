@@ -7,7 +7,9 @@
 #include <unistd.h>
 #endif
 
+#include <string.h>
 #include "env.h"
+#include "../utils/utils.h"
 
 #define CPU_INFO_IMPLEMENTATION
 #include "../vendor/cpu_info/cpu_info.h"
@@ -34,7 +36,7 @@ static TypeV_ENV env= {
 #endif
 };
 
-void typev_env_init(){
+void typev_env_init(char* sourceMapFile){
     char *cwd;
      // PATH_MAX is defined in limits.h
 
@@ -54,6 +56,12 @@ void typev_env_init(){
         fprintf(stderr, "An error occured while quering CPU");
     }
     cpui_log_result(stdout, &env.result);
+
+    env.sourceMapFile = sourceMapFile;
+
+    if(env.sourceMapFile != NULL) {
+        printf("Source map file: %s\n", env.sourceMapFile);
+    }
 }
 
 void typev_env_log(){
@@ -63,4 +71,27 @@ void typev_env_log(){
 
 TypeV_ENV get_env(){
     return env;
+}
+
+
+uint8_t env_sourcemap_has(TypeV_ENV env) {
+    return env.sourceMapFile != NULL;
+
+}
+TypeV_SourcePoint env_sourcemap_get(TypeV_ENV env, uint64_t ip){
+    if(!env_sourcemap_has(env)) {
+        return (TypeV_SourcePoint){.line = 0, .column = 0, .file = NULL};
+    }
+
+    char file[1024] = {};
+    uint64_t line = 0;
+    uint64_t column = 0;
+
+    int found = get_source_map_line_content(env.sourceMapFile, ip, file, &line, &column);
+    if(!found) {
+        return (TypeV_SourcePoint){.line = 0, .column = 0, .file = NULL};
+    }
+    else {
+        return (TypeV_SourcePoint){.line = line, .column = column, .file = strdup(file)};
+    }
 }

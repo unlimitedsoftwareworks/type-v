@@ -873,8 +873,14 @@ void a_loadf_8(TypeV_Core* core) {
     ASSERT(index < MAX_REG, "Invalid register index");
     ASSERT(array_reg <= 8, "Invalid byte size");
     TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
-    ASSERT(core->registers.regs[index].u64 < array->length, "Index out of bounds");
-    memcpy(&core->registers.regs[target], array->data + (core->registers.regs[index].u64 * array->elementSize), 1);
+
+    uint64_t idx = core->registers.regs[index].u64;
+
+    if(idx >= array->length) {
+        core_panic(core, 1, "Index out of bounds %d >= %d", idx, array->length);
+    }
+
+    memcpy(&core->registers.regs[target], array->data + (idx * array->elementSize), 1);
 }
 
 void a_loadf_16(TypeV_Core* core) {
@@ -922,7 +928,11 @@ void a_loadf_ptr(TypeV_Core* core) {
     ASSERT(array_reg <= MAX_REG, "Invalid register index");
     TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
 
-    ASSERT(core->registers.regs[index].u64 < array->length, "Index out of bounds");
+    uint64_t idx = core->registers.regs[index].u64;
+    if(idx <= array->length) {
+        core_panic(core, 1, "Index out of bounds %d <= %d", idx, array->length);
+        return;
+    }
 
     memcpy(&core->registers.regs[target], array->data + (core->registers.regs[index].u64 * array->elementSize), PTR_SIZE);
 }
