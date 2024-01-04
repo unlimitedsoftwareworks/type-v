@@ -100,6 +100,7 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         iter->currentInstructions += 1-runInf;
         TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
         //fprintf(stdout, "I[%d] %s\n", core->registers.ip-1, instructions[opcode]);
+        core->lastRanInstruction = opcode;
         op_funcs[opcode](core);
     }
 

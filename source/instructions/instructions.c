@@ -23,7 +23,11 @@ void mv_reg_reg(TypeV_Core* core){
 
     ASSERT(target < MAX_REG, "Invalid register index");
     ASSERT(source < MAX_REG, "Invalid register index");
-    ASSERT(bytesize <= 8, "Invalid bit size");
+    if(bytesize > 8) {
+        core_panic(core, 0, "Invalid byte size");
+    }
+    ASSERT(bytesize <= 8, "Invalid byte size");
+
     memcpy(&core->registers.regs[target], &core->registers.regs[source], bytesize);
 }
 
@@ -830,7 +834,10 @@ void a_storef_reg_ptr(TypeV_Core* core){
     const uint8_t source = core->program.bytecode[core->registers.ip++];
     ASSERT(source < MAX_REG, "Invalid register index");
     TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
-    ASSERT(core->registers.regs[index].u64 < array->length, "Index out of bounds");
+
+    if(core->registers.regs[index].u64 >= array->length) {
+        core_panic(core, 1, "Index out of bounds %d >= %d", core->registers.regs[index].u64, array->length);
+    }
     memcpy(array->data+(core->registers.regs[index].u64*array->elementSize), &core->registers.regs[source], PTR_SIZE);
 }
 
@@ -929,7 +936,7 @@ void a_loadf_ptr(TypeV_Core* core) {
     TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
 
     uint64_t idx = core->registers.regs[index].u64;
-    if(idx <= array->length) {
+    if(idx >= array->length) {
         core_panic(core, 1, "Index out of bounds %d <= %d", idx, array->length);
         return;
     }

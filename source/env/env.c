@@ -51,12 +51,13 @@ void typev_env_init(char* sourceMapFile){
     env.searchPaths = calloc(3, sizeof(char*));
     printf("current dir: %s\n", env.cwd);
 
+    /*
     int err = cpui_get_info(&env.result);
     if(err){
         fprintf(stderr, "An error occured while quering CPU");
     }
     cpui_log_result(stdout, &env.result);
-
+    */
     env.sourceMapFile = sourceMapFile;
 
     if(env.sourceMapFile != NULL) {

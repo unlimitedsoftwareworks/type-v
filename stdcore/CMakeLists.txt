@@ -1,7 +1,13 @@
 project(stdcore VERSION 1.0)
 
 
-set(stdcore_files source/stdcore.c)
+set(stdcore_files source/stdcore.c
+        source/vendor/yy.c
+        source/vendor/yy.h
+        source/vendor/atoi_yy.c
+        source/vendor/utils_yy.h
+        source/vendor/itoa_yy.c
+        source/vendor/dtoa_yy.c)
 
 set(typev_files
         ../source/core.c

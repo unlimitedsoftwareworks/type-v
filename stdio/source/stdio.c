@@ -23,6 +23,13 @@ void stdio_println(TypeV_Core *core) {
     printf("%.*s\n", arr->length, arr->data);
 }
 
+void print_stdstring(TypeV_Core *core) {
+    TypeV_Array* arr = typev_api_stack_pop_array(core);
+    uint64_t length = typev_api_stack_pop_u64(core);
+
+    printf("%.*s", length, arr->data);
+}
+
 void stdio_print_u64(TypeV_Core *core) {
     uint64_t value = typev_api_stack_pop_u64(core);
     printf("%llu\n", value);
@@ -32,6 +39,7 @@ static TypeV_FFIFunc stdio_lib[] = {
         (TypeV_FFIFunc)stdio_print,
         (TypeV_FFIFunc)stdio_println,
         (TypeV_FFIFunc)stdio_print_u64,
+        (TypeV_FFIFunc)print_stdstring,
         NULL
 };
 
