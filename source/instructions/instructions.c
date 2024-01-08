@@ -199,7 +199,18 @@ void mv_local_reg_##bits(TypeV_Core* core){\
 MV_LOCAL_REG(8, 1)
 MV_LOCAL_REG(16, 2)
 MV_LOCAL_REG(32, 4)
-MV_LOCAL_REG(64, 8)
+//MV_LOCAL_REG(64, 8)
+
+void mv_local_reg_64(TypeV_Core* core){
+    const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
+    size_t offset = 0; /* we do not increment offset here*/
+    memcpy(&offset, &core->program.bytecode[core->registers.ip],  offset_length);
+    core->registers.ip += offset_length;
+    const uint8_t source = core->program.bytecode[core->registers.ip++];
+    ASSERT(source < MAX_REG, "Invalid register index");
+    ASSERT(offset < core->stack.capacity, "Invalid stack offset");
+    memcpy(&core->stack.stack[core->registers.fp+offset], &core->registers.regs[source], 8);
+}
 
 void mv_local_reg_ptr(TypeV_Core* core){
     const uint8_t offset_length = core->program.bytecode[core->registers.ip++];
@@ -626,12 +637,13 @@ void i_set_offset(TypeV_Core* core){
 }
 
 void i_set_offset_i(TypeV_Core* core) {
+    const uint8_t dest = core->program.bytecode[core->registers.ip++];
     const uint8_t field_source = core->program.bytecode[core->registers.ip++];
     const uint8_t field_target = core->program.bytecode[core->registers.ip++];
     const uint8_t interface_reg = core->program.bytecode[core->registers.ip++];
     ASSERT(interface_reg < MAX_REG, "Invalid register index");
 
-    TypeV_Interface* i = (TypeV_Interface*)core->registers.regs[16].ptr;
+    TypeV_Interface* i = (TypeV_Interface*)core->registers.regs[dest].ptr;
     TypeV_Interface* v = (TypeV_Interface*)core->registers.regs[interface_reg].ptr;
 
     i->methodsOffset[field_target] = v->methodsOffset[field_source];
@@ -1822,17 +1834,17 @@ void bnot_64(TypeV_Core* core){
 }
 
 void and(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u8 = core->registers.regs[op1].u8 && core->registers.regs[op2].u8;
 }
 
 void or(TypeV_Core* core){
+    uint8_t target = core->program.bytecode[core->registers.ip++];
     uint8_t op1 = core->program.bytecode[core->registers.ip++];
     uint8_t op2 = core->program.bytecode[core->registers.ip++];
-    uint8_t target = core->program.bytecode[core->registers.ip++];
 
     core->registers.regs[target].u8 = core->registers.regs[op1].u8 || core->registers.regs[op2].u8;
 }
