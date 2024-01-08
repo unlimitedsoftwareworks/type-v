@@ -147,7 +147,7 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof(TypeV_Struct)+totalsize);
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
     struct_ptr->originalStruct = NULL;
-    struct_ptr->dataPointer = struct_ptr->data;
+    struct_ptr->dataPointer = &struct_ptr->data;
 
     // add to gc
     core->memTracker.structs = realloc(core->memTracker.structs, sizeof(size_t)*(core->memTracker.structCount+1));

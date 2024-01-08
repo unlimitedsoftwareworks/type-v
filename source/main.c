@@ -59,10 +59,10 @@ int main() {
 // Function prototypes
 uint8_t *readSegment(FILE *file, uint64_t offset, size_t size);
 
-int main(int argc, char **argv) {
+uint32_t main(int argc, char **argv) {
 
-    char *filePath = "/Users/praisethemoon/projects/type-c/output/bin.tcv"; // Change to your file's path
-    char *srcMapFile = "/Users/praisethemoon/projects/type-c/output/src_map.map.txt";
+    char *filePath = "/Users/praisethemoon/projects/type-c/type-c/output/bin.tcv"; // Change to your file's path
+    char *srcMapFile = "/Users/praisethemoon/projects/type-c/type-c/output/src_map.map.txt";
     if (argc > 1){
         filePath = argv[1];
     }
@@ -119,6 +119,8 @@ int main(int argc, char **argv) {
 
     engine_run(&engine);
 
+    uint32_t exitCode = engine.mainCoreExitCode;
+
     engine_deallocate(&engine);
     //free_program(program);
 
@@ -129,7 +131,7 @@ int main(int argc, char **argv) {
     //free(globalSegment);
     //free(codeSegment);
 
-    return 0;
+    return exitCode;
 }
 
 uint8_t *readSegment(FILE *file, uint64_t offset, size_t size) {

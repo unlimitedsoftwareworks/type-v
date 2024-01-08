@@ -646,6 +646,9 @@ void i_set_offset_i(TypeV_Core* core) {
     TypeV_Interface* i = (TypeV_Interface*)core->registers.regs[dest].ptr;
     TypeV_Interface* v = (TypeV_Interface*)core->registers.regs[interface_reg].ptr;
 
+    uint16_t z = i->methodsOffset[field_target];
+    uint16_t y = v->methodsOffset[field_source];
+
     i->methodsOffset[field_target] = v->methodsOffset[field_source];
 }
 
@@ -920,7 +923,7 @@ void a_loadf_32(TypeV_Core* core) {
     const uint8_t array_reg = core->program.bytecode[core->registers.ip++];
     ASSERT(target < MAX_REG, "Invalid register index");
     ASSERT(index < MAX_REG, "Invalid register index");
-    ASSERT(array_reg <= 8, "Invalid byte size");
+    ASSERT(array_reg <= MAX_REG, "Invalid byte size");
     TypeV_Array* array = (TypeV_Array*)core->registers.regs[array_reg].ptr;
     ASSERT(core->registers.regs[index].u64 < array->length, "Index out of bounds");
     memcpy(&core->registers.regs[target], array->data + (core->registers.regs[index].u64 * array->elementSize), 4);
@@ -2005,8 +2008,8 @@ void reg_ffi(TypeV_Core* core){
     core->registers.ip += 2;
 
     char* namePtr = &core->constantPool.pool[offset];
-
-    engine_ffi_register(core->engineRef, namePtr, id);
+    char* name = strdup(namePtr);
+    engine_ffi_register(core->engineRef, name, id);
 }
 
 void open_ffi(TypeV_Core* core){
@@ -2268,8 +2271,14 @@ void debug_reg(TypeV_Core* core){
 }
 
 void halt(TypeV_Core* core) {
+    uint8_t code_reg = core->program.bytecode[core->registers.ip++];
+    ASSERT(code_reg < MAX_REG, "Invalid register index");
+
+    uint32_t code = core->registers.regs[code_reg].u32;
+
     core->isRunning = 0;
     core->state = CS_TERMINATED;
+    core->exitCode = code;
     engine_detach_core(core->engineRef, core);
 }
 

@@ -50,8 +50,10 @@ typedef struct TypeV_Engine {
     TypeV_CoreIterator* coreIterator;
     uint32_t coreCount;                         ///< number of living cores
     uint32_t runningCoresCount;                 ///< number of running cores
+    uint32_t mainCoreExitCode;                  ///< Exit code of the main core
     uint8_t interruptNextLoop;                  ///< interrupt the next loop, set to true when cores are spawned/killed
-    TypeV_EngineFFI ffi[];                      ///< FFI libraries
+    TypeV_EngineFFI** ffi;                      ///< FFI libraries
+    uint16_t ffiCount;                          ///< Number of FFI libraries
 } TypeV_Engine;
 
 

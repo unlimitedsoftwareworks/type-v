@@ -209,6 +209,7 @@ typedef struct TypeV_Core {
     TypeV_Promise* awaitingPromise;           ///< Promise that the core is awaiting, NULL if none
 
     uint64_t lastRanInstruction;              ///< Last instruction ran
+    uint32_t exitCode;                        ///< Exit code
 }TypeV_Core;
 
 /**

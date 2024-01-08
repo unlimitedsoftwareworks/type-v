@@ -19,6 +19,8 @@ void engine_init(TypeV_Engine *engine) {
     engine->coreIterator->core = calloc(1, sizeof(TypeV_Core));
     engine->coreIterator->next = NULL;
 
+    engine->ffiCount = 0;
+
     core_init(engine->coreIterator->core, engine_generateNewCoreID(engine), engine);
     engine->coreCount++;
 }
@@ -96,7 +98,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         }
     }
 
-    while((core->state == CS_RUNNING) && (iter->currentInstructions != iter->maxInstructions) && !engine->interruptNextLoop){
+    while((core->state == CS_RUNNING) &&
+        (iter->currentInstructions != iter->maxInstructions) &&
+        !engine->interruptNextLoop){
         iter->currentInstructions += 1-runInf;
         TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
         //fprintf(stdout, "I[%d] %s\n", core->registers.ip-1, instructions[opcode]);
@@ -191,6 +195,10 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
 void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
     LOG_INFO("Core[%d] detached with status %d", core->id, core->state);
     // find the core in the iterator list
+    if(core->id == 1) {
+        // main core
+        engine->mainCoreExitCode = core->exitCode;
+    }
     TypeV_CoreIterator* iterator = engine->coreIterator;
     TypeV_CoreIterator* prevIterator = NULL;
     while(iterator != NULL) {
@@ -203,11 +211,15 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
                 prevIterator->next = iterator->next;
             }
             // Free iterator here
-            free(iterator);
+            TypeV_CoreIterator* next = iterator->next;
+            // These cause saniation issues, must fix later
+            //free(iterator);
+            iterator = next;
+            prevIterator = NULL;
 
             // free the core
-            core_deallocate(core);
-            free(core);
+            //core_deallocate(core);
+            //free(core);
             break;
         }
         prevIterator = iterator;
@@ -219,20 +231,29 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
 }
 
 void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlibID) {
-    engine->ffi[dynlibID].dynlibName = dynlibName;
-    engine->ffi[dynlibID].dynlibHandle = NULL;
+    if(dynlibID >= engine->ffiCount) {
+        engine->ffiCount = dynlibID+1;
+        engine->ffi = realloc(engine->ffi, sizeof(TypeV_EngineFFI)*engine->ffiCount);
+    }
+
+    engine->ffi[dynlibID] = malloc(sizeof(TypeV_EngineFFI));
+
+
+    engine->ffi[dynlibID]->dynlibName = dynlibName;
+    engine->ffi[dynlibID]->dynlibHandle = NULL;
+    engine->ffi[dynlibID]->ffi = NULL;
 
     // load the library
     engine_ffi_open(engine, dynlibID);
 }
 
 void engine_ffi_open(TypeV_Engine *engine, uint16_t dynlibID) {
-    TypeV_EngineFFI ffi = engine->ffi[dynlibID];
-    if(ffi.dynlibHandle != NULL) {
+    TypeV_EngineFFI* ffi = engine->ffi[dynlibID];
+    if(ffi->dynlibHandle != NULL) {
         return;
     }
 
-    char* name = engine->ffi[dynlibID].dynlibName;
+    char* name = engine->ffi[dynlibID]->dynlibName;
 
     TV_LibraryHandle lib = ffi_dynlib_load(name);
     ASSERT(lib != NULL, "Failed to load library %s", ffi_find_dynlib(name));
@@ -240,29 +261,29 @@ void engine_ffi_open(TypeV_Engine *engine, uint16_t dynlibID) {
     void* openLib = ffi_dynlib_getsym(lib, "typev_ffi_open");
     ASSERT(openLib != NULL, "Failed to open library %s", ffi_find_dynlib(name));
     size_t (*openFunc)() = openLib;
-    ffi.ffi = (TypeV_FFI*)openFunc();
-    ffi.dynlibHandle = lib;
+    ffi->ffi = (TypeV_FFI*)openFunc();
+    ffi->dynlibHandle = lib;
     engine->ffi[dynlibID] = ffi;
 }
 
 size_t engine_ffi_get(TypeV_Engine *engine, uint16_t dynlibID, uint8_t methodId){
-    TypeV_EngineFFI ffi = engine->ffi[dynlibID];
+    TypeV_EngineFFI* ffi = engine->ffi[dynlibID];
 
-    ASSERT(ffi.dynlibHandle != NULL, "Library %s not loaded", ffi_find_dynlib(ffi.dynlibName));
-    ASSERT(ffi.ffi != NULL, "Library %s not opened", ffi_find_dynlib(ffi.dynlibName));
-    ASSERT(methodId < ffi.ffi->functionCount, "Method %d not found in library %s", methodId, ffi_find_dynlib(ffi.dynlibName));
+    ASSERT(ffi->dynlibHandle != NULL, "Library %s not loaded", ffi_find_dynlib(ffi->dynlibName));
+    ASSERT(ffi->ffi != NULL, "Library %s not opened", ffi_find_dynlib(ffi->dynlibName));
+    ASSERT(methodId < ffi->ffi->functionCount, "Method %d not found in library %s", methodId, ffi_find_dynlib(ffi->dynlibName));
 
-    return (size_t)ffi.ffi->functions[methodId];
+    return (size_t)ffi->ffi->functions[methodId];
 }
 
 void engine_ffi_close(TypeV_Engine *engine, uint16_t dynlibID) {
-    TypeV_EngineFFI ffi = engine->ffi[dynlibID];
-    if(ffi.dynlibHandle == NULL) {
+    TypeV_EngineFFI* ffi = engine->ffi[dynlibID];
+    if(ffi->dynlibHandle == NULL) {
         return;
     }
 
-    ffi_dynlib_unload(ffi.dynlibHandle);
-    ffi.dynlibHandle = NULL;
-    ffi.ffi = NULL;
+    ffi_dynlib_unload(ffi->dynlibHandle);
+    ffi->dynlibHandle = NULL;
+    ffi->ffi = NULL;
     engine->ffi[dynlibID] = ffi;
 }

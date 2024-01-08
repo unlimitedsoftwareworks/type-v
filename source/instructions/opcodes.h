@@ -721,6 +721,10 @@ typedef enum TypeV_OpCode {
 
 
     OP_DEBUG_REG,
+
+    /**
+     * OP_HALT code: I (4bytes)
+     */
     OP_HALT,
 
     /**
