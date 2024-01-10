@@ -26,11 +26,11 @@ size_t typev_api_register_lib(const TypeV_FFIFunc methods[]) {
 }
 
 size_t typev_api_get_const_address(struct TypeV_Core* core, size_t vm_adr) {
-    return (size_t)core->constantPool.pool + vm_adr;
+    return (size_t)core->constPtr+ vm_adr;
 }
 
 uint64_t typev_api_stack_getSize(TypeV_Core* core) {
-    return core->registers.sp;
+    return core->funcState->sp;
 }
 
 int8_t typev_api_stack_pop_i8(TypeV_Core* core) {
@@ -127,68 +127,68 @@ TypeV_Array* typev_api_stack_pop_array(TypeV_Core* core) {
 
 void typev_api_return_i8(TypeV_Core* core, int8_t value) {
     // set the return value to the register R20
-    core->registers.regs[20].i8 = value;
+    //core->registers.regs[20].i8 = value;
 }
 
 void typev_api_return_u8(TypeV_Core* core, uint8_t value) {
     // set the return value to the register R20
-    core->registers.regs[20].u8 = value;
+    //core->registers.regs[20].u8 = value;
 }
 void typev_api_return_i16(TypeV_Core* core, int16_t value) {
     // set the return value to the register R20
-    core->registers.regs[20].i16 = value;
+    //core->registers.regs[20].i16 = value;
 }
 
 void typev_api_return_u16(TypeV_Core* core, uint16_t value) {
     // set the return value to the register R20
-    core->registers.regs[20].u16 = value;
+    // core->registers.regs[20].u16 = value;
 }
 
 void typev_api_return_i32(TypeV_Core* core, int32_t value) {
     // set the return value to the register R20
-    core->registers.regs[20].i32 = value;
+    // core->registers.regs[20].i32 = value;
 }
 
 void typev_api_return_u32(TypeV_Core* core, uint32_t value) {
     // set the return value to the register R20
-    core->registers.regs[20].u32 = value;
+    // core->registers.regs[20].u32 = value;
 }
 
 void typev_api_return_i64(TypeV_Core* core, int64_t value) {
-    core->registers.regs[20].i64 = value;
+    // core->registers.regs[20].i64 = value;
 }
 
 void typev_api_return_u64(TypeV_Core* core, uint64_t value) {
-    core->registers.regs[20].u64 = value;
+    // core->registers.regs[20].u64 = value;
 }
 
 
 void typev_api_return_ptr(TypeV_Core* core, size_t value) {
-    core->registers.regs[20].ptr = value;
+    // core->registers.regs[20].ptr = value;
 }
 
 void typev_api_return_f32(TypeV_Core* core, float value) {
-    core->registers.regs[20].f32 = value;
+    // core->registers.regs[20].f32 = value;
 }
 
 void typev_api_return_f64(TypeV_Core* core, double value) {
-    core->registers.regs[20].f64 = value;
+    // core->registers.regs[20].f64 = value;
 }
 
 void typev_api_return_struct(TypeV_Core* core, TypeV_Struct* value) {
-    core->registers.regs[20].ptr = (size_t)value;
+    // core->registers.regs[20].ptr = (size_t)value;
 }
 
 void typev_api_return_class(TypeV_Core* core, TypeV_Class* value) {
-    core->registers.regs[20].ptr = (size_t)value;
+    // core->registers.regs[20].ptr = (size_t)value;
 }
 
 void typev_api_return_interface(TypeV_Core* core, TypeV_Interface* value) {
-    core->registers.regs[20].ptr = (size_t)value;
+    // core->registers.regs[20].ptr = (size_t)value;
 }
 
 void typev_api_return_array(TypeV_Core* core, TypeV_Array* value){
-    core->registers.regs[20].ptr = (size_t)value;
+    // core->registers.regs[20].ptr = (size_t)value;
 }
 
 /**

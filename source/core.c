@@ -14,35 +14,22 @@
 #include "dynlib/dynlib.h"
 #include "utils/utils.h"
 
+TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
+    TypeV_FuncState* state = malloc(sizeof(TypeV_FuncState));
+
+    state->sp = 0;
+    stack_init(state, 1024);
+    state->prev = prev;
+    state->flags = 0;
+}
+
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->id = id;
     core->state = CS_INITIALIZED;
 
-    // Initialize Registers
-    for (int i = 0; i < MAX_REG; i++) {
-        core->registers.regs[i].u64 = 0;
-    }
-    core->registers.ip = 0;
-    core->registers.fp = 0;
-    core->registers.flags = 0;
-
-    // Initialize Stack
-    stack_init(core, 1024*1024);
-
-    // Initialize Message Queue
-    queue_init(&(core->messageInputQueue));
-
-    // Initialize Constant Pool
-    core->constantPool.pool = NULL;  // Assuming memory allocation happens elsewhere
-    core->constantPool.length = 0;
-
-    // Initialize Global Pool
-    core->globalPool.pool = NULL;  // Assuming memory allocation happens elsewhere
-    core->globalPool.length = 0;
-
-    // Initialize Program
-    core->program.bytecode = NULL;  // Assuming program loading happens elsewhere
-    core->program.length = 0;
+    core->funcState = core_create_function_state(NULL);
+    core->flags = &core->funcState->flags;
+    core->regs = &core->funcState->regs;
 
     // Initialize GC
     core->memTracker.classes = NULL;
@@ -61,16 +48,10 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->awaitingPromise = NULL;
 }
 
-void core_setup(TypeV_Core *core, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit){
-    core->program.bytecode = program;
-    core->program.length = programLength;
-
-    core->constantPool.pool = constantPool;
-    core->constantPool.length = constantPoolLength;
-
-    core->globalPool.pool = globalPool;
-    core->globalPool.length = globalPoolLength;
-
+void core_setup(TypeV_Core *core, uint8_t* program, uint8_t* constantPool, uint8_t* globalPool){
+    core->codePtr = program;
+    core->constPtr = constantPool;
+    core->globalPtr = globalPool;
     core->state = CS_RUNNING;
 }
 
@@ -117,9 +98,6 @@ void core_deallocate(TypeV_Core *core) {
         free(core->memTracker.memObjects);
     }
 
-
-    // the constant pool is part of the program, we have no ownership over it
-    core->constantPool.pool = NULL;
 
     // free stack
     stack_free(core);
@@ -379,7 +357,7 @@ void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
 
     TypeV_ENV env = get_env();
     if(env_sourcemap_has(env)){
-        TypeV_SourcePoint point = env_sourcemap_get(env, core->registers.ip);
+        TypeV_SourcePoint point = env_sourcemap_get(env, core->ip);
         LOG_ERROR("CORE[%d]: Runtime Error ID: %d: %s\nSource: %s:%d:%d", core->id, errorId, message, point.file, point.line+1, point.column);
     }
 

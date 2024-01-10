@@ -15,38 +15,18 @@
 typedef void (*op_func)(TypeV_Core *);
 static op_func op_funcs[] = {
         &mv_reg_reg,
+        &mv_reg_reg_ptr,
+        mv_reg_null,
+
         &mv_reg_i,
-        &mv_reg_const_8,
-        &mv_reg_const_16,
-        &mv_reg_const_32,
-        &mv_reg_const_64,
+
+        &mv_reg_const,
         &mv_reg_const_ptr,
 
-        &mv_reg_mem,
-        &mv_mem_reg,
-
-        &mv_reg_local_8,
-        &mv_reg_local_16,
-        &mv_reg_local_32,
-        &mv_reg_local_64,
-        &mv_reg_local_ptr,
-
-        &mv_local_reg_8,
-        &mv_local_reg_16,
-        &mv_local_reg_32,
-        &mv_local_reg_64,
-        &mv_local_reg_ptr,
-
-        &mv_global_reg_8,
-        &mv_global_reg_16,
-        &mv_global_reg_32,
-        &mv_global_reg_64,
+        &mv_global_reg,
         &mv_global_reg_ptr,
 
-        &mv_reg_global_8,
-        &mv_reg_global_16,
-        &mv_reg_global_32,
-        &mv_reg_global_64,
+        &mv_reg_global,
         &mv_reg_global_ptr,
 
         &s_alloc,
@@ -54,38 +34,26 @@ static op_func op_funcs[] = {
         &s_set_offset,
         &s_set_offset_shadow,
 
-        &s_loadf_8,
-        &s_loadf_16,
-        &s_loadf_32,
-        &s_loadf_64,
+        &s_loadf,
         &s_loadf_ptr,
 
-        &s_storef_const_8,
-        &s_storef_const_16,
-        &s_storef_const_32,
-        &s_storef_const_64,
+        &s_storef_const,
         &s_storef_const_ptr,
 
-        &s_storef_reg_8,
-        &s_storef_reg_16,
-        &s_storef_reg_32,
-        &s_storef_reg_64,
+        &s_storef_reg,
         &s_storef_reg_ptr,
 
         &c_alloc,
         &c_storem,
         &c_loadm,
 
-        &c_storef_reg_8,
-        &c_storef_reg_16,
-        &c_storef_reg_32,
-        &c_storef_reg_64,
+        &c_storef_reg,
         &c_storef_reg_ptr,
 
-        &c_loadf_8,
-        &c_loadf_16,
-        &c_loadf_32,
-        &c_loadf_64,
+        &c_storef_const,
+        &c_storef_const_ptr,
+
+        &c_loadf,
         &c_loadf_ptr,
 
         &i_alloc,
@@ -102,37 +70,27 @@ static op_func op_funcs[] = {
         &a_extend,
         &a_len,
 
-        &a_storef_reg_8,
-        &a_storef_reg_16,
-        &a_storef_reg_32,
-        &a_storef_reg_64,
+        &a_storef_reg,
         &a_storef_reg_ptr,
 
-        &a_storef_const_8,
-        &a_storef_const_16,
-        &a_storef_const_32,
-        &a_storef_const_64,
+        &a_storef_const,
         &a_storef_const_ptr,
 
-        &a_loadf_8,
-        &a_loadf_16,
-        &a_loadf_32,
-        &a_loadf_64,
+        &a_loadf,
         &a_loadf_ptr,
 
         &push,
         &push_const,
         &pop,
 
-        &frame_init_args,
-        &frame_init_locals,
-        &frame_rm,
-        &frame_precall,
-        &fn_main,
-        &fn_ret,
+        &fn_alloc,
+        &fn_set_reg,
+        &fn_set_reg_ptr,
         &fn_call,
         &fn_calli,
-
+        &fn_ret,
+        &fn_get_ret_reg,
+        &fn_get_ret_reg_ptr,
 
         &cast_i8_u8,
         &cast_u8_i8,

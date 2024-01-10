@@ -26,7 +26,7 @@ void engine_init(TypeV_Engine *engine) {
 }
 
 void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit){
-    core_setup(engine->coreIterator->core, program, programLength, constantPool, constantPoolLength, globalPool, globalPoolLength, stackCapacity, stackLimit);
+    core_setup(engine->coreIterator->core, program, constantPool, globalPool);
 }
 
 void engine_deallocate(TypeV_Engine *engine) {
@@ -102,9 +102,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         (iter->currentInstructions != iter->maxInstructions) &&
         !engine->interruptNextLoop){
         iter->currentInstructions += 1-runInf;
-        TypeV_OpCode opcode = core->program.bytecode[core->registers.ip++];
-        //fprintf(stdout, "I[%d] %s\n", core->registers.ip-1, instructions[opcode]);
-        core->lastRanInstruction = opcode;
+        TypeV_OpCode opcode = core->codePtr[core->ip++];
+        fprintf(stdout, "I[%d] %s\n", core->ip-1, instructions[opcode]);
+
         op_funcs[opcode](core);
     }
 
@@ -144,31 +144,12 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
     core_init(newCore, id, engine);
     engine->coreCount++;
 
-    newCore->registers.ip = ip;
+    newCore->ip = ip;
 
     core_setup(newCore,
-               parentCore->program.bytecode,
-               parentCore->program.length,
-               parentCore->constantPool.pool,
-               parentCore->constantPool.length,
-               parentCore->globalPool.pool,
-               parentCore->globalPool.length,
-               parentCore->stack.capacity,
-               parentCore->stack.limit);
-
-    // now we need to copy the stack from fp upwards to the new core stack
-    memcpy(newCore->stack.stack,
-           parentCore->stack.stack + parentCore->registers.fp,
-           parentCore->stack.capacity - parentCore->registers.fp);
-
-    // set stack pointer to size of args
-    newCore->registers.sp = parentCore->registers.sp - parentCore->registers.fp;
-
-    // fp is zero because we are the first frame
-    newCore->registers.fp = 0;
-
-    // fe is the size of the stack
-    newCore->registers.fe = newCore->registers.sp;
+               parentCore->codePtr,
+               parentCore->constPtr,
+               parentCore->globalPtr);
 
     // add iterator and attack to engine
     TypeV_CoreIterator* newCoreIterator = calloc(1, sizeof(TypeV_CoreIterator));

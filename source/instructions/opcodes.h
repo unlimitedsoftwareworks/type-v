@@ -13,11 +13,8 @@
 /**
  * Terminology:
  * R: Register
- * Rm: Register containing memory address (read as ptr)
- * I: Immediate (when used alone, its <= 255), (when used with Z, it can be >= 255)
- * Z: Immediate value size in bytes (for immediate values > 255 when applicable)
- * C: Constant (offset)
- * S: byte-size, 1, 2, 4, 8 or 0 for pointer
+ * I[b]: Immediate where b is the number of bytes (1, 2, 4, 8)
+ * S: byte-size, 1, 2, 4, 8.
  */
 typedef enum TypeV_OpCode {
     /**
@@ -32,70 +29,40 @@ typedef enum TypeV_OpCode {
     OP_MV_REG_REG = 0x00,
 
     /**
+     * OP_MV_REG_MEM dest: R, src: R
+     */
+    OP_MV_REG_REG_PTR,
+
+    /**
+     * OP_MV_REG_NULL dest: R
+     * sets reg R to null
+     */
+    OP_MV_REG_NULL,
+
+    /**
      * OP_MV_REG_I: dest: R, value-size: Z, value: I
      */
     OP_MV_REG_I,
 
     /**
-     * OP_MV_REG_CONST_[size] dest: R, offset-size: Z, offset: I
-     * OP_MV_REG_CONST_8 R0, 0x1, 0x10
+     * OP_MV_REG_CONST dest: R, offset-size: Z, offset: I, byteSize: S
      */
-    OP_MV_REG_CONST_8,
-    OP_MV_REG_CONST_16,
-    OP_MV_REG_CONST_32,
-    OP_MV_REG_CONST_64,
+    OP_MV_REG_CONST,
     OP_MV_REG_CONST_PTR,
 
-    /**
-     * OP_MV_REG_MEM dest: R, src: Rm, bytes: S
-     * moves S bytes from memory address in Rm to R
-     */
-    OP_MV_REG_MEM,
 
     /**
-     * OP_MV_MEM_REG dest: Rm, src: R, bytes: S
-     * moves S bytes from R to memory address in Rm
-     */
-    OP_MV_MEM_REG,
-
-    /**
-     * OP_MV_REG_LOCAL_[size] dest: R, offset-size: Z, offset: I
-     * moves S bytes from local stack address frame-pointer + offset to register R
-     */
-    OP_MV_REG_LOCAL_8,
-    OP_MV_REG_LOCAL_16,
-    OP_MV_REG_LOCAL_32,
-    OP_MV_REG_LOCAL_64,
-    OP_MV_REG_LOCAL_PTR,
-
-    /**
-     * OP_MV_LOCAL_REG offset-size: Z, offset: I, src: R
-     * moves S bytes from register R to local stack address frame-pointer + offset
-     */
-    OP_MV_LOCAL_REG_8,
-    OP_MV_LOCAL_REG_16,
-    OP_MV_LOCAL_REG_32,
-    OP_MV_LOCAL_REG_64,
-    OP_MV_LOCAL_REG_PTR,
-
-    /**
-     * OP_MV_GLOBAL_REG_[size] offset-size: Z, offset: I, source: R
+     * OP_MV_GLOBAL_REG_[size] offset-size: Z, offset: I, source: R, byteSize: S
      * moves S bytes from register R to global pool address offset
      */
-    OP_MV_GLOBAL_REG_8,
-    OP_MV_GLOBAL_REG_16,
-    OP_MV_GLOBAL_REG_32,
-    OP_MV_GLOBAL_REG_64,
+    OP_MV_GLOBAL_REG,
     OP_MV_GLOBAL_REG_PTR,
 
     /**
      * OP_MV_REG_GLOBAL_[size] dest: reg, offset-size: Z, offset: I
      * moves S bytes from global pool address offset to register R
      */
-    OP_MV_REG_GLOBAL_8,
-    OP_MV_REG_GLOBAL_16,
-    OP_MV_REG_GLOBAL_32,
-    OP_MV_REG_GLOBAL_64,
+    OP_MV_REG_GLOBAL,
     OP_MV_REG_GLOBAL_PTR,
 
     /**
@@ -130,34 +97,25 @@ typedef enum TypeV_OpCode {
     OP_S_SET_OFFSET_SHADOW,
 
     /**
-     * OP_S_LOADF_[size] dest: R, src: R fieldIndex: I
+     * OP_S_LOADF_[size] dest: R, src: R fieldIndex: I, byteSize: S
      * Loads size bytes from field I of struct stored at src to register dest
      */
-    OP_S_LOADF_8,
-    OP_S_LOADF_16,
-    OP_S_LOADF_32,
-    OP_S_LOADF_64,
+    OP_S_LOADF,
     OP_S_LOADF_PTR,
 
     /**
-     * OP_S_STOREF_CONST_[size] dest: R, fieldIndex: I, constant-offset: I (8 bytes)
+     * OP_S_STOREF_CONST_[size] dest: R, fieldIndex: I, constant-offset: I (8 bytes), byteSize: S
      * Stores [size] bytes from constant pool address offset to field I of
      * struct stored at dest
      */
-    OP_S_STOREF_CONST_8,
-    OP_S_STOREF_CONST_16,
-    OP_S_STOREF_CONST_32,
-    OP_S_STOREF_CONST_64,
+    OP_S_STOREF_CONST,
     OP_S_STOREF_CONST_PTR,
 
     /**
-     * OP_S_STOREF_REG_[size] dest: R, fieldIndex: I, source: R
+     * OP_S_STOREF_REG_[size] dest: R, fieldIndex: I, source: R, byteSize: S
      * Stores [size] bytes from register R to field I of struct stored at dest
      */
-    OP_S_STOREF_REG_8,
-    OP_S_STOREF_REG_16,
-    OP_S_STOREF_REG_32,
-    OP_S_STOREF_REG_64,
+    OP_S_STOREF,
     OP_S_STOREF_REG_PTR,
 
     /**
@@ -181,24 +139,24 @@ typedef enum TypeV_OpCode {
     OP_C_LOADM,
 
     /**
-     * OP_CSTOREF_REG_[size] classReg: R, fieldOffset: I (2 bytes), R: source register
+     * OP_CSTOREF_REG_[size] classReg: R, fieldOffset: I (2 bytes), R: source register, byteSize: S
      * Stores [size] bytes from register R to field I of class stored at classReg
      */
-    OP_C_STOREF_REG_8,
-    OP_C_STOREF_REG_16,
-    OP_C_STOREF_REG_32,
-    OP_C_STOREF_REG_64,
+    OP_C_STOREF_REG,
     OP_C_STOREF_REG_PTR,
+
+    /**
+     * OP_C_STOREF_CONST_[size] classReg: R, fieldOffset: I (2 bytes), offset: I (8 bytes), byteSize: S
+     */
+    OP_C_STOREF_CONST,
+    OP_C_STOREF_CONST_PTR,
 
 
     /**
-     * OP_C_LOADF_[size] dest: R, classReg: R, fieldOffset: I (2 bytes)
+     * OP_C_LOADF_[size] dest: R, classReg: R, fieldOffset: I (2 bytes), byteSize: S
      * Loads [size] bytes from field I of class stored at classReg to register R
      */
-    OP_C_LOADF_8,
-    OP_C_LOADF_16,
-    OP_C_LOADF_32,
-    OP_C_LOADF_64,
+    OP_C_LOADF,
     OP_C_LOADF_PTR,
 
 
@@ -286,36 +244,27 @@ typedef enum TypeV_OpCode {
     OP_A_LEN,
 
     /**
-     * OP_A_STOREF_REG_[size] dest: R, index: R, source: R
+     * OP_A_STOREF_REG_[size] dest: R, index: R, source: R, byteSize: S
      * Stores [size] bytes from register src to field
      * index of array dest
      */
-    OP_A_STOREF_REG_8,
-    OP_A_STOREF_REG_16,
-    OP_A_STOREF_REG_32,
-    OP_A_STOREF_REG_64,
+    OP_A_STOREF_REG,
     OP_A_STOREF_REG_PTR,
 
     /**
-     * OP_A_STOREF_CONST_[size] dest: R, index: R, offset: I (8 bytes)
+     * OP_A_STOREF_CONST_[size] dest: R, index: R, offset: I (8 bytes), byteSize: S
      * Stores [size] bytes from constant pool address offset to field
      * value stored in register index of array stored at dest
      */
-    OP_A_STOREF_CONST_8,
-    OP_A_STOREF_CONST_16,
-    OP_A_STOREF_CONST_32,
-    OP_A_STOREF_CONST_64,
+    OP_A_STOREF_CONST,
     OP_A_STOREF_CONST_PTR,
 
     /**
-     * OP_A_LOADF dest: R, index: R, src: R
+     * OP_A_LOADF dest: R, index: R, src: R, byteSize: S
      * Loads [size] bytes from field value stored in register index
      * of array stored at src to register dest
      */
-    OP_A_LOADF_8,
-    OP_A_LOADF_16,
-    OP_A_LOADF_32,
-    OP_A_LOADF_64,
+    OP_A_LOADF,
     OP_A_LOADF_PTR,
 
 
@@ -334,55 +283,22 @@ typedef enum TypeV_OpCode {
      */
     OP_POP,
 
-    /**
-     * OP_FRAME_INIT_ARGS size-length: Z, size: I
-     * Creates a stack-frame of the given size.
-     * The stack frame is initialized with the specified size
-     * that is already stored in the constant pool.
-     * from type-c args are pushed in reverse order,
-     * meaning bottom of the stack is the first argument
-     */
-    OP_FRAME_INIT_ARGS,
 
     /**
-     *  OP_FRAME_INIT_LOCALS size-length: Z, size: I
-     *  Extends the previous stack frame with the given size.
-     *  The given size is the total size of local variables.
-     *  Variables are pushed to the stack in the order they
-     *  are declared.
+     * OP_FN_ALLOC
+     * Allocates a function state, which is the .next of the current active one
      */
-    OP_FRAME_INIT_LOCALS,
+    OP_FN_ALLOC,
 
     /**
-     * OP_FRAME_RM removes the current stack frame from the stack
-     * everything on top of the frame will be removed
+     * OP_FN_SET_REG_[size] dest: R, source: R, byteSize: S
+     * sets the value of the dest register in the .next function state to
+     * the value of source register in the active function state
      */
-    OP_FRAME_RM,
+    OP_FN_SET_REG,
+    OP_FN_SET_REG_PTR,
 
-    /**
-     * OP_FRAME_PRECALL
-     * pushes core state into the stack
-     * to be popped after the function exits
-     */
-    OP_FRAME_PRECALL,
 
-    /**
-     * OP_FN_MAIN
-     * Make sure that the stack contains the arguments
-     * and local variables allocated,
-     * i.e stack pointer equals frame_end
-     */
-    OP_FN_MAIN,
-
-    /**
-     * OP_FN_RET
-     * pops core state from the stack
-     * after the function exits. R20 is not popped,
-     * it is used to store the return value of the function
-     * Returns the IP to its previous value, hence, exits
-     * the function
-     */
-    OP_FN_RET,
 
     /**
      * OP_FN_CALL function-address: R
@@ -398,6 +314,18 @@ typedef enum TypeV_OpCode {
      * and the arguments are pushed to the stack
      */
     OP_FN_CALLI,
+
+
+    /**
+     * OP_FN_RET returns the current function state (.prev).
+     */
+    OP_FN_RET,
+
+    /**
+     * OP_FN_GET_RET_REG dest: R, src: R, size: b
+     */
+    OP_FN_GET_RET_REG,
+    OP_FN_GET_RET_REG_PTR,
 
     /** Casting instructions*/
 
@@ -610,11 +538,6 @@ typedef enum TypeV_OpCode {
      */
     OP_P_ALLOC,
 
-    /**
-     * OP_P_SPAWN process-address: R
-     * Spawns a new process from the given process address
-     */
-    //OP_P_SPAWN,
 
     /**
      * OP_P_DEQUEUE dest: R, promise: Rm

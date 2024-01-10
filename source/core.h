@@ -13,7 +13,7 @@
 #include "queue/queue.h"
 
 #define PTR_SIZE 8
-#define MAX_REG 21
+#define MAX_REG 256
 
 
 typedef struct TypeV_Struct {
@@ -27,10 +27,6 @@ typedef struct TypeV_Struct {
 typedef struct TypeV_Class{
     uint64_t uid;             ///< Unique ID
     uint8_t num_methods;      ///< number of methods
-    /** methods */
-    // maybe remove offsets from class,
-    // oly needed in interfaces
-    //uint16_t* methodsOffset;  ///< method offset table
     size_t* methods;          ///< A pointer to the method table
     /** data */
     uint8_t data[];            ///< Fields start from here, direct access
@@ -77,7 +73,7 @@ typedef union {
     uint64_t u64;
     float f32;
     double f64;
-    size_t ptr;
+    uintptr_t ptr;
 } TypeV_Register;
 
 /**
@@ -147,30 +143,6 @@ typedef struct TypeV_GlobalPool {
 #define WRITE_FLAG(flags, flag, value) ((value) ? ((flags) |= (flag)) : ((flags) &= ~(flag)))
 
 /**
- * @breif Core registers
- */
-typedef struct TypeV_Registers {
-    uint64_t flags;          ///< Flags
-    uint64_t ip;             ///< Instruction counter
-
-    uint64_t fp;             ///< Frame pointer
-    uint64_t fe;             ///< Frame end pointer
-    uint64_t sp;             ///< Stack pointer
-    TypeV_Register regs[MAX_REG]; ///< General purpose registers, R0 -> R15 for general purpose,
-                             ///< R16 for structs, R17 for classes and 18 for interfaces
-                             ///< R19 for function return value
-}TypeV_Registers;
-
-/**
- * @brief Core stack
- */
-typedef struct TypeV_Stack {
-    uint8_t *stack;    ///< Stack
-    uint64_t capacity; ///< Stack capacity
-    uint64_t limit;    ///< Stack limit
-}TypeV_Stack;
-
-/**
  * @brief Future GC, right now it only holds
  * references of the objects given.
  */
@@ -187,6 +159,26 @@ typedef struct TypeV_GC {
     uint64_t memObjectCount;
 }TypeV_GC;
 
+
+/**
+ * @brief A function state is an object that holds the state of a function. Since function arguments are passed
+ * through registers, the function state holds the registers that are used by the function.
+ * When a function calls another, it allocates the next function state using fn_init_state, switches the active
+ * function state to the new one, using fn_call (automatically loads .next), and when the function returns, it
+ * deallocates the current function state and gets the old context using fn_ret (automatically loads .prev).
+ */
+typedef struct TypeV_FuncState {
+    uint8_t *stack;    ///< Stack
+    uint64_t capacity; ///< Stack capacity
+    uint64_t limit;    ///< Stack limit
+    uint64_t flags;          ///< Flags
+    uint64_t sp;             ///< Stack pointer
+    uint64_t ip;             ///< Instruction pointer, used only as back up
+    TypeV_Register regs[MAX_REG]; ///< 256 registers.
+    struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
+    struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
+}TypeV_FuncState;
+
 /**
  * @brief Core structure, a core is the equivalent of a process in type-c.
  * Each core runs independently from each other, and communicates through message passing.
@@ -196,21 +188,29 @@ typedef struct TypeV_Core {
     uint32_t id;                              ///< Core ID
     uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
-    TypeV_Registers registers;                ///< Registers
-    TypeV_Stack stack;                        ///< Stack
+
     TypeV_IOMessageQueue messageInputQueue;   ///< Message input queue
-    TypeV_ConstantPool constantPool;          ///< Constant pool
-    TypeV_GlobalPool globalPool;              ///< Global pool
-    TypeV_Program program;                    ///< Program
     TypeV_GC memTracker;                      ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
     TypeV_CoreSignal lastSignal;              ///< Last signal received
     TypeV_Promise* awaitingPromise;           ///< Promise that the core is awaiting, NULL if none
 
-    uint64_t lastRanInstruction;              ///< Last instruction ran
     uint32_t exitCode;                        ///< Exit code
+
+    uint8_t* constPtr;                        ///< Constant pointer
+    uint8_t* templatePtr;                     ///< Template pointer
+    uint8_t* codePtr;                         ///< Code pointer
+    uint8_t* globalPtr;                       ///< Global pointer
+    uint64_t ip;                              ///< Instruction pointer
+
+    TypeV_Register* regs;                     ///< Registers, pointer to current function state registers for faster access.
+    uint64_t* flags;                          ///< Flags, pointer to current function state flags for faster access.
+    TypeV_FuncState* funcState;               ///< Function state
 }TypeV_Core;
+
+TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev);
+void core_destroy_function_state(TypeV_Core* core, TypeV_FuncState** state);
 
 /**
  * Initializes a core
@@ -219,7 +219,7 @@ typedef struct TypeV_Core {
  * @param engineRef
  */
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef);
-void core_setup(TypeV_Core *core, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit);
+void core_setup(TypeV_Core *core, uint8_t* program, uint8_t* constantPool, uint8_t* globalPool);
 
 /**
  * Deallocates a core
@@ -267,7 +267,7 @@ void core_queue_resolve(TypeV_Core* core);
  * @param totalsize Total size of the struct
  * @return Pointer to the allocated struct
  */
-size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
+uintptr_t  core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
 
 /**
  * Allocates a struct object as shadow to another struct
@@ -276,7 +276,7 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
  * @param totalsize Total size of the struct
  * @return Pointer to the allocated struct
  */
-size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct);
+uintptr_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct);
 
 /**
  * Allocates a class object
@@ -285,7 +285,7 @@ size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
  * @param total_fields_size  total size of fields in bytes
  * @return new Class object initialized.
  */
-size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId);
+uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId);
 
 /**
  * Allocates an interface object
@@ -293,7 +293,7 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
  * @param num_methods number of methods
  * @param class_ptr class reference
  */
-size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
+uintptr_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
 
 /**
  * Allocates an interface object from another interface
@@ -303,7 +303,7 @@ size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class* 
  * @param interface_ptr
  * @return
  */
-size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* interface_ptr);
+uintptr_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* interface_ptr);
 /**
  * Allocates an array object
  * @param core
@@ -311,7 +311,7 @@ size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Inter
  * @param element_size
  * @return
  */
-size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size);
+uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size);
 
 /**
  * Extends the size of an array
@@ -320,7 +320,7 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
  * @param num_elements new number of elements
  * @return
  */
-size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements);
+uintptr_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements);
 
 /**
  * Load a FFI library
@@ -328,7 +328,7 @@ size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elemen
  * @param namePointer
  * @return
  */
-size_t core_ffi_load(TypeV_Core* core, size_t namePointer);
+uintptr_t core_ffi_load(TypeV_Core* core, size_t namePointer);
 
 /**
  * Closes a FFI library
@@ -344,7 +344,7 @@ void core_ffi_close(TypeV_Core* core, size_t libHandle);
  * @param size
  * @return
  */
-size_t core_mem_alloc(TypeV_Core* core, size_t size);
+uintptr_t core_mem_alloc(TypeV_Core* core, size_t size);
 
 /**
  * Updates the flags of the core
