@@ -22,7 +22,7 @@
 #if defined(TYPE_V_ASSERT_STANDARD)
 #define ASSERT(c ,msg, ...) assert(c)
 #elif defined (TYPE_V_ASSERT_LOG)
-#define ASSERT(c, msg, ...) typev_assert(c, #c, __FUNCTION_NAME__ , msg, ##__VA_ARGS__)
+#define ASSERT(c, msg, ...)
 #elif defined (TYPE_V_ASSERT_NONE)
 #define ASSERT(c, msg, ...)
 #else

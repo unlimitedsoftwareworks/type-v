@@ -198,15 +198,18 @@ typedef struct TypeV_Core {
 
     uint32_t exitCode;                        ///< Exit code
 
-    uint8_t* constPtr;                        ///< Constant pointer
-    uint8_t* templatePtr;                     ///< Template pointer
-    uint8_t* codePtr;                         ///< Code pointer
-    uint8_t* globalPtr;                       ///< Global pointer
+    const uint8_t* constPtr;                        ///< Constant pointer
+    const uint8_t* templatePtr;                     ///< Template pointer
+    const uint8_t* codePtr;                         ///< Code pointer
+
+    const uint8_t* globalPtr;                       ///< Global pointer
     uint64_t ip;                              ///< Instruction pointer
 
     TypeV_Register* regs;                     ///< Registers, pointer to current function state registers for faster access.
-    uint64_t* flags;                          ///< Flags, pointer to current function state flags for faster access.
+    uint16_t* flags;                          ///< Flags, pointer to current function state flags for faster access.
     TypeV_FuncState* funcState;               ///< Function state
+
+
 }TypeV_Core;
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev);
@@ -219,7 +222,7 @@ void core_destroy_function_state(TypeV_Core* core, TypeV_FuncState** state);
  * @param engineRef
  */
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef);
-void core_setup(TypeV_Core *core, uint8_t* program, uint8_t* constantPool, uint8_t* globalPool);
+void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, const uint8_t* globalPool);
 
 /**
  * Deallocates a core

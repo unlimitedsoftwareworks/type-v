@@ -20,7 +20,10 @@ TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     state->sp = 0;
     stack_init(state, 1024);
     state->prev = prev;
+    state->next = NULL;
     state->flags = 0;
+
+    return state;
 }
 
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
@@ -29,7 +32,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
 
     core->funcState = core_create_function_state(NULL);
     core->flags = &core->funcState->flags;
-    core->regs = &core->funcState->regs;
+    core->regs = core->funcState->regs;
 
     // Initialize GC
     core->memTracker.classes = NULL;
@@ -48,7 +51,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->awaitingPromise = NULL;
 }
 
-void core_setup(TypeV_Core *core, uint8_t* program, uint8_t* constantPool, uint8_t* globalPool){
+void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, const uint8_t* globalPool){
     core->codePtr = program;
     core->constPtr = constantPool;
     core->globalPtr = globalPool;

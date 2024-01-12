@@ -89,10 +89,6 @@ TypeV_SourcePoint env_sourcemap_get(TypeV_ENV env, uint64_t ip){
     uint64_t column = 0;
 
     int found = get_source_map_line_content(env.sourceMapFile, ip, file, &line, &column);
-    if(!found) {
-        return (TypeV_SourcePoint){.line = 0, .column = 0, .file = NULL};
-    }
-    else {
-        return (TypeV_SourcePoint){.line = line, .column = column, .file = strdup(file)};
-    }
+
+    return (TypeV_SourcePoint){.line = line, .column = column, .file = strdup(file)};
 }

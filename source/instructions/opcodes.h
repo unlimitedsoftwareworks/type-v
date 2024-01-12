@@ -115,7 +115,7 @@ typedef enum TypeV_OpCode {
      * OP_S_STOREF_REG_[size] dest: R, fieldIndex: I, source: R, byteSize: S
      * Stores [size] bytes from register R to field I of struct stored at dest
      */
-    OP_S_STOREF,
+    OP_S_STOREF_REG,
     OP_S_STOREF_REG_PTR,
 
     /**
@@ -272,6 +272,7 @@ typedef enum TypeV_OpCode {
      * OP_PUSH register: R, bytes: S
      */
     OP_PUSH,
+    OP_PUSH_PTR,
 
     /**
      * OP_PUSH_CONST offset-size: Z, offset: I, bytes: S
@@ -282,7 +283,7 @@ typedef enum TypeV_OpCode {
      * OP_POP register: R, bytes: S
      */
     OP_POP,
-
+    OP_POP_PTR,
 
     /**
      * OP_FN_ALLOC
@@ -461,18 +462,6 @@ typedef enum TypeV_OpCode {
     OP_RSHIFT_I64,
     OP_RSHIFT_U64,
 
-    OP_CMP_I8,
-    OP_CMP_U8,
-    OP_CMP_I16,
-    OP_CMP_U16,
-    OP_CMP_I32,
-    OP_CMP_U32,
-    OP_CMP_I64,
-    OP_CMP_U64,
-    OP_CMP_F32,
-    OP_CMP_F64,
-    OP_CMP_PTR,
-
     OP_BAND_8,
     OP_BAND_16,
     OP_BAND_32,
@@ -498,12 +487,28 @@ typedef enum TypeV_OpCode {
     OP_NOT,
 
     OP_J,
-    OP_JE,
-    OP_JNE,
-    OP_JG,
-    OP_JGE,
-    OP_JL,
-    OP_JLE,
+    /**
+     * OP_J_CMP_[type] arg1, arg2, cmpType: I(1 byte), jump-address: I (8 bytes)
+     * compares arg1 and arg2 using the given comparison type
+     * 0: equal
+     * 1: not equal
+     * 2: greater than
+     * 3: greater than or equal
+     * 4: less than
+     * 5: less than or equal
+     * if the comparison is true, it jumps to the given address
+     */
+    OP_J_CMP_U8,
+    OP_J_CMP_I8,
+    OP_J_CMP_U16,
+    OP_J_CMP_I16,
+    OP_J_CMP_U32,
+    OP_J_CMP_I32,
+    OP_J_CMP_U64,
+    OP_J_CMP_I64,
+    OP_J_CMP_F32,
+    OP_J_CMP_F64,
+    OP_J_CMP_PTR,
 
     /**
      * OP_REG_FFI nnameconst-offset-size: I, nameconst-offset: I, ID: I (2 bytes),

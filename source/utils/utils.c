@@ -40,13 +40,14 @@ int get_source_map_line_content(const char* sourceMapFile, uint64_t position, ch
     char last_valid_file[MAX_FILENAME_LENGTH];
     uint64_t last_valid_line = 0, last_valid_pos = 0;
     uint64_t current_pos = 0;
+    uint64_t current_line = 0;
     int found = 0;
 
     while (fgets(buffer, MAX_LINE_LENGTH, fp)) {
         char temp_file[MAX_FILENAME_LENGTH];
         uint64_t temp_line;
         if (sscanf(buffer, "%[^,],%llu", temp_file, &temp_line) == 2) {
-            if (current_pos == position) {
+            if (current_line == position) {
                 strcpy(file, temp_file);
                 *line = temp_line;
                 *pos = position;
@@ -55,9 +56,9 @@ int get_source_map_line_content(const char* sourceMapFile, uint64_t position, ch
             }
             strcpy(last_valid_file, temp_file);
             last_valid_line = temp_line;
-            last_valid_pos = current_pos;
             current_pos++;
         }
+        current_line++;
     }
 
     if (!found) { // If exact position not found, use the last seen valid instruction
