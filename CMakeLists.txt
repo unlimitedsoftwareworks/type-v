@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(type_v C)
 
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 11)
 
 add_subdirectory(stdio)
 add_subdirectory(string)

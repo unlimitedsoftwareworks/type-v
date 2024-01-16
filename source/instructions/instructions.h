@@ -27,59 +27,36 @@
 
 
 // for aligned data
-static inline void typev_memcpy(void* dest, const void* src, size_t n) {
-    // Assuming dest and src are properly aligned for their respective types
-    switch (n) {
-        case 1:
-            *(uint8_t*)dest = *(const uint8_t*)src;
-            return;
-        case 2:
-            *(uint16_t*)dest = *(const uint16_t*)src;
-            return;
-        case 3:
-            *(uint16_t*)dest = *(const uint16_t*)src;
-            *((uint8_t*)dest + 2) = *((const uint8_t*)src + 2);
-            return;
-        case 4:
-            *(uint32_t*)dest = *(const uint32_t*)src;
-            return;
-        case 8:
-            *(uint64_t*)dest = *(const uint64_t*)src;
-            return;
-        default:
-            memcpy(dest, src, n);
-            return;
-    }
+static inline void typev_memcpy_u64_ptr(unsigned char* dest, const unsigned char* src, size_t n) {
+
+    static void* dispatch_table[] = {&&DO_1, &&DO_2, &&DO_3, &&DO_4, &&DO_5, &&DO_6, &&DO_7, &&DO_8};
+    goto *dispatch_table[n - 1];
+    DO_8: dest[7] = src[7];
+    DO_7: dest[6] = src[6];
+    DO_6: dest[5] = src[5];
+    DO_5: dest[4] = src[4];
+    DO_4: dest[3] = src[3];
+    DO_3: dest[2] = src[2];
+    DO_2: dest[1] = src[1];
+    DO_1: dest[0] = src[0];
 }
 
-// for possibly unaligned data
-static inline void typev_umemcpy(void* dest, const void* src, size_t n) {
-    // Assuming dest and src are properly aligned for their respective types
-    switch (n) {
-        case 1:
-            *(uint8_t*)dest = *(const uint8_t*)src;
-            return;
-        case 2:
-            *(uint16_t*)dest = *(const uint16_t*)src;
-            return;
-        case 3:
-            *(uint16_t*)dest = *(const uint16_t*)src;
-            *((uint8_t*)dest + 2) = *((const uint8_t*)src + 2);
-            return;
-        case 4:
-            *(uint32_t*)dest = *(const uint32_t*)src;
-            return;
-        case 8:
-            *(uint64_t*)dest = *(const uint64_t*)src;
-            return;
-        default:
-            memcpy(dest, src, n);
-            return;
+
+// Custom memcpy function
+static inline uint64_t typev_memcpy_u64(const unsigned char *s, size_t size) {
+    uint64_t dest = 0;
+
+    for (size_t i = 0; i < size; ++i) {
+        dest |= (uint64_t)s[i] << (i * 8);
     }
+
+    return dest;
 }
 
-static inline void typev_const_memcpy(void* dest, const uint8_t* constPtr, size_t n) {
-
+static inline void typev_memcpy_u64_ptr_u64_ptr(const unsigned char* dest, const unsigned char *s, size_t size) {
+    for (size_t i = 0; i < size; ++i) {
+        *(uint64_t*)dest |= (uint64_t)s[i] << (i * 8);
+    }
 }
 
 static inline void mv_reg_reg(TypeV_Core* core){
@@ -90,7 +67,7 @@ static inline void mv_reg_reg(TypeV_Core* core){
     //uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
-    //typev_memcpy(&core->regs[target], &core->regs[source], byteSize);
+    //typev_memcpy_u64_ptr(&core->regs[target], &core->regs[source], byteSize);
     core->regs[target].ptr = core->regs[source].ptr;
 }
 
@@ -98,7 +75,7 @@ static inline void mv_reg_reg_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t source = core->codePtr[core->ip++];
 
-    typev_memcpy(&core->regs[target], &core->regs[source], PTR_SIZE);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->regs[source], PTR_SIZE);
 }
 
 static inline void mv_reg_null(TypeV_Core* core){
@@ -109,11 +86,14 @@ static inline void mv_reg_null(TypeV_Core* core){
 static inline void mv_reg_i(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     uint8_t immediate_size = core->codePtr[core->ip++];
-    uint64_t immediate = 0;
+    //uint64_t immediate = 0;
+    uint64_t immediate = typev_memcpy_u64(&core->codePtr[core->ip], immediate_size);
     // data could be unaligned
-    typev_memcpy(&immediate, &core->codePtr[core->ip], immediate_size);
+    //typev_memcpy_u64_ptr(&immediate, &core->codePtr[core->ip], immediate_size);
     core->ip += immediate_size;
-    typev_memcpy(&core->regs[target], &immediate, 8);
+    core->regs[target].ptr =  immediate;
+    //typev_memcpy_u64_ptr(&core->regs[target], &immediate, immediate_size);
+    //typev_memcpy_u64_ptr(&core->regs[target], &immediate, 8);
 }
 
 
@@ -122,14 +102,14 @@ static inline void mv_reg_const(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t constant_offset = 0;
     // data could be unaligned
-    typev_memcpy(&constant_offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&constant_offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
 
     uint8_t byteSize = core->codePtr[core->ip++];
 
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
-    typev_memcpy(&core->regs[target], &core->constPtr[constant_offset], byteSize);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->constPtr[constant_offset], byteSize);
 }
 
 /*
@@ -139,9 +119,9 @@ static inline void mv_reg_const_8(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t constant_offset = 0;
     // data could be unaligned
-    typev_memcpy(&constant_offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&constant_offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
-    typev_memcpy(&core->regs[target], &core->constPtr[constant_offset], 1);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->constPtr[constant_offset], 1);
 }
 
 static inline void mv_reg_const_16(TypeV_Core* core){
@@ -150,9 +130,9 @@ static inline void mv_reg_const_16(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t constant_offset = 0;
     // data could be unaligned
-    typev_memcpy(&constant_offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&constant_offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
-    typev_memcpy(&core->regs[target], &core->constPtr[constant_offset], 2);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->constPtr[constant_offset], 2);
 }
 
 static inline void mv_reg_const_32(TypeV_Core* core){
@@ -161,9 +141,9 @@ static inline void mv_reg_const_32(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t constant_offset = 0;
     // data could be unaligned
-    typev_memcpy(&constant_offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&constant_offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
-    typev_memcpy(&core->regs[target], &core->constPtr[constant_offset], 4);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->constPtr[constant_offset], 4);
 }
 
 static inline void mv_reg_const_64(TypeV_Core* core){
@@ -172,9 +152,9 @@ static inline void mv_reg_const_64(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t constant_offset = 0;
     // data could be unaligned
-    typev_memcpy(&constant_offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&constant_offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
-    typev_memcpy(&core->regs[target], &core->constPtr[constant_offset], 8);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->constPtr[constant_offset], 8);
 }
 */
 
@@ -184,133 +164,133 @@ static inline void mv_reg_const_ptr(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t constant_offset = 0;
     // data could be unaligned
-    typev_memcpy(&constant_offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&constant_offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
-    typev_memcpy(&core->regs[target], &core->constPtr[constant_offset], PTR_SIZE);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->constPtr[constant_offset], PTR_SIZE);
 }
 
 static inline void mv_global_reg(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
     const uint8_t source = core->codePtr[core->ip++];
     uint8_t byteSize = core->codePtr[core->ip++];
 
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
-    typev_memcpy(&core->globalPtr[offset], &core->regs[source], byteSize);
+    typev_memcpy_u64_ptr(&core->globalPtr[offset], &core->regs[source], byteSize);
 }
 
 /*
 static inline void mv_global_reg_8(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
     const uint8_t source = core->codePtr[core->ip++];
 
 
-    typev_memcpy(&core->globalPtr[offset], &core->regs[source], 1);
+    typev_memcpy_u64_ptr(&core->globalPtr[offset], &core->regs[source], 1);
 }
 
 static inline void mv_global_reg_16(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
     const uint8_t source = core->codePtr[core->ip++];
 
-    typev_memcpy(&core->globalPtr[offset], &core->regs[source], 2);
+    typev_memcpy_u64_ptr(&core->globalPtr[offset], &core->regs[source], 2);
 }
 
 
 static inline void mv_global_reg_32(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
     const uint8_t source = core->codePtr[core->ip++];
 
-    typev_memcpy(&core->globalPtr[offset], &core->regs[source], 4);
+    typev_memcpy_u64_ptr(&core->globalPtr[offset], &core->regs[source], 4);
 }
 
 static inline void mv_global_reg_64(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
     const uint8_t source = core->codePtr[core->ip++];
 
 
-    typev_memcpy(&core->globalPtr[offset], &core->regs[source], 8);
+    typev_memcpy_u64_ptr(&core->globalPtr[offset], &core->regs[source], 8);
 }
  */
 
 static inline void mv_global_reg_ptr(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
     const uint8_t source = core->codePtr[core->ip++];
 
-    typev_memcpy(&core->globalPtr[offset], &core->regs[source], PTR_SIZE);
+    typev_memcpy_u64_ptr(&core->globalPtr[offset], &core->regs[source], PTR_SIZE);
 }
 
 static inline void mv_reg_global(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
-    typev_memcpy(&core->regs[target], &core->globalPtr[offset], byteSize);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->globalPtr[offset], byteSize);
 }
 /*
 static inline void mv_reg_global_8(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
 
 
-    typev_memcpy(&core->regs[target], &core->globalPtr[offset], 1);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->globalPtr[offset], 1);
 }
 
 static inline void mv_reg_global_16(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
 
 
-    typev_memcpy(&core->regs[target], &core->globalPtr[offset], 2);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->globalPtr[offset], 2);
 }
 
 static inline void mv_reg_global_32(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
 
 
-    typev_memcpy(&core->regs[target], &core->globalPtr[offset], 4);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->globalPtr[offset], 4);
 }
 
 static inline void mv_reg_global_64(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
 
 
-    typev_memcpy(&core->regs[target], &core->globalPtr[offset], 8);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->globalPtr[offset], 8);
 }
 */
 
@@ -318,11 +298,11 @@ static inline void mv_reg_global_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
 
 
-    typev_memcpy(&core->regs[target], &core->globalPtr[offset], PTR_SIZE);
+    typev_memcpy_u64_ptr(&core->regs[target], &core->globalPtr[offset], PTR_SIZE);
 }
 
 static inline void s_alloc(TypeV_Core* core){
@@ -330,7 +310,7 @@ static inline void s_alloc(TypeV_Core* core){
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
     const uint8_t fields_count = core->codePtr[core->ip++];
     uint16_t struct_size = 0;
-    typev_memcpy(&struct_size, &core->codePtr[core->ip],  2);
+    typev_memcpy_u64_ptr(&struct_size, &core->codePtr[core->ip],  2);
     core->ip += 2;
 
     // allocate memory for struct
@@ -360,7 +340,7 @@ static inline void s_set_offset(TypeV_Core* core){
     ASSERT(src_reg < MAX_REG, "Invalid register index");
     const uint8_t field_index = core->codePtr[core->ip++];
     uint16_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  2);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  2);
     core->ip += 2;
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[src_reg].ptr;
@@ -389,7 +369,7 @@ static inline void s_loadf(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
-    typev_memcpy(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], byteSize);
+    typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], byteSize);
 }
 
 /*
@@ -400,7 +380,7 @@ static inline void s_loadf_8(TypeV_Core* core){
 
     const uint8_t field_index = core->codePtr[core->ip++];
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
-    typev_memcpy(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], 1);
+    typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], 1);
 }
 
 static inline void s_loadf_16(TypeV_Core* core){
@@ -410,7 +390,7 @@ static inline void s_loadf_16(TypeV_Core* core){
 
     const uint8_t field_index = core->codePtr[core->ip++];
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
-    typev_memcpy(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], 2);
+    typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], 2);
 }
 
 static inline void s_loadf_32(TypeV_Core* core){
@@ -420,7 +400,7 @@ static inline void s_loadf_32(TypeV_Core* core){
 
     const uint8_t field_index = core->codePtr[core->ip++];
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
-    typev_memcpy(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], 4);
+    typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], 4);
 }
 
 static inline void s_loadf_64(TypeV_Core* core){
@@ -430,7 +410,7 @@ static inline void s_loadf_64(TypeV_Core* core){
 
     const uint8_t field_index = core->codePtr[core->ip++];
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
-    typev_memcpy(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], 8);
+    typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], 8);
 }
 */
 
@@ -441,19 +421,19 @@ static inline void s_loadf_ptr(TypeV_Core* core){
 
     const uint8_t field_index = core->codePtr[core->ip++];
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
-    typev_memcpy(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], PTR_SIZE);
+    typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], PTR_SIZE);
 }
 
 static inline void s_storef_const(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     const uint8_t field_index = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], byteSize);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], byteSize);
 }
 
 /*
@@ -461,40 +441,40 @@ static inline void s_storef_const_8(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     const uint8_t field_index = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], 1);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], 1);
 }
 
 static inline void s_storef_const_16(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     const uint8_t field_index = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], 2);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], 2);
 }
 
 static inline void s_storef_const_32(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     const uint8_t field_index = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], 4);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], 4);
 }
 
 static inline void s_storef_const_64(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     const uint8_t field_index = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], 8);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], 8);
 }
 */
 
@@ -502,10 +482,10 @@ static inline void s_storef_const_ptr(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     const uint8_t field_index = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], PTR_SIZE);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], &core->constPtr[offset], PTR_SIZE);
 }
 
 static inline void s_storef_reg(TypeV_Core* core){
@@ -517,7 +497,7 @@ static inline void s_storef_reg(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], byteSize);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], byteSize);
 }
 
 /*
@@ -528,7 +508,7 @@ static inline void s_storef_reg_8(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 1);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 1);
 }
 
 static inline void s_storef_reg_16(TypeV_Core* core){
@@ -538,7 +518,7 @@ static inline void s_storef_reg_16(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 2);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 2);
 }
 
 static inline void s_storef_reg_32(TypeV_Core* core){
@@ -548,7 +528,7 @@ static inline void s_storef_reg_32(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 4);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 4);
 }
 
 static inline void s_storef_reg_64(TypeV_Core* core){
@@ -558,7 +538,7 @@ static inline void s_storef_reg_64(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 8);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 8);
 }
 */
 
@@ -569,7 +549,7 @@ static inline void s_storef_reg_ptr(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    typev_memcpy(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 8);
+    typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 8);
 }
 
 
@@ -578,12 +558,12 @@ static inline void c_alloc(TypeV_Core* core){
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
     const uint8_t methods_count = core->codePtr[core->ip++];
     size_t fields_size = 0;
-    typev_memcpy(&fields_size, &core->codePtr[core->ip],  2);
+    typev_memcpy_u64_ptr(&fields_size, &core->codePtr[core->ip],  2);
     core->ip += 2;
 
     uint8_t classId_size = core->codePtr[core->ip++];
     uint64_t classId = 0;
-    typev_memcpy(&classId, &core->codePtr[core->ip],  classId_size);
+    typev_memcpy_u64_ptr(&classId, &core->codePtr[core->ip],  classId_size);
     core->ip += classId_size;
 
 
@@ -598,7 +578,7 @@ static inline void c_storem(TypeV_Core* core){
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
     const uint8_t method_index = core->codePtr[core->ip++];
     size_t methd_address = 0; /* we do not increment methd_address here*/
-    typev_memcpy(&methd_address, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&methd_address, &core->codePtr[core->ip], 8);
     core->ip += 8;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[dest_reg].ptr;
@@ -622,59 +602,59 @@ static inline void c_loadm(TypeV_Core* core){
 static inline void c_storef_reg(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t field_offset = 0;
-    typev_memcpy(&field_offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&field_offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     const uint8_t source = core->codePtr[core->ip++];
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(c->data+field_offset, &core->regs[source], byteSize);
+    typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source], byteSize);
 }
 
 /*
 static inline void c_storef_reg_8(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t field_offset = 0;
-    typev_memcpy(&field_offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&field_offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(c->data+field_offset, &core->regs[source].ptr, 1);
+    typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source].ptr, 1);
 }
 
 static inline void c_storef_reg_16(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t field_offset = 0;
-    typev_memcpy(&field_offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&field_offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(c->data+field_offset, &core->regs[source].ptr, 2);
+    typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source].ptr, 2);
 }
 
 static inline void c_storef_reg_32(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t field_offset = 0;
-    typev_memcpy(&field_offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&field_offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(c->data+field_offset, &core->regs[source].ptr, 4);
+    typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source].ptr, 4);
 }
 
 static inline void c_storef_reg_64(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t field_offset = 0;
-    typev_memcpy(&field_offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&field_offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(c->data+field_offset, &core->regs[source].ptr, 8);
+    typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source].ptr, 8);
 }
 */
 
@@ -682,54 +662,54 @@ static inline void c_storef_reg_ptr(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
     ASSERT(class_reg < MAX_REG, "Invalid register index");
     size_t field_offset = 0;
-    typev_memcpy(&field_offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&field_offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(c->data+field_offset, &core->regs[source].ptr, PTR_SIZE);
+    typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source].ptr, PTR_SIZE);
 }
 
 static inline void c_storef_const(TypeV_Core* core) {
     const uint8_t class_reg = core->codePtr[core->ip++];
     ASSERT(class_reg < MAX_REG, "Invalid register index");
     size_t field_offset = 0;
-    typev_memcpy(&field_offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&field_offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Class *c = (TypeV_Class *) core->regs[class_reg].ptr;
-    typev_memcpy(c->data + field_offset, &core->constPtr[offset], byteSize);
+    typev_memcpy_u64_ptr(c->data + field_offset, &core->constPtr[offset], byteSize);
 }
 
 static inline void c_storef_const_ptr(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
     ASSERT(class_reg < MAX_REG, "Invalid register index");
     size_t field_offset = 0;
-    typev_memcpy(&field_offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&field_offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(c->data+field_offset, &core->constPtr[offset], PTR_SIZE);
+    typev_memcpy_u64_ptr(c->data+field_offset, &core->constPtr[offset], PTR_SIZE);
 }
 
 static inline void c_loadf(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(&core->regs[target], c->data+offset, byteSize);
+    typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, byteSize);
 }
 
 /*
@@ -737,40 +717,40 @@ static inline void c_loadf_8(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(&core->regs[target], c->data+offset, 1);
+    typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, 1);
 }
 
 static inline void c_loadf_16(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(&core->regs[target], c->data+offset, 2);
+    typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, 2);
 }
 
 static inline void c_loadf_32(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(&core->regs[target], c->data+offset, 4);
+    typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, 4);
 }
 
 static inline void c_loadf_64(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(&core->regs[target], c->data+offset, 8);
+    typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, 8);
 }
  */
 
@@ -778,10 +758,10 @@ static inline void c_loadf_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy(&core->regs[target], c->data+offset, PTR_SIZE);
+    typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, PTR_SIZE);
 }
 
 static inline void i_alloc(TypeV_Core* core){
@@ -810,7 +790,7 @@ static inline void i_set_offset(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     const uint8_t field_index = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 2);
     core->ip += 2;
 
     TypeV_Interface* i = (TypeV_Interface*)core->regs[dest_reg].ptr;
@@ -835,15 +815,15 @@ static inline void i_set_offset_i(TypeV_Core* core) {
 
 static inline void i_set_offset_m(TypeV_Core* core){
     uint64_t lookUpMethodId = 0;
-    typev_memcpy(&lookUpMethodId, &core->codePtr[core->ip],  8);
+    typev_memcpy_u64_ptr(&lookUpMethodId, &core->codePtr[core->ip],  8);
     core->ip += 8;
 
     uint16_t field_number = 0;
-    typev_memcpy(&field_number, &core->codePtr[core->ip],  2);
+    typev_memcpy_u64_ptr(&field_number, &core->codePtr[core->ip],  2);
     core->ip += 2;
 
     uint64_t jumpFailureAddress = 0;
-    typev_memcpy(&jumpFailureAddress, &core->codePtr[core->ip],  8);
+    typev_memcpy_u64_ptr(&jumpFailureAddress, &core->codePtr[core->ip],  8);
     core->ip += 8;
 
     TypeV_Interface* interface = (TypeV_Interface*)core->regs[16].ptr;
@@ -852,11 +832,11 @@ static inline void i_set_offset_m(TypeV_Core* core){
     uint8_t found = 0;
     for(size_t i = 0; i < class_->num_methods; i++) {
         uint64_t methodId = 0;
-        typev_memcpy(&methodId, &core->codePtr[class_->methods[i]],  8);
+        typev_memcpy_u64_ptr(&methodId, &core->codePtr[class_->methods[i]],  8);
         if(lookUpMethodId == methodId) {
             found = 1;
             uint16_t offset = i;
-            typev_memcpy(&interface->methodsOffset[field_number], &offset, 2);
+            typev_memcpy_u64_ptr(&interface->methodsOffset[field_number], &offset, 2);
             break;
         }
     }
@@ -882,7 +862,7 @@ static inline void i_is_c(TypeV_Core* core){
     const uint8_t interface_reg = core->codePtr[core->ip++];
 
     uint64_t classId = 0;
-    typev_memcpy(&classId, &core->codePtr[core->ip],  8);
+    typev_memcpy_u64_ptr(&classId, &core->codePtr[core->ip],  8);
     core->ip += 8;
 
     TypeV_Interface* interface = (TypeV_Interface*)core->regs[interface_reg].ptr;
@@ -893,13 +873,13 @@ static inline void i_is_c(TypeV_Core* core){
 
 static inline void i_is_i(TypeV_Core* core){
     uint64_t lookUpMethodId = 0;
-    typev_memcpy(&lookUpMethodId, &core->codePtr[core->ip],  8);
+    typev_memcpy_u64_ptr(&lookUpMethodId, &core->codePtr[core->ip],  8);
     core->ip += 8;
 
     const uint8_t interface_reg = core->codePtr[core->ip++];
 
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
 
     TypeV_Interface* interface = (TypeV_Interface*)core->regs[interface_reg].ptr;
@@ -908,7 +888,7 @@ static inline void i_is_i(TypeV_Core* core){
     uint8_t found = 0;
     for(size_t i = 0; i < class_->num_methods; i++) {
         uint64_t methodId = 0;
-        typev_memcpy(&methodId, &core->codePtr[class_->methods[i]]-8,  8);
+        typev_memcpy_u64_ptr(&methodId, &core->codePtr[class_->methods[i]]-8,  8);
         if(lookUpMethodId == methodId) {
             found = 1;
             break;
@@ -932,7 +912,7 @@ static inline void a_alloc(TypeV_Core* core){
     const uint8_t dest = core->codePtr[core->ip++];
 
     size_t num_elements = 0;
-    typev_memcpy(&num_elements, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&num_elements, &core->codePtr[core->ip], 8);
     core->ip += 8;
     // next read the element size
     uint8_t element_size = core->codePtr[core->ip++];
@@ -972,7 +952,7 @@ static inline void a_storef_reg(TypeV_Core* core){
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], byteSize);
+    typev_memcpy_u64_ptr(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], byteSize);
 }
 
 /*
@@ -983,7 +963,7 @@ static inline void a_storef_reg_8(TypeV_Core* core){
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], 1);
+    typev_memcpy_u64_ptr(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], 1);
 }
 
 static inline void a_storef_reg_16(TypeV_Core* core){
@@ -995,7 +975,7 @@ static inline void a_storef_reg_16(TypeV_Core* core){
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], 2);
+    typev_memcpy_u64_ptr(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], 2);
 }
 
 static inline void a_storef_reg_32(TypeV_Core* core){
@@ -1005,7 +985,7 @@ static inline void a_storef_reg_32(TypeV_Core* core){
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], 4);
+    typev_memcpy_u64_ptr(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], 4);
 }
 
 static inline void a_storef_reg_64(TypeV_Core* core){
@@ -1014,7 +994,7 @@ static inline void a_storef_reg_64(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
-    typev_memcpy(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], 8);
+    typev_memcpy_u64_ptr(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], 8);
 }
  */
 
@@ -1028,14 +1008,14 @@ static inline void a_storef_reg_ptr(TypeV_Core* core){
     if(core->regs[index].u64 >= array->length) {
         core_panic(core, 1, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
     }
-    typev_memcpy(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], PTR_SIZE);
+    typev_memcpy_u64_ptr(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], PTR_SIZE);
 }
 
 static inline void a_storef_const(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     uint8_t indexReg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
 
     uint8_t byteSize = core->codePtr[core->ip++];
@@ -1043,7 +1023,7 @@ static inline void a_storef_const(TypeV_Core* core){
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[indexReg].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], byteSize);
+    typev_memcpy_u64_ptr(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], byteSize);
 }
 
 /*
@@ -1051,45 +1031,45 @@ static inline void a_storef_const_8(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     uint8_t indexReg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[indexReg].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], 1);
+    typev_memcpy_u64_ptr(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], 1);
 }
 
 static inline void a_storef_const_16(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     uint8_t indexReg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[indexReg].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], 2);
+    typev_memcpy_u64_ptr(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], 2);
 }
 
 static inline void a_storef_const_32(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     uint8_t indexReg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[indexReg].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], 4);
+    typev_memcpy_u64_ptr(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], 4);
 }
 
 static inline void a_storef_const_64(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     uint8_t indexReg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[indexReg].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], 8);
+    typev_memcpy_u64_ptr(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], 8);
 }
 */
 
@@ -1097,11 +1077,11 @@ static inline void a_storef_const_ptr(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     uint8_t indexReg = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[indexReg].u64 < array->length, "Index out of bounds");
-    typev_memcpy(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], PTR_SIZE);
+    typev_memcpy_u64_ptr(array->data+(core->regs[indexReg].u64*array->elementSize), &core->constPtr[offset], PTR_SIZE);
 }
 
 static inline void a_loadf(TypeV_Core* core) {
@@ -1121,7 +1101,7 @@ static inline void a_loadf(TypeV_Core* core) {
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
-    typev_memcpy(&core->regs[target], array->data + (idx * array->elementSize), byteSize);
+    typev_memcpy_u64_ptr(&core->regs[target], array->data + (idx * array->elementSize), byteSize);
 }
 
 /*
@@ -1139,7 +1119,7 @@ static inline void a_loadf_8(TypeV_Core* core) {
         core_panic(core, 1, "Index out of bounds %d >= %d", idx, array->length);
     }
 
-    typev_memcpy(&core->regs[target], array->data + (idx * array->elementSize), 1);
+    typev_memcpy_u64_ptr(&core->regs[target], array->data + (idx * array->elementSize), 1);
 }
 
 static inline void a_loadf_16(TypeV_Core* core) {
@@ -1150,7 +1130,7 @@ static inline void a_loadf_16(TypeV_Core* core) {
     ASSERT(array_reg <= 8, "Invalid byte size");
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
-    typev_memcpy(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize), 2);
+    typev_memcpy_u64_ptr(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize), 2);
 }
 
 static inline void a_loadf_32(TypeV_Core* core) {
@@ -1160,7 +1140,7 @@ static inline void a_loadf_32(TypeV_Core* core) {
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
-    typev_memcpy(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize), 4);
+    typev_memcpy_u64_ptr(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize), 4);
 }
 
 static inline void a_loadf_64(TypeV_Core* core) {
@@ -1170,7 +1150,7 @@ static inline void a_loadf_64(TypeV_Core* core) {
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
-    typev_memcpy(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize), 8);
+    typev_memcpy_u64_ptr(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize), 8);
 }
 */
 
@@ -1187,7 +1167,7 @@ static inline void a_loadf_ptr(TypeV_Core* core) {
         return;
     }
 
-    typev_memcpy(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize), PTR_SIZE);
+    typev_memcpy_u64_ptr(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize), PTR_SIZE);
 }
 
 
@@ -1227,7 +1207,7 @@ static inline void push_ptr(TypeV_Core* core){
 static inline void push_const(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
 
     // get bytes
@@ -1314,7 +1294,7 @@ static inline void fn_set_reg(TypeV_Core* core){
     //uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
-    //typev_memcpy(&core->funcState->next->regs[dest_reg], &core->regs[source_reg], byteSize);
+    //typev_memcpy_u64_ptr(&core->funcState->next->regs[dest_reg], &core->regs[source_reg], byteSize);
     core->funcState->next->regs[dest_reg] = core->regs[source_reg];
 }
 
@@ -1339,10 +1319,11 @@ static inline void fn_call(TypeV_Core* core){
 
 static inline void fn_calli(TypeV_Core* core){
     // same as fn_call but takes immediate value
-    const uint8_t offset_length = core->codePtr[core->ip++];
-    size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
-    core->ip += offset_length;
+    core->ip++;
+    //const uint8_t offset_length = core->codePtr[core->ip++];
+    size_t offset = typev_memcpy_u64(&core->codePtr[core->ip], 8);
+    //typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip],  offset_length);
+    core->ip += 8;
 
 
     // jump to the address
@@ -1350,14 +1331,12 @@ static inline void fn_calli(TypeV_Core* core){
     core->ip = offset;
     core->funcState = core->funcState->next;
     core->regs = core->funcState->regs;
-    core->flags = &core->funcState->flags;
 }
 
 static inline void fn_ret(TypeV_Core* core){
     core->ip = core->funcState->prev->ip;
     core->funcState = core->funcState->prev;
     core->regs = core->funcState->regs;
-    core->flags = &core->funcState->flags;
 }
 
 static inline void fn_get_ret_reg(TypeV_Core* core){
@@ -1410,7 +1389,7 @@ static inline void upcast_i(TypeV_Core* core) {
 
     // Extract the value from the register
     int64_t value = 0;
-    typev_memcpy(&value, &core->regs[reg], from);
+    typev_memcpy_u64_ptr(&value, &core->regs[reg], from);
 
     // Perform sign extension without branching
     if (from < 8) {
@@ -1419,7 +1398,7 @@ static inline void upcast_i(TypeV_Core* core) {
     }
 
     // Store the result back in the register
-    typev_memcpy(&core->regs[reg], &value, to);
+    typev_memcpy_u64_ptr(&core->regs[reg], &value, to);
 }
 
 static inline void upcast_u(TypeV_Core* core) {
@@ -1432,7 +1411,7 @@ static inline void upcast_u(TypeV_Core* core) {
 
     // Extract the value from the register
     uint64_t value = 0;
-    typev_memcpy(&value, &core->regs[reg], from);
+    typev_memcpy_u64_ptr(&value, &core->regs[reg], from);
 
     if(to == 2){
         core->regs[reg].u16 = (uint16_t) value;
@@ -1449,7 +1428,7 @@ static inline void upcast_u(TypeV_Core* core) {
     }
 
     // Store the result back in the register
-    //typev_memcpy(&core->regs[reg], &value, to);
+    //typev_memcpy_u64_ptr(&core->regs[reg], &value, to);
 }
 
 static inline void upcast_f(TypeV_Core* core) {
@@ -1462,13 +1441,13 @@ static inline void upcast_f(TypeV_Core* core) {
 
     // Extract the float value from the register
     float floatValue = 0.0f;
-    typev_memcpy(&floatValue, &core->regs[reg], from);
+    typev_memcpy_u64_ptr(&floatValue, &core->regs[reg], from);
 
     // Convert to double
     double doubleValue = (double)floatValue;
 
     // Store the result back in the register
-    typev_memcpy(&core->regs[reg], &doubleValue, to);
+    typev_memcpy_u64_ptr(&core->regs[reg], &doubleValue, to);
 }
 
 
@@ -1482,10 +1461,10 @@ static inline void dcast_i(TypeV_Core* core) {
 
     // We simply need to copy the lower 'to' bytes from the register
     int64_t value = 0;
-    typev_memcpy(&value, &core->regs[reg], to);
+    typev_memcpy_u64_ptr(&value, &core->regs[reg], to);
 
     // Store the result back in the register (overwriting only 'to' bytes)
-    typev_memcpy(&core->regs[reg], &value, to);
+    typev_memcpy_u64_ptr(&core->regs[reg], &value, to);
 }
 
 static inline void dcast_u(TypeV_Core* core) {
@@ -1498,14 +1477,14 @@ static inline void dcast_u(TypeV_Core* core) {
 
     // Extract the value from the register
     uint64_t value = 0;
-    typev_memcpy(&value, &core->regs[reg], from);
+    typev_memcpy_u64_ptr(&value, &core->regs[reg], from);
 
     // Truncate the value to the smaller size
     uint64_t truncatedValue = 0;
-    typev_memcpy(&truncatedValue, &value, to);
+    typev_memcpy_u64_ptr(&truncatedValue, &value, to);
 
     // Store the truncated value back in the register
-    typev_memcpy(&core->regs[reg], &truncatedValue, to);
+    typev_memcpy_u64_ptr(&core->regs[reg], &truncatedValue, to);
 }
 
 static inline void dcast_f(TypeV_Core* core) {
@@ -1518,13 +1497,13 @@ static inline void dcast_f(TypeV_Core* core) {
 
     // Extract the double value from the register
     double doubleValue = 0.0;
-    typev_memcpy(&doubleValue, &core->regs[reg], from);
+    typev_memcpy_u64_ptr(&doubleValue, &core->regs[reg], from);
 
     // Convert to float
     float floatValue = (float)doubleValue;
 
     // Store the result back in the register
-    typev_memcpy(&core->regs[reg], &floatValue, to);
+    typev_memcpy_u64_ptr(&core->regs[reg], &floatValue, to);
 }
 
 
@@ -1818,9 +1797,9 @@ static inline void not(TypeV_Core* core){
 }
 
 static inline void jmp(TypeV_Core* core){
-    const uint8_t offset_length = core->codePtr[core->ip++];
-    size_t offset = 0;
-    typev_memcpy(&offset, &core->codePtr[core->ip],  offset_length);
+    core->ip++;
+    //const uint8_t offset_length = core->codePtr[core->ip++];
+    size_t offset = typev_memcpy_u64(&core->codePtr[core->ip], 8);\
     core->ip = offset;
 }
 
@@ -1830,8 +1809,7 @@ static inline void j_cmp_##name(TypeV_Core* core) {\
     uint8_t op1 = core->codePtr[core->ip++];\
     uint8_t op2 = core->codePtr[core->ip++];\
     uint8_t cmpType = core->codePtr[core->ip++];\
-    size_t offset = 0;\
-    typev_memcpy(&offset, &core->codePtr[core->ip],  8);\
+    size_t offset = typev_memcpy_u64(&core->codePtr[core->ip], 8);\
     core->ip += 8;\
     type v1 = core->regs[op1].name;\
     type v2 = core->regs[op2].name;\
@@ -1892,7 +1870,7 @@ static inline void reg_ffi(TypeV_Core* core){
 
 static inline void open_ffi(TypeV_Core* core){
     uint16_t ffi_id = 0;
-    typev_memcpy(&ffi_id, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&ffi_id, &core->codePtr[core->ip], 2);
     core->ip += 2;
 
     engine_ffi_open(core->engineRef, ffi_id);
@@ -1903,7 +1881,7 @@ static inline void ld_ffi(TypeV_Core* core){
     ASSERT(dest < MAX_REG, "Invalid register index");
 
     uint16_t id = 0;
-    typev_memcpy(&id, &core->codePtr[core->ip], 2);
+    typev_memcpy_u64_ptr(&id, &core->codePtr[core->ip], 2);
     core->ip += 2;
 
     uint8_t methodId = core->codePtr[core->ip++];
@@ -1927,7 +1905,7 @@ static inline void p_alloc(TypeV_Core* core){
     uint8_t reg = core->codePtr[core->ip++];
     uint8_t size_length = core->codePtr[core->ip++];
     size_t size = 0;
-    typev_memcpy(&size, &core->codePtr[core->ip], size_length);
+    typev_memcpy_u64_ptr(&size, &core->codePtr[core->ip], size_length);
     core->ip += size_length;
 
     core->regs[reg].ptr = (size_t)engine_spawnCore(core->engineRef, core, size);
