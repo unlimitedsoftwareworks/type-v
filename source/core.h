@@ -175,6 +175,7 @@ typedef struct TypeV_FuncState {
     uint64_t sp;             ///< Stack pointer
     uint64_t ip;             ///< Instruction pointer, used only as back up
     TypeV_Register regs[MAX_REG]; ///< 256 registers.
+    TypeV_Register* spillSlots; ///< Spill slots, used when registers are not enough
     struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
     struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
 }TypeV_FuncState;
@@ -432,6 +433,7 @@ void core_promise_check_resume(TypeV_Core* core);
  */
 void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...);
 
+void core_spill_alloc(TypeV_Core* core, uint16_t size);
 
 typedef void (*TypeV_FFIFunc)(TypeV_Core* core);
 typedef struct TypeV_FFI {

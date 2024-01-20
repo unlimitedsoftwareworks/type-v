@@ -283,8 +283,15 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         &&DO_DEBUG_REG,
         &&DO_HALT,
         &&DO_LOAD_STD,
-        &&DO_VM_HEALTH};
-        #define DISPATCH() goto *dispatch_table[core->codePtr[core->ip++]]
+        &&DO_VM_HEALTH,
+        &&DO_SPILL_ALLOC,
+        &&DO_SPILL_REG,
+        &&DO_UNSPILL_REG
+        };
+        #define DISPATCH() { \
+            /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]);*/ \
+            goto *dispatch_table[core->codePtr[core->ip++]];                      \
+        }
 
         DISPATCH();
         while(1){
@@ -905,6 +912,15 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
                 DISPATCH();
             DO_VM_HEALTH:
                 vm_health(core);
+                DISPATCH();
+            DO_SPILL_ALLOC:
+                spill_alloc(core);
+                DISPATCH();
+            DO_SPILL_REG:
+                spill_reg(core);
+                DISPATCH();
+            DO_UNSPILL_REG:
+                unspill_reg(core);
                 DISPATCH();
         }
 

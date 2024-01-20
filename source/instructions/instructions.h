@@ -1521,7 +1521,16 @@ OP_BINARY(add, u8, +)
 OP_BINARY(add, i16, +)
 OP_BINARY(add, u16, +)
 OP_BINARY(add, i32, +)
-OP_BINARY(add, u32, +)
+//OP_BINARY(add, u32, +)
+
+static inline void add_u32(TypeV_Core* core){
+    uint8_t target = core->codePtr[core->ip++];
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    //printf("adding %d + %d\n", core->regs[op1].u32, core->regs[op2].u32);
+    core->regs[target].u32 = core->regs[op1].u32 + core->regs[op2].u32;
+}
+
 OP_BINARY(add, i64, +)
 //OP_BINARY(add, u64, +)
 OP_BINARY(add, f32, +)
@@ -2145,5 +2154,25 @@ static inline void vm_health(TypeV_Core* core){
     core->regs[dest].u8 = core->engineRef->health;
 }
 
+static inline void spill_alloc(TypeV_Core* core){
+    uint16_t size = (uint16_t)typev_memcpy_u64(&core->codePtr[core->ip], 2);
+    core->ip += 2;
+    core_spill_alloc(core, size);
+}
+
+static inline void spill_reg(TypeV_Core* core){
+    uint16_t slot = (uint16_t)typev_memcpy_u64(&core->codePtr[core->ip], 2);
+    core->ip += 2;
+    uint8_t reg = core->codePtr[core->ip++];
+    core->funcState->spillSlots[slot] = core->regs[reg];
+}
+
+
+static inline void unspill_reg(TypeV_Core* core){
+    uint8_t reg = core->codePtr[core->ip++];
+    uint16_t slot = (uint16_t)typev_memcpy_u64(&core->codePtr[core->ip], 2);
+    core->ip += 2;
+    core->regs[reg] = core->funcState->spillSlots[slot];
+}
 
 #endif //TYPE_V_INSTRUCTIONS_H

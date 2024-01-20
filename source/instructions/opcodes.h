@@ -666,6 +666,21 @@ typedef enum TypeV_OpCode {
      * Returns VM health into dest reg R[u8]
      */
     OP_VM_HEALTH,
+
+    /**
+     * OP_SPILL_ALLOC size: I (2 bytes)
+     */
+    SPILL_ALLOC,
+
+    /**
+     * OP_SPILL_REG: slot (2 bytes), source: R
+     */
+    SPILL_REG,
+
+    /**
+     * OP_UNSPILL_ALLOC dest: R, slot: I (2 bytes)
+     */
+    UNSPILL_REG,
 }TypeV_OpCode;
 
 #endif //TYPE_V_OPCODES_H

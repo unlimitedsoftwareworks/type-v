@@ -280,6 +280,9 @@ static char* instructions[] = {
         "load_std",
 
         "vm_health",
+        "spill_alloc",
+        "spill_reg",
+        "unspill_reg"
 };
 #define MAX_INSTRUCTION 251
 

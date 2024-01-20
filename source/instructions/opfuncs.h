@@ -262,6 +262,9 @@ static op_func op_funcs[] = {
         &load_std,
 
         &vm_health,
+        &spill_alloc,
+        &spill_reg,
+        &unspill_reg
 };
 
 #endif //TYPE_V_OPFUNCS_H

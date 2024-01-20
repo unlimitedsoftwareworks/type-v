@@ -22,6 +22,7 @@ TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     state->prev = prev;
     state->next = NULL;
     state->flags = 0;
+    state->spillSlots = malloc(sizeof(TypeV_Register));
 
     return state;
 }
@@ -365,4 +366,8 @@ void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
     }
 
     core->state = CS_CRASHED;
+}
+
+void core_spill_alloc(TypeV_Core* core, uint16_t size) {
+    core->funcState->spillSlots = realloc(core->funcState->spillSlots, sizeof(TypeV_Register)*(size));
 }
