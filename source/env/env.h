@@ -14,6 +14,7 @@
 
 typedef struct {
     char* file;
+    char* func_name;
     uint64_t line;
     uint64_t column;
 }TypeV_SourcePoint;

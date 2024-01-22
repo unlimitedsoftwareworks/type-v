@@ -361,11 +361,21 @@ void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
 
     TypeV_ENV env = get_env();
     if(env_sourcemap_has(env)){
+        LOG_ERROR("Stack trace:");
+        // print first frame
         TypeV_SourcePoint point = env_sourcemap_get(env, core->ip);
-        LOG_ERROR("CORE[%d]: Runtime Error ID: %d: %s\nSource: %s:%d:%d", core->id, errorId, message, point.file, point.line+1, point.column);
+        LOG_ERROR("function: %s at %s:%d:%d", point.func_name, point.file, point.line+1, point.column);
+        TypeV_FuncState* state = core->funcState->prev;
+        while (state != NULL) {
+            TypeV_SourcePoint point = env_sourcemap_get(env, state->ip);
+            LOG_ERROR("function: %s at %s:%d:%d", point.func_name, point.file, point.line + 1, point.column);
+            state = state->prev;
+        }
     }
 
+
     core->state = CS_CRASHED;
+    exit(-1);
 }
 
 void core_spill_alloc(TypeV_Core* core, uint16_t size) {

@@ -79,6 +79,7 @@ uint8_t env_sourcemap_has(TypeV_ENV env) {
     return env.sourceMapFile != NULL;
 
 }
+
 TypeV_SourcePoint env_sourcemap_get(TypeV_ENV env, uint64_t ip){
     if(!env_sourcemap_has(env)) {
         return (TypeV_SourcePoint){.line = 0, .column = 0, .file = NULL};
@@ -87,8 +88,8 @@ TypeV_SourcePoint env_sourcemap_get(TypeV_ENV env, uint64_t ip){
     char file[1024] = {};
     uint64_t line = 0;
     uint64_t column = 0;
+    char func_name[1024] = {};
+    int found = get_source_map_line_content(env.sourceMapFile, ip, file, &line, &column, func_name);
 
-    int found = get_source_map_line_content(env.sourceMapFile, ip, file, &line, &column);
-
-    return (TypeV_SourcePoint){.line = line, .column = column, .file = strdup(file)};
+    return (TypeV_SourcePoint){.line = line, .column = column, .file = strdup(file), .func_name = strdup(func_name)};
 }
