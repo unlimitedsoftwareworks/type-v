@@ -38,9 +38,6 @@ void println_stdstring(TypeV_Core *core) {
     TypeV_Array* arr = typev_api_stack_pop_array(core);
     uint64_t length = typev_api_stack_pop_u64(core);
 
-    //printf("%.*s\n", length, arr->data);
-    //fwrite(arr->data, 1, length, stdout);
-    //fwrite("\n", 1, 1, stdout);
     printf("%.*s\n", length, arr->data);
 }
 
