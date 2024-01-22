@@ -351,8 +351,8 @@ static inline void s_set_offset_shadow(TypeV_Core* core){
     const uint8_t src_reg = core->codePtr[core->ip++];
     ASSERT(src_reg < MAX_REG, "Invalid register index");
 
-    const uint8_t field_source_index = core->codePtr[core->ip++];
     const uint8_t field_target_index = core->codePtr[core->ip++];
+    const uint8_t field_source_index = core->codePtr[core->ip++];
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[src_reg].ptr;
     ASSERT(struct_ptr->originalStruct != NULL, "Cannot set offset of shadow struct without original struct");
@@ -1848,17 +1848,119 @@ static inline void j_cmp_##name(TypeV_Core* core) {\
 }\
 
 
-OP_CMP(u8, uint8_t)
+//OP_CMP(u8, uint8_t)
+
+static inline void j_cmp_u8(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    uint8_t cmpType = core->codePtr[core->ip++];
+    size_t offset = typev_memcpy_u64(&core->codePtr[core->ip], 8);
+    core->ip += 8;
+    uint8_t v1 = core->regs[op1].u8;
+    uint8_t v2 = core->regs[op2].u8;
+    switch(cmpType) {
+        case 0:
+            if(v1 == v2) core->ip = offset;
+            break;
+        case 1:
+            if(v1 != v2) core->ip = offset;
+            break;
+        case 2:
+            if(v1 > v2) core->ip = offset;
+            break;
+        case 3:
+            if(v1 >= v2) core->ip = offset;
+            break;
+        case 4:
+            if(v1 < v2) core->ip = offset;
+            break;
+        case 5:
+            if(v1 <= v2) core->ip = offset;
+            break;
+        default:
+            CORE_ASSERT(0, "Invalid comparison type");\
+            exit(-1);
+    }
+}
+
 OP_CMP(i8, int8_t)
 OP_CMP(u16, uint16_t)
 OP_CMP(i16, int16_t)
-OP_CMP(u32, uint32_t)
+//OP_CMP(u32, uint32_t)
+
+static inline void j_cmp_u32(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    uint8_t cmpType = core->codePtr[core->ip++];
+    size_t offset = typev_memcpy_u64(&core->codePtr[core->ip], 8);
+    core->ip += 8;
+    uint32_t v1 = core->regs[op1].u32;
+    uint32_t v2 = core->regs[op2].u32;
+    switch(cmpType) {
+        case 0:
+            if(v1 == v2) core->ip = offset;
+            break;
+        case 1:
+            if(v1 != v2) core->ip = offset;
+            break;
+        case 2:
+            if(v1 > v2) core->ip = offset;
+            break;
+        case 3:
+            if(v1 >= v2) core->ip = offset;
+            break;
+        case 4:
+            if(v1 < v2) core->ip = offset;
+            break;
+        case 5:
+            if(v1 <= v2) core->ip = offset;
+            break;
+        default:
+            CORE_ASSERT(0, "Invalid comparison type");\
+            exit(-1);
+    }
+}
+
 OP_CMP(i32, int32_t)
 OP_CMP(u64, uint64_t)
 OP_CMP(i64, int64_t)
 OP_CMP(f32, float)
 OP_CMP(f64, double)
-OP_CMP(ptr, uintptr_t)
+//OP_CMP(ptr, uintptr_t)
+
+static inline void j_cmp_ptr(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    uint8_t cmpType = core->codePtr[core->ip++];
+    size_t offset = typev_memcpy_u64(&core->codePtr[core->ip], 8);
+    core->ip += 8;
+    uintptr_t v1 = core->regs[op1].ptr;
+    uintptr_t v2 = core->regs[op2].ptr;
+    switch(cmpType) {
+        case 0:
+            if(v1 == v2) core->ip = offset;
+            break;
+        case 1:
+            if(v1 != v2) core->ip = offset;
+            break;
+        case 2:
+            if(v1 > v2) core->ip = offset;
+            break;
+        case 3:
+            if(v1 >= v2) core->ip = offset;
+            break;
+        case 4:
+            if(v1 < v2) core->ip = offset;
+            break;
+        case 5:
+            if(v1 <= v2) core->ip = offset;
+            break;
+        default:
+            CORE_ASSERT(0, "Invalid comparison type");\
+            exit(-1);
+    }
+}
+
 #undef OP_CMP
 
 
