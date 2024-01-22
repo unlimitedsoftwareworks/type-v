@@ -387,7 +387,12 @@ void string_append_bool(TypeV_Core* core){
     uint32_t pos = typev_api_stack_pop_u32(core);
 
     char* bool_str = value?"true":"false";
-    int32_t gap = snprintf((char*)str->data+pos, 5, "%s", bool_str);
+
+    if(str->length < pos + 6){
+        core_array_extend(core, (size_t)str, pos+6);
+    }
+
+    int32_t gap = snprintf((char*)str->data+pos, 6, "%s", bool_str);
     if(gap < 0){
         core_panic(core, 1, "Failed to convert bool to string, snprintf returned %d\n", gap);
     }
