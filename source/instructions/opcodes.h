@@ -244,6 +244,11 @@ typedef enum TypeV_OpCode {
     OP_A_LEN,
 
     /**
+     * OP_A_SLICE dest: R, array: R, start: R, end: R
+     */
+    OP_A_SLICE,
+
+    /**
      * OP_A_STOREF_REG_[size] dest: R, index: R, source: R, byteSize: S
      * Stores [size] bytes from register src to field
      * index of array dest

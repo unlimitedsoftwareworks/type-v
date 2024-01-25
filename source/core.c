@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "engine.h"
 #include "core.h"
@@ -218,6 +219,18 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
     array_ptr->data = calloc(num_elements, element_size);
 
     return (size_t)array_ptr;
+}
+
+uintptr_t core_array_slice(TypeV_Array* array, uint64_t start, uint64_t end){
+    LOG_INFO("Slicing array %p from %d to %d", array, start, end);
+    TypeV_Array* array_ptr = (TypeV_Array*)calloc(1, sizeof(TypeV_Array));
+    array_ptr->elementSize = array->elementSize;
+    array_ptr->length = end-start;
+    array_ptr->data = malloc(array_ptr->length*array_ptr->elementSize);
+    // todo: maybe replace memcpy
+    memcpy(array_ptr->data, array->data+start*array_ptr->elementSize, array_ptr->length*array_ptr->elementSize);
+
+    return (uintptr_t)array_ptr;
 }
 
 size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){

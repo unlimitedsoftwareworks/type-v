@@ -943,6 +943,20 @@ static inline void a_len(TypeV_Core* core){
     core->regs[target].u64 = array->length;
 }
 
+static inline void a_slice(TypeV_Core* core){
+    const uint8_t target = core->codePtr[core->ip++];
+    const uint8_t source = core->codePtr[core->ip++];
+    const uint8_t start = core->codePtr[core->ip++];
+    const uint8_t end = core->codePtr[core->ip++];
+
+    TypeV_Array* array = (TypeV_Array*)core->regs[source].ptr;
+    uint64_t start_ = core->regs[start].u64;
+    uint64_t end_ = core->regs[end].u64;
+
+    size_t mem = core_array_slice(array, start_, end_);
+    core->regs[target].ptr = mem;
+}
+
 static inline void a_storef_reg(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     const uint8_t index = core->codePtr[core->ip++];

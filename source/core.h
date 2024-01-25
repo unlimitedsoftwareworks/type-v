@@ -327,6 +327,17 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t elem
 uintptr_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements);
 
 /**
+ * Slices an array, creating a shallow copy.
+ * the new array has an independent data block but still the content of the data
+ * block is copied from the original array.
+ * @param array
+ * @param start
+ * @param end
+ * @return
+ */
+uintptr_t core_array_slice(TypeV_Array* array, uint64_t start, uint64_t end);
+
+/**
  * Load a FFI library
  * @param core
  * @param namePointer
