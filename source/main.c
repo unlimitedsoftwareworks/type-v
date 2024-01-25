@@ -59,7 +59,7 @@ int main() {
 // Function prototypes
 uint8_t *readSegment(FILE *file, uint64_t offset, size_t size);
 
-uint32_t main(int argc, char **argv) {
+int main(int argc, char **argv) {
 
     char *filePath = "/Users/praisethemoon/projects/type-c/type-c/output/bin.tcv"; // Change to your file's path
     char *srcMapFile = "/Users/praisethemoon/projects/type-c/type-c/output/src_map.map.txt";
@@ -117,6 +117,7 @@ uint32_t main(int argc, char **argv) {
                    program.constPool, program.constPoolSize,
                    program.globalPool, program.globalPoolSize, 1024, 1024);
 
+
     engine_run(&engine);
 
     uint32_t exitCode = engine.mainCoreExitCode;
@@ -130,6 +131,8 @@ uint32_t main(int argc, char **argv) {
     //free(constantSegment);
     //free(globalSegment);
     //free(codeSegment);
+    
+    printf("done\n");
 
     return exitCode;
 }
