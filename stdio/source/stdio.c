@@ -13,16 +13,14 @@
 void stdio_print(TypeV_Core *core) {
     size_t ptr = typev_api_stack_pop_u64(core);
     TypeV_Array* arr = (TypeV_Array*)(ptr);
-    //fwrite(arr->data, 1, arr->length, stdout);
-    //fwrite(arr->data, 1, arr->length, stdout);
+
     printf("%.*s", arr->length, arr->data);
 }
 
 void stdio_println(TypeV_Core *core) {
     size_t ptr = typev_api_stack_pop_u64(core);
     TypeV_Array* arr = (TypeV_Array*)(ptr);
-    //fwrite(arr->data, 1, arr->length, stdout);
-    //fwrite("\n", 1, 1, stdout);
+
     printf("%.*s\n", arr->length, arr->data);
 }
 
@@ -30,7 +28,6 @@ void print_stdstring(TypeV_Core *core) {
     TypeV_Array* arr = typev_api_stack_pop_array(core);
     uint64_t length = typev_api_stack_pop_u64(core);
 
-    //fwrite(arr->data, 1, length, stdout);
     printf("%.*s", length, arr->data);
 }
 
@@ -44,6 +41,7 @@ void println_stdstring(TypeV_Core *core) {
 
 void stdio_print_u64(TypeV_Core *core) {
     uint64_t value = typev_api_stack_pop_u64(core);
+
     printf("%llu\n", value);
 }
 
