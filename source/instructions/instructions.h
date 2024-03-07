@@ -953,7 +953,7 @@ static inline void a_slice(TypeV_Core* core){
     uint64_t start_ = core->regs[start].u64;
     uint64_t end_ = core->regs[end].u64;
 
-    size_t mem = core_array_slice(array, start_, end_);
+    size_t mem = core_array_slice(core, array, start_, end_);
     core->regs[target].ptr = mem;
 }
 

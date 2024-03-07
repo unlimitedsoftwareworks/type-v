@@ -37,14 +37,6 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->regs = core->funcState->regs;
 
     // Initialize GC
-    core->memTracker.classes = NULL;
-    core->memTracker.classCount = 0;
-    core->memTracker.interfaces = NULL;
-    core->memTracker.interfaceCount = 0;
-    core->memTracker.structs = NULL;
-    core->memTracker.structCount = 0;
-    core->memTracker.arrays = NULL;
-    core->memTracker.arrayCount = 0;
     core->memTracker.memObjects = NULL;
     core->memTracker.memObjectCount = 0;
 
@@ -66,42 +58,7 @@ void core_deallocate(TypeV_Core *core) {
 
     queue_deallocate(&(core->messageInputQueue));
 
-    // free all memory objects
-    for(size_t i = 0; i < core->memTracker.classCount; i++){
-        free(core->memTracker.classes[i]);
-    }
-    if(core->memTracker.classes != NULL) {
-        free(core->memTracker.classes);
-    }
-
-    for(size_t i = 0; i < core->memTracker.interfaceCount; i++){
-        free(core->memTracker.interfaces[i]);
-    }
-    if(core->memTracker.interfaces != NULL) {
-        free(core->memTracker.interfaces);
-    }
-
-    for(size_t i = 0; i < core->memTracker.structCount; i++){
-        free(core->memTracker.structs[i]->fieldOffsets);
-        free(core->memTracker.structs[i]);
-    }
-    if(core->memTracker.structs != NULL) {
-        free(core->memTracker.structs);
-    }
-
-    for(size_t i = 0; i < core->memTracker.arrayCount; i++){
-        free(core->memTracker.arrays[i]);
-    }
-    if(core->memTracker.arrays != NULL) {
-        free(core->memTracker.arrays);
-    }
-
-    for(size_t i = 0; i < core->memTracker.memObjectCount; i++){
-        free(core->memTracker.memObjects[i]);
-    }
-    if(core->memTracker.memObjects != NULL) {
-        free(core->memTracker.memObjects);
-    }
+    // TODO: free mem objects
 
 
     // free stack
@@ -110,132 +67,155 @@ void core_deallocate(TypeV_Core *core) {
     // Note: Program deallocation depends on how programs are loaded and managed
 }
 
+void core_gc_track_alloc(TypeV_Core* core, void* object) {
+    core->memTracker.memObjects = realloc(core->memTracker.memObjects, sizeof(size_t)*(core->memTracker.memObjectCount+1));
+    core->memTracker.memObjects[core->memTracker.memObjectCount++] = object;
+}
+
+
 size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
-    /**
-     * Struct layout in type-v
-     * struct {offsets: uint16_t*, data: void* }
-     * offset is a pointer to the start of each field,
-     * data is a pointer to the start of the actual struct data.
-     *
-     * to get the value of a field, we need to address of the struct,
-     * lets say R16 contains this address
-     * ADD R16, R16, size_of_pointer // since the first field is pointer
-     * ADD R16, R16, offset_of_field // offset of the field we want to access
-     * the offset_of_field is fetched from the struct[offset[index]]
-     * where index is the field index.
-     */
-    // we want to data to have the following structure
     // [offset_pointer (size_t), data_block (totalsize)]
     LOG_INFO("CORE[%d]: Allocating struct with %d fields and %d bytes, total allocated size: %d", core->id, numfields, totalsize, sizeof(size_t)+totalsize);
-    TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof(TypeV_Struct)+totalsize);
+
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize;
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+
+    // Set header information
+    header->type = OT_STRUCT;
+    header->size = totalAllocationSize;
+
+    // Get a pointer to the actual struct, which comes after the header
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
     struct_ptr->originalStruct = NULL;
     struct_ptr->dataPointer = &struct_ptr->data;
 
-    // add to gc
-    core->memTracker.structs = realloc(core->memTracker.structs, sizeof(size_t)*(core->memTracker.structCount+1));
-    core->memTracker.structs[core->memTracker.structCount++] = struct_ptr;
+    core_gc_track_alloc(core, header);
+
     return (size_t)struct_ptr;
 }
-
 size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct) {
-    /**
-     * A shadow copy is a struct whos data segment points to another struct's data segment.
-     * A shadow copy has its own offset table
-     */
-
     TypeV_Struct* original = (TypeV_Struct*)originalStruct;
-    LOG_INFO("CORE[%d]: Allocating struct shadow of %p with %d fields, total allocated size: %d", core->id, (void*)originalStruct, numfields, 2*sizeof(size_t));
-    // we allocated 2 pointers, one for the offset table, and one for the data segment
-    TypeV_Struct* struct_ptr = (TypeV_Struct*)calloc(1, sizeof (TypeV_Struct));
-    struct_ptr->dataPointer = original->data;
-    struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
+    LOG_INFO("CORE[%d]: Allocating struct shadow of %p with %d fields", core->id, (void*)originalStruct, numfields);
+
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+
+    // Set header information
+    header->type = OT_STRUCT_SHADOW;  // Assuming you have an enum value for shadow structs
+    header->size = totalAllocationSize;
+
+    // Get a pointer to the actual struct, which comes after the header
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
+    struct_ptr->dataPointer = original->data;  // Point to original struct's data
+    struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));  // Allocate field offsets
     struct_ptr->originalStruct = original;
 
-    // add to gc
-    core->memTracker.structs = realloc(core->memTracker.structs, sizeof(size_t)*(core->memTracker.structCount+1));
-    core->memTracker.structs[core->memTracker.structCount++] = struct_ptr;
+    // Track the allocation with the GC
+    core_gc_track_alloc(core, header);
 
     return (size_t)struct_ptr;
 }
 
-
 size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {
-    LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, total allocated size: %d, uid: %d", core->id, num_methods, total_fields_size, (3*sizeof(size_t))+total_fields_size, classId);
-    TypeV_Class* class_ptr = (TypeV_Class*)calloc(1, sizeof(TypeV_Class)+total_fields_size);
-    class_ptr->num_methods = num_methods;
-    //class_ptr->methodsOffset = calloc(num_methods, sizeof(uint16_t));
-    class_ptr->uid = classId;
-    // class methods offset table is sequential, since class objects are primitive entities
-    // and cannot be a shadow copy of another class
-    /*for(size_t i = 0; i < num_methods; i++){
-        // TODO: Replace size_t with 8?
-        class_ptr->methodsOffset[i] = i*sizeof(uint16_t);
-    }*/
+    LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, uid: %d", core->id, num_methods, total_fields_size, classId);
 
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class) + total_fields_size;
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+
+    // Set header information
+    header->type = OT_CLASS;
+    header->size = totalAllocationSize;
+
+    // Get a pointer to the actual class, which comes after the header
+    TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
+    class_ptr->num_methods = num_methods;
+    class_ptr->uid = classId;
     class_ptr->methods = calloc(num_methods, sizeof(size_t));
 
-    // add to gc
-    core->memTracker.classes = realloc(core->memTracker.classes, sizeof(size_t)*(core->memTracker.classCount+1));
-    core->memTracker.classes[core->memTracker.classCount++] = class_ptr;
+    // Initialize other class fields here if needed
+
+    // Track the allocation with the GC
+    core_gc_track_alloc(core, header);
 
     return (size_t)class_ptr;
 }
 
-size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class * class_ptr){
-    LOG_INFO("CORE[%d]: Allocating interface from class %p with %d methods, total allocated size: %d from class %d", core->id, (size_t)num_methods, num_methods*sizeof(size_t), class_ptr->uid);
-    TypeV_Interface* interface_ptr = (TypeV_Interface*)calloc(1, sizeof(TypeV_Interface)+(sizeof(uint16_t)*num_methods));
+size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class *class_ptr) {
+    LOG_INFO("CORE[%d]: Allocating interface from class %p with %d methods", core->id, (void*)class_ptr, num_methods);
+
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Interface) + sizeof(uint16_t) * num_methods;
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    header->type = OT_INTERFACE;
+    header->size = totalAllocationSize;
+
+    TypeV_Interface* interface_ptr = (TypeV_Interface*)(header + 1);
     interface_ptr->classPtr = class_ptr;
 
-    // add to gc
-    core->memTracker.interfaces = realloc(core->memTracker.interfaces, sizeof(size_t)*(core->memTracker.interfaceCount+1));
-    core->memTracker.interfaces[core->memTracker.interfaceCount++] = interface_ptr;
-
+    core_gc_track_alloc(core, header);
     return (size_t)interface_ptr;
 }
 
-size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* interface_ptr){
-    LOG_INFO("CORE[%d]: Allocating interface from interface %p with %d methods, total allocated size: %d", core->id, (size_t)interface_ptr, num_methods*sizeof(size_t));
-    TypeV_Interface* interface_ptr_new = (TypeV_Interface*)calloc(1, sizeof(TypeV_Interface)+(sizeof(uint16_t)*num_methods));
-    interface_ptr_new->classPtr = interface_ptr_new->classPtr;
+size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* original_interface_ptr) {
+    LOG_INFO("CORE[%d]: Allocating interface from interface %p with %d methods", core->id, (void*)original_interface_ptr, num_methods);
 
-    // add to gc
-    core->memTracker.interfaces = realloc(core->memTracker.interfaces, sizeof(size_t)*(core->memTracker.interfaceCount+1));
-    core->memTracker.interfaces[core->memTracker.interfaceCount++] = interface_ptr_new;
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Interface) + sizeof(uint16_t) * num_methods;
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    header->type = OT_INTERFACE;
+    header->size = totalAllocationSize;
 
+    TypeV_Interface* interface_ptr_new = (TypeV_Interface*)(header + 1);
+    interface_ptr_new->classPtr = original_interface_ptr->classPtr;
+
+    core_gc_track_alloc(core, header);
     return (size_t)interface_ptr_new;
 }
 
 size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
-    LOG_INFO("CORE[%d]: Allocating array with %d elements of size %d, total allocated size: %d", core->id, num_elements, element_size, sizeof(size_t)+num_elements*element_size);
-    TypeV_Array* array_ptr = (TypeV_Array*)calloc(1, sizeof(TypeV_Array));
+    LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of size %d", core->id, num_elements, element_size);
 
-    // add to gc
-    core->memTracker.arrays = realloc(core->memTracker.arrays, sizeof(size_t)*(core->memTracker.arrayCount+1));
-    core->memTracker.arrays[core->memTracker.arrayCount++] = array_ptr;
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    header->type = OT_ARRAY;
+    header->size = totalAllocationSize;
 
+    TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
+    array_ptr->data = (uint8_t*)(array_ptr + 1); // Data starts right after the array structure
+
     array_ptr->data = calloc(num_elements, element_size);
 
+    core_gc_track_alloc(core, header);
     return (size_t)array_ptr;
 }
 
-uintptr_t core_array_slice(TypeV_Array* array, uint64_t start, uint64_t end){
-    LOG_INFO("Slicing array %p from %d to %d", array, start, end);
-    TypeV_Array* array_ptr = (TypeV_Array*)calloc(1, sizeof(TypeV_Array));
-    array_ptr->elementSize = array->elementSize;
-    array_ptr->length = end-start;
-    array_ptr->data = malloc(array_ptr->length*array_ptr->elementSize);
-    // todo: maybe replace memcpy
-    memcpy(array_ptr->data, array->data+start*array_ptr->elementSize, array_ptr->length*array_ptr->elementSize);
+uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start, uint64_t end){
+    LOG_INFO("Slicing array %p from %" PRIu64 " to %" PRIu64, array, start, end);
 
+    size_t slice_length = end - start;
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array) + slice_length * array->elementSize;
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    header->type = OT_ARRAY;
+    header->size = totalAllocationSize;
+
+    TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
+    array_ptr->elementSize = array->elementSize;
+    array_ptr->length = slice_length;
+    array_ptr->data = (uint8_t*)(array_ptr + 1);
+
+    memcpy(array_ptr->data, array->data + start * array->elementSize, slice_length * array->elementSize);
+
+    core_gc_track_alloc(core, header);
     return (uintptr_t)array_ptr;
 }
+
+
 
 size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
     LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated size: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
+
     array->data = realloc(array->data, num_elements*array->elementSize);
     array->length = num_elements;
     return array_ptr;

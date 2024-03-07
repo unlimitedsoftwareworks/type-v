@@ -147,18 +147,32 @@ typedef struct TypeV_GlobalPool {
  * references of the objects given.
  */
 typedef struct TypeV_GC {
-    TypeV_Class** classes;
-    uint64_t classCount;
-    TypeV_Interface** interfaces;
-    uint64_t interfaceCount;
-    TypeV_Struct** structs;
-    uint64_t structCount;
-    TypeV_Array ** arrays;
-    uint64_t arrayCount;
+    uint64_t totalAllocs;
+    uint64_t allocsSincePastGC;
     void** memObjects;
     uint64_t memObjectCount;
 }TypeV_GC;
 
+
+/**
+ * @brief Object Types, used to identify a the underlying structure of GC allocated memory
+ * object
+ */
+typedef enum {
+    OT_CLASS,
+    OT_PROCESS,
+    OT_INTERFACE,
+    OT_STRUCT,
+    OT_STRUCT_SHADOW,
+    OT_ARRAY,
+    OT_RAWMEM,
+}TypeV_ObjectType;
+
+
+typedef struct {
+    TypeV_ObjectType type;
+    size_t size;
+}TypeV_ObjectHeader;
 
 /**
  * @brief A function state is an object that holds the state of a function. Since function arguments are passed
@@ -179,6 +193,18 @@ typedef struct TypeV_FuncState {
     struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
     struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
 }TypeV_FuncState;
+
+/**
+ * @brief Closure, a closure is a function that has captured its environment.
+ * TODO: closures are still not implemented
+ */
+
+typedef struct TypeV_Closure {
+    void* fnPtr; ///< Function pointer
+    TypeV_Register* capturedRegs; ///< Captured registers
+    uint32_t envSize; ///< Environment size
+    uint32_t refCount; ///< Reference count
+}TypeV_Closure;
 
 /**
  * @brief Core structure, a core is the equivalent of a process in type-c.
@@ -209,8 +235,6 @@ typedef struct TypeV_Core {
     TypeV_Register* regs;                     ///< Registers, pointer to current function state registers for faster access.
     uint16_t* flags;                          ///< Flags, pointer to current function state flags for faster access.
     TypeV_FuncState* funcState;               ///< Function state
-
-
 }TypeV_Core;
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev);
@@ -335,7 +359,7 @@ uintptr_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_ele
  * @param end
  * @return
  */
-uintptr_t core_array_slice(TypeV_Array* array, uint64_t start, uint64_t end);
+uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start, uint64_t end);
 
 /**
  * Load a FFI library
@@ -451,5 +475,13 @@ typedef struct TypeV_FFI {
     const TypeV_FFIFunc* functions;///< FFI functions
     uint8_t functionCount;   ///< FFI function count
 }TypeV_FFI;
+
+/**
+ * @brief Adds the given object to the GC tracker, object must be a header+data block, i.e
+ * allocated using the available API core_*_alloc functions.
+ * @param core
+ * @param object
+ */
+void core_gc_track_alloc(TypeV_Core* core, void* object);
 
 #endif //TYPE_V_CORE_H
