@@ -675,17 +675,60 @@ typedef enum TypeV_OpCode {
     /**
      * OP_SPILL_ALLOC size: I (2 bytes)
      */
-    SPILL_ALLOC,
+    OP_SPILL_ALLOC,
 
     /**
      * OP_SPILL_REG: slot (2 bytes), source: R
      */
-    SPILL_REG,
+    OP_SPILL_REG,
 
     /**
      * OP_UNSPILL_ALLOC dest: R, slot: I (2 bytes)
      */
-    UNSPILL_REG,
+    OP_UNSPILL_REG,
+
+    /**
+     * OP_CLOSURE_ALLOC, dest:R, fn_address: R, env-size: I
+     * Allocates a closure, setting its function pointer to the address in
+     * function-address and preparing an environment of environment-size slots.
+     */
+    OP_CLOSURE_ALLOC,
+
+    /**
+     * OP_CAPTURE_VAR, closure: R, source-reg: R, env-slot: I
+     * Copies the value from the specified register in the current function
+     * state to the specified environment slot in the closure.
+     */
+    OP_CAPTURE_VAR,
+
+    /**
+     * OP_CLOSURE_CALL, closure: R
+     * Similar to OP_FN_RET, but includes additional logic to properly
+     * restore the previous function state's environment.
+     */
+    OP_CLOSURE_CALL,
+
+    /**
+     * OP_CLOSURE_RET
+     * Similar to OP_FN_RET, but includes additional logic to properly restore
+     * the previous function state's environment.
+     */
+    OP_CLOSURE_RET,
+
+    /**
+     * OP_SET_CLOSURE_ENV, closure: R
+     * Used to set up the function state's environment pointer to the environment
+     * of the specified closure.
+     */
+
+    OP_SET_CLOSURE_ENV,
+
+    /**
+     * OP_GET_CLOSURE_VAR, dest: R, closure: R, env-slot: I
+     * Retrieves a value from the specified slot in the closure's
+     * environment and stores it in the specified register.
+     */
+    OP_GET_CLOSURE_VAR,
 }TypeV_OpCode;
 
 #endif //TYPE_V_OPCODES_H
