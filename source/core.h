@@ -142,24 +142,13 @@ typedef struct TypeV_GlobalPool {
 #define FLAG_CHECK(flags, flag) ((flags) & (flag))
 #define WRITE_FLAG(flags, flag, value) ((value) ? ((flags) |= (flag)) : ((flags) &= ~(flag)))
 
-/**
- * @brief Future GC, right now it only holds
- * references of the objects given.
- */
-typedef struct TypeV_GC {
-    uint64_t totalAllocs;
-    uint64_t allocsSincePastGC;
-    void** memObjects;
-    uint64_t memObjectCount;
-}TypeV_GC;
-
 
 /**
  * @brief Object Types, used to identify a the underlying structure of GC allocated memory
  * object
  */
 typedef enum {
-    OT_CLASS,
+    OT_CLASS = 0,
     OT_PROCESS,
     OT_INTERFACE,
     OT_STRUCT,
@@ -172,7 +161,23 @@ typedef enum {
 typedef struct {
     TypeV_ObjectType type;
     size_t size;
+    uint8_t marked;
+    uint64_t ptrsCount;
+    void** ptrs;
 }TypeV_ObjectHeader;
+
+/**
+ * @brief Future GC, right now it only holds
+ * references of the objects given.
+ */
+typedef struct TypeV_GC {
+    void** memObjects;
+    uint64_t memObjectCount;
+    uint64_t memObjectCapacity;
+
+    uint64_t totalAllocs;
+    uint64_t allocsSincePastGC;
+}TypeV_GC;
 
 /**
  * @brief A function state is an object that holds the state of a function. Since function arguments are passed
@@ -190,6 +195,7 @@ typedef struct TypeV_FuncState {
     uint64_t ip;             ///< Instruction pointer, used only as back up
     TypeV_Register regs[MAX_REG]; ///< 256 registers.
     TypeV_Register* spillSlots; ///< Spill slots, used when registers are not enough
+    uint16_t spillSize; ///< Spill size
     struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
     struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
 }TypeV_FuncState;
@@ -201,9 +207,8 @@ typedef struct TypeV_FuncState {
 
 typedef struct TypeV_Closure {
     void* fnPtr; ///< Function pointer
-    TypeV_Register* capturedRegs; ///< Captured registers
+    TypeV_Register* upvalues; ///< Captured registers
     uint32_t envSize; ///< Environment size
-    uint32_t refCount; ///< Reference count
 }TypeV_Closure;
 
 /**
@@ -217,7 +222,7 @@ typedef struct TypeV_Core {
     TypeV_CoreState state;                    ///< Core state
 
     TypeV_IOMessageQueue messageInputQueue;   ///< Message input queue
-    TypeV_GC memTracker;                      ///< Future Garbage collector
+    TypeV_GC gc;                      ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
     TypeV_CoreSignal lastSignal;              ///< Last signal received
@@ -476,12 +481,27 @@ typedef struct TypeV_FFI {
     uint8_t functionCount;   ///< FFI function count
 }TypeV_FFI;
 
+
+
+void* core_gc_alloc(TypeV_Core* core, size_t size);
+
 /**
- * @brief Adds the given object to the GC tracker, object must be a header+data block, i.e
- * allocated using the available API core_*_alloc functions.
+ * @brief Updates the amount of allocations count of the GC tracker,
+ * this is used to trigger a GC
  * @param core
- * @param object
+ * @param mem
  */
-void core_gc_track_alloc(TypeV_Core* core, void* object);
+void core_gc_update_alloc(TypeV_Core* core, size_t mem);
+void core_gc_mark_object(TypeV_Core* core, TypeV_ObjectHeader * ptr);
+void core_gc_sweep(TypeV_Core* core);
+void core_gc_collect(TypeV_Core* core);
+void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state);
+
+void core_gc_update_struct_field(TypeV_Core* core, TypeV_Struct* structPtr, void* ptr, uint16_t fieldIndex);
+void core_gc_update_class_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex);
+void core_gc_update_process_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex);
+void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* ptr, uint64_t fieldIndex);
+TypeV_ObjectHeader* get_header_from_pointer(void* ptr);
+void core_gc_sweep_all(TypeV_Core* core);
 
 #endif //TYPE_V_CORE_H

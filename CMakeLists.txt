@@ -50,7 +50,7 @@ add_executable(
         source/env/env.h
         source/env/env.c
         source/vendor/cpu_info/cpu_info.h
-        )
+)
 
 add_dependencies(type_v stdio string stdcore)
 target_link_libraries(type_v stdio string stdcore)

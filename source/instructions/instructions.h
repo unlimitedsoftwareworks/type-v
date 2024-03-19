@@ -369,6 +369,7 @@ static inline void s_loadf(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
+    TypeV_ObjectHeader *header = (TypeV_ObjectHeader *)core->regs[source].ptr;
     typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[field_index], byteSize);
 }
 
@@ -550,6 +551,7 @@ static inline void s_storef_reg_ptr(TypeV_Core* core){
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
     typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[field_index], &core->regs[source], 8);
+    core_gc_update_struct_field(core, struct_ptr, (void*)core->regs[source].ptr, field_index);
 }
 
 
@@ -582,7 +584,7 @@ static inline void c_storem(TypeV_Core* core){
     core->ip += 8;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[dest_reg].ptr;
-    LOG_INFO("Storing method %d at methd_address %d in class %p", method_index, methd_address, (static inline void*)c);
+    LOG_INFO("Storing method %d at method_address %d in class %p", method_index, methd_address, (void*)c);
     c->methods[method_index] = methd_address;
 }
 
@@ -593,7 +595,7 @@ static inline void c_loadm(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
 
-    LOG_INFO("Loading method %d from class %p", method_index, (static inline void*)c);
+    LOG_INFO("Loading method %d from class %p", method_index, (void*)c);
 
     size_t offset = c->methods[method_index];
     core->regs[target].ptr = offset;
@@ -668,6 +670,8 @@ static inline void c_storef_reg_ptr(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
     typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source].ptr, PTR_SIZE);
+
+    core_gc_update_class_field(core, c, (void*)core->regs[source].ptr, field_offset);
 }
 
 static inline void c_storef_const(TypeV_Core* core) {
@@ -1023,6 +1027,7 @@ static inline void a_storef_reg_ptr(TypeV_Core* core){
         core_panic(core, 1, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
     }
     typev_memcpy_u64_ptr(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source], PTR_SIZE);
+    core_gc_update_array_field(core, array, (void*)core->regs[source].ptr, core->regs[index].u64);
 }
 
 static inline void a_storef_const(TypeV_Core* core){
@@ -2256,6 +2261,8 @@ static inline void halt(TypeV_Core* core) {
     ASSERT(code_reg < MAX_REG, "Invalid register index");
 
     uint32_t code = core->regs[code_reg].u32;
+
+    core_gc_sweep_all(core);
 
     exit(code);
 }

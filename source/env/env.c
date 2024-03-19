@@ -19,7 +19,6 @@
 #include <limits.h>
 
 
-char buffer[PATH_MAX];
 
 
 static TypeV_ENV env= {
@@ -40,7 +39,9 @@ void typev_env_init(char* sourceMapFile){
     char *cwd;
      // PATH_MAX is defined in limits.h
 
-    cwd = getcwd(buffer, PATH_MAX);
+    char buffer[4096];
+
+    cwd = getcwd(buffer, 4096);
     if (cwd == NULL) {
         perror("getcwd() error");
         exit(-1);
