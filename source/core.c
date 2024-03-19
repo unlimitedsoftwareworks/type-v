@@ -24,6 +24,7 @@ TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     state->next = NULL;
     state->flags = 0;
     state->spillSlots = malloc(sizeof(TypeV_Register));
+    state->spillSize = 1;
 
     return state;
 }
@@ -37,8 +38,12 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->regs = core->funcState->regs;
 
     // Initialize GC
-    core->memTracker.memObjects = NULL;
-    core->memTracker.memObjectCount = 0;
+    core->gc.memObjectCapacity = 2000;
+    core->gc.memObjectCount = 0;
+    core->gc.memObjects = malloc(sizeof(void*)*core->gc.memObjectCapacity);
+    core->gc.allocsSincePastGC = 0;
+    core->gc.totalAllocs = 0;
+
 
     core->engineRef = engineRef;
     core->lastSignal = CSIG_NONE;
@@ -67,9 +72,244 @@ void core_deallocate(TypeV_Core *core) {
     // Note: Program deallocation depends on how programs are loaded and managed
 }
 
-void core_gc_track_alloc(TypeV_Core* core, void* object) {
-    core->memTracker.memObjects = realloc(core->memTracker.memObjects, sizeof(size_t)*(core->memTracker.memObjectCount+1));
-    core->memTracker.memObjects[core->memTracker.memObjectCount++] = object;
+
+void* core_gc_alloc(TypeV_Core* core, size_t size) {
+    if (core->gc.allocsSincePastGC > 2) {
+        core_gc_collect(core);
+        core->gc.allocsSincePastGC = 0;
+    }
+
+    if(core->gc.memObjectCount >= core->gc.memObjectCapacity) {
+        core->gc.memObjectCapacity *= 2;
+        core->gc.memObjects = realloc(core->gc.memObjects, sizeof(size_t)*(core->gc.memObjectCapacity));
+    }
+    void* mem = malloc(size);
+    core->gc.memObjects[core->gc.memObjectCount++] = mem;
+
+    return mem;
+}
+
+void core_gc_update_alloc(TypeV_Core* core, size_t mem) {
+    core->gc.allocsSincePastGC += mem;
+    core->gc.totalAllocs += mem;
+
+}
+
+TypeV_ObjectHeader* get_header_from_pointer(void* objectPtr) {
+    if (objectPtr == NULL) {
+        return NULL;
+    }
+
+    // The header is just before the object memory in the allocation.
+
+    return (TypeV_ObjectHeader*)((char*)objectPtr - sizeof(TypeV_ObjectHeader));
+}
+
+
+uint64_t core_gc_is_valid_ptr(TypeV_Core* core, uintptr_t ptr) {
+    uintptr_t headerPtr = (uintptr_t) get_header_from_pointer((void*)ptr);
+    if (!ptr) {
+        return 0; // Null pointer
+    }
+    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
+        uintptr_t objPtr = (uintptr_t)(core->gc.memObjects[i]);
+
+        if (objPtr == headerPtr) {
+            return i+1; // Found a matching pointer
+        }
+    }
+    return 0; // No matching pointer found
+}
+
+
+
+void core_gc_mark_object(TypeV_Core* core, TypeV_ObjectHeader* header) {
+    if (header == NULL){ // || (header->marked == 1)) { causes fault
+        return;  // Already marked, or null
+    }
+
+    // Mark this object
+    header->marked = 1;
+
+    // Now mark the objects this one points to
+    for (size_t i = 0; i < header->ptrsCount; i++) {
+        void* pointedObject = header->ptrs[i];
+        uint64_t idx = core_gc_is_valid_ptr(core, (uintptr_t)pointedObject);
+        if (idx) {
+            TypeV_ObjectHeader* pointedHeader = get_header_from_pointer(pointedObject);
+            core_gc_mark_object(core, pointedHeader);
+        }
+    }
+}
+
+void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
+    for(size_t i = 0; i < header->ptrsCount; i++) {
+        void* ptr = header->ptrs[i];
+        uint64_t idx = core_gc_is_valid_ptr(core, (uintptr_t)ptr);
+        if(idx) {
+            TypeV_ObjectHeader* pointedHeader = get_header_from_pointer(ptr);
+            core_gc_free_header(core, pointedHeader);
+            core->gc.memObjects[idx-1] = NULL;
+            header->ptrs[i] = NULL;
+        }
+    }
+
+    switch(header->type) {
+        case OT_STRUCT: {
+            TypeV_Struct* s = (TypeV_Struct*)(header + 1);
+            //free(s->fieldOffsets);
+
+            break;
+        }
+        case OT_STRUCT_SHADOW: {
+            TypeV_Struct *s = (TypeV_Struct *) (header + 1);
+            //free(s->fieldOffsets);
+
+            break;
+        }
+        case OT_CLASS: {
+            TypeV_Class* c = (TypeV_Class *)(header + 1);
+            //free(c->methods);
+            break;
+        }
+        case OT_INTERFACE: {
+            TypeV_Interface* i = (TypeV_Interface*)(header + 1);
+            break;
+        }
+        case OT_ARRAY: {
+            TypeV_Array* a = (TypeV_Array*)(header + 1);
+            //free(a->data);
+            break;
+        }
+        case OT_PROCESS:
+        case OT_RAWMEM:
+            break;
+    }
+
+    // Free the object
+    //free(header);
+}
+
+void core_gc_sweep(TypeV_Core* core) {
+    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
+        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
+        if (header && !header->marked) {
+            core_gc_free_header(core, header);
+            header = NULL;
+            core->gc.memObjects[i] = NULL;  // Clear the tracker entry
+        }
+    }
+
+    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
+        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
+        if (header) {
+            header->marked = 0;
+        }
+    }
+}
+
+void core_gc_collect(TypeV_Core* core) {
+    LOG_INFO("Collecting state for core %d", core->id);
+    core_gc_collect_state(core, core->funcState);
+}
+
+void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
+    // iterate through the registers
+    for (size_t i = 0; i < MAX_REG; i++) {
+        uintptr_t ptr = state->regs[i].ptr;
+        if(core_gc_is_valid_ptr(core, ptr)) {
+            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
+            //if(header->marked == 0) {
+            core_gc_mark_object(core, header);
+
+            // Mark original struct if shadow struct
+            if(header->type == OT_STRUCT_SHADOW) {
+                TypeV_Struct* structPtr = (TypeV_Struct*)(header + 1);
+                if(structPtr->originalStruct != NULL) {
+                    TypeV_ObjectHeader* originalHeader = get_header_from_pointer(structPtr->originalStruct);
+                    core_gc_mark_object(core, originalHeader);
+                }
+            }
+            // mark original class if interface
+            if(header->type == OT_INTERFACE) {
+                TypeV_Interface* interfacePtr = (TypeV_Interface*)(header + 1);
+                TypeV_ObjectHeader* classHeader = get_header_from_pointer(interfacePtr->classPtr);
+                core_gc_mark_object(core, classHeader);
+            }
+        }
+    }
+
+    for(size_t i = 0; i < state->spillSize; i++) {
+        uintptr_t ptr = state->spillSlots[i].ptr;
+        if(core_gc_is_valid_ptr(core, ptr)) {
+            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
+            //if(header->marked == 0) {
+                core_gc_mark_object(core, header);
+            //}
+        }
+    }
+
+    // if previous state exists, collect it
+    if(state->prev != NULL) {
+        core_gc_collect_state(core, state->prev);
+    }
+    else {
+        core_gc_sweep(core);
+    }
+}
+
+void core_gc_sweep_all(TypeV_Core* core){
+    for(size_t i = 0; i < core->gc.memObjectCount; i++) {
+        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
+        if(header) {
+            core_gc_free_header(core, header);
+            core->gc.memObjects[i] = NULL;
+        }
+    }
+    core->gc.memObjectCount = 0;
+}
+
+
+void core_gc_update_struct_field(TypeV_Core* core, TypeV_Struct* structPtr, void* ptr, uint16_t fieldIndex) {
+    if (fieldIndex >= 255) {
+        // Handle error: fieldIndex is out of bounds
+        return;
+    }
+
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)((char*)structPtr - sizeof(TypeV_ObjectHeader));
+    header->ptrs[fieldIndex] = ptr;
+}
+
+void core_gc_update_class_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex) {
+    if (fieldIndex >= 255) {
+        // Handle error: fieldIndex is out of bounds
+        return;
+    }
+
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)((char*)classPtr - sizeof(TypeV_ObjectHeader));
+    header->ptrs[fieldIndex] = ptr;
+}
+
+void core_gc_update_process_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex) {
+    // TODO: Implement
+    // throw an error
+    fprintf(stderr, "Not implemented yet\n");
+    exit(-1);
+}
+
+void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* ptr, uint64_t fieldIndex) {
+    if (fieldIndex >= arrayPtr->length) {
+        // Handle error: fieldIndex is out of bounds
+        return;
+    }
+
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)((char*)arrayPtr - sizeof(TypeV_ObjectHeader));
+    if (fieldIndex >= header->ptrsCount) {
+        // Handle dynamic resizing of ptrs array if needed
+        return;
+    }
+
+    header->ptrs[fieldIndex] = ptr;
 }
 
 
@@ -78,11 +318,14 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     LOG_INFO("CORE[%d]: Allocating struct with %d fields and %d bytes, total allocated size: %d", core->id, numfields, totalsize, sizeof(size_t)+totalsize);
 
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
 
     // Set header information
+    header->marked = 0;
     header->type = OT_STRUCT;
     header->size = totalAllocationSize;
+    header->ptrsCount = numfields;
+    header->ptrs = calloc(numfields, sizeof(void*));
 
     // Get a pointer to the actual struct, which comes after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
@@ -90,20 +333,24 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     struct_ptr->originalStruct = NULL;
     struct_ptr->dataPointer = &struct_ptr->data;
 
-    core_gc_track_alloc(core, header);
+    core_gc_update_alloc(core, totalAllocationSize);
 
     return (size_t)struct_ptr;
 }
+
 size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct) {
     TypeV_Struct* original = (TypeV_Struct*)originalStruct;
     LOG_INFO("CORE[%d]: Allocating struct shadow of %p with %d fields", core->id, (void*)originalStruct, numfields);
 
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
 
     // Set header information
+    header->marked = 0;
     header->type = OT_STRUCT_SHADOW;  // Assuming you have an enum value for shadow structs
     header->size = totalAllocationSize;
+    header->ptrsCount = numfields;
+    header->ptrs = calloc(numfields, sizeof(void*));
 
     // Get a pointer to the actual struct, which comes after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
@@ -112,7 +359,7 @@ size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t orig
     struct_ptr->originalStruct = original;
 
     // Track the allocation with the GC
-    core_gc_track_alloc(core, header);
+    core_gc_update_alloc(core, totalAllocationSize);
 
     return (size_t)struct_ptr;
 }
@@ -121,11 +368,14 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
     LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, uid: %d", core->id, num_methods, total_fields_size, classId);
 
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class) + total_fields_size;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
 
     // Set header information
+    header->marked = 0;
     header->type = OT_CLASS;
     header->size = totalAllocationSize;
+    header->ptrsCount = total_fields_size; // assume worse case, 1 pointer per byte
+    header->ptrs = calloc(total_fields_size, sizeof(void*));
 
     // Get a pointer to the actual class, which comes after the header
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
@@ -136,7 +386,7 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
     // Initialize other class fields here if needed
 
     // Track the allocation with the GC
-    core_gc_track_alloc(core, header);
+    core_gc_update_alloc(core, totalAllocationSize);
 
     return (size_t)class_ptr;
 }
@@ -145,14 +395,16 @@ size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class *
     LOG_INFO("CORE[%d]: Allocating interface from class %p with %d methods", core->id, (void*)class_ptr, num_methods);
 
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Interface) + sizeof(uint16_t) * num_methods;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    header->marked = 0;
     header->type = OT_INTERFACE;
     header->size = totalAllocationSize;
 
     TypeV_Interface* interface_ptr = (TypeV_Interface*)(header + 1);
     interface_ptr->classPtr = class_ptr;
 
-    core_gc_track_alloc(core, header);
+    core_gc_update_alloc(core, totalAllocationSize);
+
     return (size_t)interface_ptr;
 }
 
@@ -160,14 +412,16 @@ size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Inter
     LOG_INFO("CORE[%d]: Allocating interface from interface %p with %d methods", core->id, (void*)original_interface_ptr, num_methods);
 
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Interface) + sizeof(uint16_t) * num_methods;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    header->marked = 0;
     header->type = OT_INTERFACE;
     header->size = totalAllocationSize;
 
     TypeV_Interface* interface_ptr_new = (TypeV_Interface*)(header + 1);
     interface_ptr_new->classPtr = original_interface_ptr->classPtr;
 
-    core_gc_track_alloc(core, header);
+    core_gc_update_alloc(core, totalAllocationSize);
+
     return (size_t)interface_ptr_new;
 }
 
@@ -175,9 +429,13 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
     LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of size %d", core->id, num_elements, element_size);
 
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    header->marked = 0;
     header->type = OT_ARRAY;
     header->size = totalAllocationSize;
+    // we could extend bytecode to separate pointer arrays from data arrays
+    header->ptrsCount = num_elements;
+    header->ptrs = calloc(num_elements, sizeof(void*));
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = element_size;
@@ -186,7 +444,8 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
 
     array_ptr->data = calloc(num_elements, element_size);
 
-    core_gc_track_alloc(core, header);
+    core_gc_update_alloc(core, totalAllocationSize);
+
     return (size_t)array_ptr;
 }
 
@@ -195,9 +454,13 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
 
     size_t slice_length = end - start;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array) + slice_length * array->elementSize;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)calloc(1, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    header->marked = 0;
     header->type = OT_ARRAY;
     header->size = totalAllocationSize;
+
+    header->ptrsCount = slice_length;
+    header->ptrs = calloc(slice_length, sizeof(void*));
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = array->elementSize;
@@ -206,18 +469,24 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
 
     memcpy(array_ptr->data, array->data + start * array->elementSize, slice_length * array->elementSize);
 
-    core_gc_track_alloc(core, header);
+    core_gc_update_alloc(core, totalAllocationSize);
+
     return (uintptr_t)array_ptr;
 }
-
-
 
 size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
     LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated size: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
 
+    TypeV_ObjectHeader* header = get_header_from_pointer(array);
+    header->size += num_elements * array->elementSize;
+
+    header->ptrsCount = num_elements;
+    header->ptrs = realloc(header->ptrs, num_elements* sizeof(void*));
+
     array->data = realloc(array->data, num_elements*array->elementSize);
     array->length = num_elements;
+
     return array_ptr;
 }
 
@@ -240,13 +509,7 @@ void core_ffi_close(TypeV_Core* core, size_t libHandle){
 
 size_t core_mem_alloc(TypeV_Core* core, size_t size) {
     LOG_INFO("CORE[%d]: Allocating %d bytes", core->id, size);
-    void* mem =  calloc(1, size);
-
-    // add mem to tracker
-    core->memTracker.memObjects = realloc(core->memTracker.memObjects, sizeof(size_t)*(core->memTracker.memObjectCount+1));
-    core->memTracker.memObjects[core->memTracker.memObjectCount++] = mem;
-
-    return (size_t)mem;
+    return (size_t)core_gc_alloc(core, size);
 }
 
 void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message) {
@@ -373,4 +636,5 @@ void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
 
 void core_spill_alloc(TypeV_Core* core, uint16_t size) {
     core->funcState->spillSlots = realloc(core->funcState->spillSlots, sizeof(TypeV_Register)*(size));
+    core->funcState->spillSize = size;
 }
