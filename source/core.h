@@ -10,7 +10,6 @@
 #define TYPE_V_CORE_H
 
 #include <stdint.h>
-#include "queue/queue.h"
 
 #define PTR_SIZE 8
 #define MAX_REG 256
@@ -82,12 +81,10 @@ typedef union {
 typedef enum {
     CS_INITIALIZED = 0,   ///< Initialized state
     CS_HALTED = 1,        ///< Halted as the VM is running another core, or process
-    CS_AWAITING_QUEUE,    ///< Process is awaiting for a queue
-    CS_AWAITING_PROMISE,  ///< Process is awaiting for a promise
     CS_RUNNING,           ///< Process is Running
     CS_FINISHING,         ///< Process has received terminate signal and is no longer accepting messages
     CS_TERMINATED,        ///< Process has been gracefully terminated
-    CS_KILLED   ,          ///< Process has been killed
+    CS_KILLED,          ///< Process has been killed
     CS_CRASHED            ///< Process has crashed
 }TypeV_CoreState;
 
@@ -221,7 +218,6 @@ typedef struct TypeV_Core {
     uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
 
-    TypeV_IOMessageQueue messageInputQueue;   ///< Message input queue
     TypeV_GC gc;                      ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
@@ -279,19 +275,6 @@ void core_resume(TypeV_Core *core);
  * @param core
  */
 void core_halt(TypeV_Core *core);
-
-/**
- * Sets core to await for a queue
- * @param core
- */
-void core_queue_await(TypeV_Core* core);
-
-/**
- * Awakes process
- * @param core
- */
-void core_queue_resolve(TypeV_Core* core);
-
 
 /**
  * Allocates a struct object
@@ -396,74 +379,6 @@ uintptr_t core_mem_alloc(TypeV_Core* core, size_t size);
  * @param value
  */
 void core_update_flags(TypeV_Core *core, uint64_t value);
-
-void core_process_alloc(TypeV_Core* core, uint64_t ip);
-
-
-/**
- * Sends a message to the core's queue
- * @param core
- * @param message
- */
-void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message);
-
-/**
- * Handles the reception of a signal
- * @param core
- * @param signal
- */
-void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal);
-
-/**
- * Allocates a new lock
- * @param core
- * @return
- */
-TypeV_Lock* core_lock_alloc(TypeV_Core* core, size_t value);
-
-/**
- * Acquires a lock
- * @param core
- * @param lock
- */
-void core_lock_acquire(TypeV_Core* core, TypeV_Lock* lock);
-
-/**
- * Releases a lock
- * @param core
- * @param lock
- */
-void core_lock_release(TypeV_Core* core, TypeV_Lock* lock);
-
-
-/**
- * Allocates new core
- * @param core
- * @return
- */
-TypeV_Promise* core_promise_alloc(TypeV_Core* core);
-
-/**
- * Resolves a promise
- * @param core
- * @param promise
- * @param value
- */
-void core_promise_resolve(TypeV_Core* core, TypeV_Promise* promise, size_t value);
-
-/**
- * Halts the core to await a promise
- * @param core
- * @param promise
- */
-void core_promise_await(TypeV_Core* core, TypeV_Promise* promise);
-
-/**
- * Checks if the core's waiting promise has been resolved
- * and can be resumed
- * @param core
- */
-void core_promise_check_resume(TypeV_Core* core);
 
 /**
  * Throws an error and terminates the core

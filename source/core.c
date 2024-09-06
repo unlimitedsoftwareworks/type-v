@@ -9,7 +9,6 @@
 
 #include "engine.h"
 #include "core.h"
-#include "queue/queue.h"
 #include "utils/log.h"
 #include "stack/stack.h"
 #include "dynlib/dynlib.h"
@@ -61,7 +60,6 @@ void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constan
 void core_deallocate(TypeV_Core *core) {
     stack_free(core);
 
-    queue_deallocate(&(core->messageInputQueue));
 
     // TODO: free mem objects
 
@@ -512,98 +510,12 @@ size_t core_mem_alloc(TypeV_Core* core, size_t size) {
     return (size_t)core_gc_alloc(core, size);
 }
 
-void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message) {
-    queue_enqueue(&(core->messageInputQueue), message);
-    core_queue_resolve(core);
-}
-
 void core_resume(TypeV_Core* core) {
     core->state = CS_RUNNING;
 }
 
 void core_halt(TypeV_Core* core) {
     core->state = CS_HALTED;
-}
-
-void core_queue_await(TypeV_Core* core) {
-    core->state = CS_AWAITING_QUEUE;
-}
-
-void core_queue_resolve(TypeV_Core* core) {
-    core->state = CS_RUNNING;
-}
-
-void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal) {
-    LOG_WARN("CORE[%d]: Received signal %s", core->id, signal == CSIG_KILL ? "KILL" : (signal == CSIG_TERMINATE ? "TERMINATE" : "NONE"));
-    if(signal == CSIG_NONE) {return;}
-    if(signal == CSIG_KILL) {
-        core->lastSignal = CSIG_KILL;
-    }
-    if(signal == CSIG_TERMINATE){
-        core->lastSignal = CSIG_TERMINATE;
-    }
-}
-
-
-TypeV_Promise* core_promise_alloc(TypeV_Core* core) {
-    static size_t promiseId = 0;
-    TypeV_Promise* promise = calloc(1, sizeof(TypeV_Promise));
-    promise->resolved = 0;
-    promise->value = 0;
-    promise->id  = promiseId++;
-    return promise;
-}
-
-void core_promise_resolve(TypeV_Core* core, TypeV_Promise* promise, size_t value) {
-    LOG_INFO("CORE[%d]: Resolving promise", core->id);
-    promise->resolved = 1;
-    promise->value = value;
-}
-
-void core_promise_await(TypeV_Core* core, TypeV_Promise* promise) {
-    LOG_INFO("CORE[%d]: Awaiting promise %d", core->id, promise->id);
-    core->state = CS_AWAITING_PROMISE;
-    core->awaitingPromise = promise;
-}
-
-void core_promise_check_resume(TypeV_Core* core) {
-    if(core->state == CS_AWAITING_PROMISE && core->awaitingPromise->resolved) {
-        LOG_INFO("CORE[%d]: Resuming from promise %d", core->id, core->awaitingPromise->id);
-        core->state = CS_RUNNING;
-    }
-}
-
-
-TypeV_Lock* core_lock_alloc(TypeV_Core* core, size_t value){
-    TypeV_Lock* lock = calloc(1, sizeof(TypeV_Lock));
-    lock->locked = 0;
-    lock->holder = 0;
-    lock->value = value;
-    lock->promise = core_promise_alloc(core);
-    return lock;
-}
-
-void core_lock_acquire(TypeV_Core* core, TypeV_Lock* lock) {
-    //ASSERT(lock->locked == 0, "Lock %p is already locked", lock->id);
-    if(lock->locked == 1) {
-        LOG_INFO("CORE[%d]: Lock %p is already locked, awaiting", core->id, lock->id);
-        core_promise_await(core, lock->promise);
-        return;
-    }
-    lock->locked = 1;
-    lock->holder = core->id;
-    // set promise
-    lock->promise = core_promise_alloc(core);
-}
-
-void core_lock_release(TypeV_Core* core, TypeV_Lock* lock) {
-    ASSERT(lock->holder == core->id, "Lock %p is not held by core %d", lock->id, core->id);
-    lock->locked = 0;
-    lock->holder = 0;
-    // reset promise
-    // TODO: request GC cleanup?
-    core_promise_resolve(core, lock->promise, lock->value);
-    lock->promise = NULL;
 }
 
 void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {

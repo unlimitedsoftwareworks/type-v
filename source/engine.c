@@ -262,22 +262,6 @@ static void* dispatch_table[] = { \
     &&DO_LD_FFI, \
     &&DO_CALL_FFI, \
     &&DO_CLOSE_FFI, \
-    &&DO_P_ALLOC, \
-    &&DO_P_DEQUEUE, \
-    &&DO_P_QUEUE_SIZE, \
-    &&DO_P_EMIT, \
-    &&DO_P_WAIT_QUEUE, \
-    &&DO_P_SEND_SIG, \
-    &&DO_P_ID, \
-    &&DO_P_CID, \
-    &&DO_P_STATE, \
-    &&DO_PROMISE_ALLOC, \
-    &&DO_PROMISE_RESOLVE, \
-    &&DO_PROMISE_AWAIT, \
-    &&DO_PROMISE_DATA, \
-    &&DO_LOCK_ALLOC, \
-    &&DO_LOCK_ACQUIRE, \
-    &&DO_LOCK_RELEASE, \
     &&DO_DEBUG_REG, \
     &&DO_HALT, \
     &&DO_LOAD_STD, \
@@ -294,25 +278,11 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         core_resume(core);
     }
 
-    if((core->state == CS_AWAITING_QUEUE) && (core->lastSignal == CSIG_TERMINATE)){
-        LOG_INFO("Core[%d] Gracefully terminated", iter->core->id);
-        engine_detach_core(engine, core);
-        return;
-    }
-
     if(core->state == CS_CRASHED){
         LOG_INFO("Core[%d] Crashed");
         engine_detach_core(engine, core);
         return;
     }
-
-    if(core->state == CS_AWAITING_PROMISE) {
-        core_promise_check_resume(core);
-        if(core->state == CS_AWAITING_PROMISE) {
-            LOG_WARN("Core[%d] is awaiting promise %d, skipping run", iter->core->id, core->awaitingPromise->id);
-        }
-    }
-
     while(1){
 
         DISPATCH_TABLE
@@ -888,54 +858,8 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_CLOSE_FFI:
             close_ffi(core);
             DISPATCH();
-        DO_P_ALLOC:
-            p_alloc(core);
-            DISPATCH();
-        DO_P_DEQUEUE:
-            p_dequeue(core);
-            DISPATCH();
-        DO_P_QUEUE_SIZE:
-            p_queue_size(core);
-            DISPATCH();
-        DO_P_EMIT:
-            p_emit(core);
-            DISPATCH();
-        DO_P_WAIT_QUEUE:
-            p_wait_queue(core);
-            DISPATCH();
-        DO_P_SEND_SIG:
-            p_send_sig(core);
-            DISPATCH();
-        DO_P_ID:
-            p_id(core);
-            DISPATCH();
-        DO_P_CID:
-            p_cid(core);
-            DISPATCH();
-        DO_P_STATE:
-            p_state(core);
-            DISPATCH();
-        DO_PROMISE_ALLOC:
-            promise_alloc(core);
-            DISPATCH();
-        DO_PROMISE_RESOLVE:
-            promise_resolve(core);
-            DISPATCH();
-        DO_PROMISE_AWAIT:
-            promise_await(core);
-            DISPATCH();
-        DO_PROMISE_DATA:
-            promise_data(core);
-            DISPATCH();
-        DO_LOCK_ALLOC:
-            lock_alloc(core);
-            DISPATCH();
-        DO_LOCK_ACQUIRE:
-            lock_acquire(core);
-            DISPATCH();
-        DO_LOCK_RELEASE:
-            lock_release(core);
-            DISPATCH();
+
+
         DO_DEBUG_REG:
             debug_reg(core);
             DISPATCH();

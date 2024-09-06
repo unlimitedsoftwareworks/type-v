@@ -14,7 +14,6 @@ set(typev_files
         ../source/stack/stack.c
         ../source/dynlib/dynlib.c
         ../source/env/env.c
-        ../source/queue/queue.c
         ../source/api/typev_api.c
         ../source/utils/utils.c
 )

@@ -238,24 +238,6 @@ static op_func op_funcs[] = {
         &call_ffi,
         &close_ffi,
 
-        &p_alloc,
-        &p_dequeue,
-        &p_queue_size,
-        &p_emit,
-        &p_wait_queue,
-        &p_send_sig,
-        &p_id,
-        &p_cid,
-        &p_state,
-
-        &promise_alloc,
-        &promise_resolve,
-        &promise_await,
-        &promise_data,
-
-        &lock_alloc,
-        &lock_acquire,
-        &lock_release,
 
         &debug_reg,
         &halt,

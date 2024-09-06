@@ -541,117 +541,6 @@ typedef enum TypeV_OpCode {
 
     OP_CLOSE_FFI,
 
-    /**
-     * OP_P_ALLOC dest: R, initfn-offset-size: Z, initfn-offset: I
-     * Allocates a new process, storing its address in R
-     * and calls the init function at the given offset
-     */
-    OP_P_ALLOC,
-
-
-    /**
-     * OP_P_DEQUEUE dest: R, promise: Rm
-     * gets a message from the current process message queue,
-     * stores the message in dest and the address of the promise
-     * in the given register
-     */
-    OP_P_DEQUEUE,
-
-    /**
-     * OP_P_QUEUE_SIZE dest: R,
-     */
-    OP_P_QUEUE_SIZE,
-
-    /**
-     * OP_P_EMIT targetProcess: Rm, data: Rm, Promise: Rm
-     * Emits data from the current process to the target
-     * process message queue. Rm stores the address of the
-     * allocated promise
-     */
-    OP_P_EMIT,
-
-
-    /**
-     * OP_P_WAIT_QUEUE,
-     * Waits for the current process queue to receive a message
-     */
-    OP_P_WAIT_QUEUE,
-
-
-    /**
-     * OP_P_SEND_SEG targetProcess: Rm, data: I (<255)
-     * Sends a signal to the target process,
-     * Signals include KILL, PAUSE, RESUME, etc.
-     */
-    OP_P_SEND_SIG,
-
-    /**
-     * OP_P_ID dest: R
-     */
-    /**
-     * OP_P_ID dest: R, process: Pm
-     * Returns process id into dest reg R[u32] of process Pm
-     */
-    OP_P_ID,
-
-    /**
-     * Returns current process ID
-     * OP_P_CID dest: R
-     */
-    OP_P_CID,
-
-    /**
-     * OP_P_STATUS dest: R, process: Pm
-     * Returns process status into dest reg R[u8] of process Pm
-     */
-    OP_P_STATE,
-
-
-    /**
-     * OP_PROMISE_ALLOC dest: Rm
-     * Allocates a new promise, stores its address in dest
-     */
-    OP_PROMISE_ALLOC,
-
-    /**
-     * OP_PROMISE_RESOLVE promise: Rm, payload: Rm
-     * Resolves the given promise with the given payload
-     */
-    OP_PROMISE_RESOLVE,
-
-    /**
-     * OP_PROMISE_AWAIT promise: Rm
-     * Awaits the given promise
-     */
-    OP_PROMISE_AWAIT,
-
-    /**
-     * OP_PROMISE_DATA dest: R, promise: Rm,
-     * Returns promise data into dest reg R of promise Pm
-     * Promise must have been resolved, otherwise fails
-     */
-    OP_PROMISE_DATA,
-
-    /**
-     * OP_LOCK_ALLOC dest: Rm, data: Rm
-     * Allocates a new lock, containing data, stores its address in dest
-     */
-    OP_LOCK_ALLOC,
-
-    /**
-     * OP_LOCK_ACQUIRE lock: Rm, data: R,
-     * Acquires the given lock. Will block if the lock is already acquired.
-     * i.e waiting for lock promise to resolve. Stores the lock data in
-     * the given argument
-     */
-    OP_LOCK_ACQUIRE,
-
-    /**
-     * OP_LOCK_RELEASE lock: Rm
-     * Releases the given lock.
-     */
-    OP_LOCK_RELEASE,
-
 
     OP_DEBUG_REG,
 
@@ -665,12 +554,6 @@ typedef enum TypeV_OpCode {
      * Loads a standard library function into dest reg R
      */
     OP_LOAD_STD,
-
-    /**
-     * OP_VM_HEALTH dest: R
-     * Returns VM health into dest reg R[u8]
-     */
-    OP_VM_HEALTH,
 
     /**
      * OP_SPILL_ALLOC size: I (2 bytes)
