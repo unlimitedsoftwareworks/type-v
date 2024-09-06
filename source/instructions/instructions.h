@@ -1982,7 +1982,6 @@ static inline void j_cmp_ptr(TypeV_Core* core) {
 
 #undef OP_CMP
 
-
 static inline void reg_ffi(TypeV_Core* core){
     uint8_t offsetSize = core->codePtr[core->ip++];
     size_t offset = 0;
@@ -2031,129 +2030,15 @@ static inline void close_ffi(TypeV_Core* core){
     core_ffi_close(core, core->regs[reg].ptr);
 }
 
-static inline void p_alloc(TypeV_Core* core){
-    uint8_t reg = core->codePtr[core->ip++];
-    uint8_t size_length = core->codePtr[core->ip++];
-    size_t size = 0;
-    typev_memcpy_u64_ptr(&size, &core->codePtr[core->ip], size_length);
-    core->ip += size_length;
+static inline void promise_set_cb(TypeV_Core* core){
+    uint8_t new_reg = core->codePtr[core->ip++];
+    uint8_t promise_reg = core->codePtr[core->ip++];
+    uint64_t cb_address = 0;
+    typev_memcpy_u64_ptr(&cb_address, &core->codePtr[core->ip], 8);
+    core->ip += 8;
 
-    core->regs[reg].ptr = (size_t)engine_spawnCore(core->engineRef, core, size);
-}
-
-static inline void p_dequeue(TypeV_Core* core){
-    LOG_INFO("Core[%d] dequeueing 1/%d", core->id, core->messageInputQueue.length);
-    uint8_t dest = core->codePtr[core->ip++];
-    uint8_t promiseDest = core->codePtr[core->ip++];
-    ASSERT(dest < MAX_REG, "Invalid register index");
-    ASSERT(promiseDest < MAX_REG, "Invalid register index");
-
-    // get the next queue element from core queue
-    // check queue length
-    if(core->messageInputQueue.length == 0) {
-        LOG_ERROR("Core[%d] tried to dequeue from empty queue", core->id);
-        ASSERT(0, "fail");
-    }
-    TypeV_IOMessage* msg = queue_dequeue(&core->messageInputQueue);
-    core->regs[dest].ptr = (size_t)msg->message;
-    core->regs[promiseDest].ptr = (size_t)msg->promise;
-}
-
-static inline void p_emit(TypeV_Core* core){
-    uint8_t targetProcessReg = core->codePtr[core->ip++];
-    uint8_t dataReg = core->codePtr[core->ip++];
-    uint8_t promiseReg = core->codePtr[core->ip++];
-
-    ASSERT(targetProcessReg < MAX_REG, "Invalid register index");
-    ASSERT(dataReg < MAX_REG, "Invalid register index");
-    ASSERT(promiseReg < MAX_REG, "Invalid register index");
-
-    size_t data_ptr = core->regs[dataReg].ptr;
-    TypeV_Core* target = (TypeV_Core*)core->regs[targetProcessReg].ptr;
-
-    LOG_INFO("Core[%d] emitting message to Core[%d]", core->id, target->id);
-
-    TypeV_IOMessage* msg = malloc(sizeof(TypeV_IOMessage));
-    msg->sender = core->id;
-    msg->message = (void*)data_ptr;
-    msg->promise = core_promise_alloc(core);
-    core->regs[promiseReg].ptr = (size_t)msg->promise;
-
-    core_enqueue_message(target, msg);
-
-    core->regs[promiseReg].ptr = (size_t)msg->promise;
-}
-
-static inline void p_wait_queue(TypeV_Core* core){
-    LOG_INFO("Core[%d] waiting for queue", core->id);
-    if(core->messageInputQueue.length == 0){
-        core_queue_await(core);
-    }
-}
-
-static inline void p_queue_size(TypeV_Core* core){
-    uint8_t dest = core->codePtr[core->ip++];
-    core->regs[dest].u64 = core->messageInputQueue.length;
-}
-
-static inline void p_send_sig(TypeV_Core * core){
-    uint8_t targetProcessReg = core->codePtr[core->ip++];
-    uint8_t sig = core->codePtr[core->ip++];
-
-    ASSERT(targetProcessReg < MAX_REG, "Invalid register index");
-    ASSERT(sig <= CSIG_KILL, "Invalid signal value");
-
-    TypeV_Core* target = (TypeV_Core*)core->regs[targetProcessReg].ptr;
-
-    LOG_INFO("Core[%d] sending signal %d to Core[%d]", core->id, sig, target->id);
-
-    core_receive_signal(target, sig);
-}
-
-static inline void p_id(TypeV_Core* core){
-    uint8_t dest = core->codePtr[core->ip++];
-    uint8_t processReg = core->codePtr[core->ip++];
-    ASSERT(dest < MAX_REG, "Invalid register index");
-    ASSERT(processReg < MAX_REG, "Invalid register index");
-
-    TypeV_Core* c = (TypeV_Core*)core->regs[processReg].ptr;
-
-    core->regs[dest].u32 = c->id;
-}
-
-static inline void p_cid(TypeV_Core* core){
-    uint8_t dest = core->codePtr[core->ip++];
-    ASSERT(dest < MAX_REG, "Invalid register index");
-    core->regs[dest].u32 = core->id;
-}
-
-static inline void p_state(TypeV_Core* core){
-    uint8_t dest = core->codePtr[core->ip++];
-    uint8_t processReg = core->codePtr[core->ip++];
-    ASSERT(dest < MAX_REG, "Invalid register index");
-    ASSERT(processReg < MAX_REG, "Invalid register index");
-
-    TypeV_Core* c = (TypeV_Core*)core->regs[processReg].ptr;
-
-    core->regs[dest].u8 = c->state;
-}
-
-static inline void promise_alloc(TypeV_Core* core){
-    uint8_t dest = core->codePtr[core->ip++];
-    ASSERT(dest < MAX_REG, "Invalid register index");
-    core->regs[dest].ptr = (size_t) core_promise_alloc(core);
-}
-
-static inline void promise_resolve(TypeV_Core* core){
-    uint8_t promiseReg = core->codePtr[core->ip++];
-    uint8_t dataReg = core->codePtr[core->ip++];
-    ASSERT(promiseReg < MAX_REG, "Invalid register index");
-    ASSERT(dataReg < MAX_REG, "Invalid register index");
-
-    TypeV_Promise* promise = (TypeV_Promise*)core->regs[promiseReg].ptr;
-    size_t data = core->regs[dataReg].ptr;
-
-    core_promise_resolve(core, promise, data);
+    TypeV_Promise* oldPromise = (TypeV_Promise*)core->regs[promise_reg].ptr;
+    //TypeV_Promise* newPromise = core_promise_set_cb(core, oldPromise, cb_address);
 }
 
 static inline void promise_await(TypeV_Core* core){
@@ -2166,7 +2051,7 @@ static inline void promise_await(TypeV_Core* core){
     core_promise_await(core, promise);
 }
 
-static inline void promise_data(TypeV_Core* core){
+static inline void promise_await_data(TypeV_Core* core){
     uint8_t dest = core->codePtr[core->ip++];
     uint8_t promiseReg = core->codePtr[core->ip++];
     ASSERT(dest < MAX_REG, "Invalid register index");
@@ -2258,13 +2143,11 @@ static inline void debug_reg(TypeV_Core* core){
 
 static inline void halt(TypeV_Core* core) {
     uint8_t code_reg = core->codePtr[core->ip++];
-    ASSERT(code_reg < MAX_REG, "Invalid register index");
-
     uint32_t code = core->regs[code_reg].u32;
+    //core_gc_sweep_all(core);
 
-    core_gc_sweep_all(core);
-
-    exit(code);
+    core->state = CS_TERMINATED;
+    core->exitCode = code;
 }
 
 static inline void load_std(TypeV_Core* core){

@@ -10,68 +10,6 @@
 #include "utils/log.h"
 #include "utils/utils.h"
 
-void engine_init(TypeV_Engine *engine) {
-    // we will allocate memory for cores later
-    engine->coreCount = 0;
-    engine->runningCoresCount = 0;
-    engine->health = EH_OK;
-    engine->coreIterator = calloc(1, sizeof(TypeV_CoreIterator));
-    engine->coreIterator->core = calloc(1, sizeof(TypeV_Core));
-    engine->coreIterator->next = NULL;
-
-    engine->ffi = malloc(sizeof(TypeV_FFI*));
-    engine->ffiCount = 0;
-
-    core_init(engine->coreIterator->core, engine_generateNewCoreID(engine), engine);
-    engine->coreCount++;
-}
-
-void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit){
-    core_setup(engine->coreIterator->core, program, constantPool, globalPool);
-}
-
-void engine_deallocate(TypeV_Engine *engine) {
-    // free cores
-    TypeV_CoreIterator* iterator = engine->coreIterator;
-    while(iterator != NULL) {
-        TypeV_CoreIterator* next = iterator->next;
-        core_deallocate(iterator->core);
-        free(iterator->core);
-        free(iterator);
-        iterator = next;
-    }
-    engine->coreIterator = NULL;
-    engine->coreCount = 0;
-}
-
-void engine_run(TypeV_Engine *engine) {
-    int coreIterator = -1;
-    engine_update_scheduler(engine);
-
-    while(1) {
-        if(engine->interruptNextLoop){
-            engine->interruptNextLoop = 0;
-        }
-
-        TypeV_CoreIterator* iter = engine->coreIterator;
-        while(iter != NULL){
-            iter->currentInstructions = 0;
-            if(iter->core->lastSignal == CSIG_KILL) {
-                // kill the core
-                LOG_INFO("Core[%d] killed", iter->core->id);
-                engine_detach_core(engine, iter->core);
-                iter = iter->next;
-                continue;
-            }
-            engine_run_core(engine, iter);
-            iter = iter->next;
-        }
-
-        if(engine->coreCount == 0) {
-            break;
-        }
-    }
-}
 
 #define DISPATCH_TABLE \
 static void* dispatch_table[] = { \
@@ -256,21 +194,13 @@ static void* dispatch_table[] = { \
     &&DO_J_CMP_I64, \
     &&DO_J_CMP_F32, \
     &&DO_J_CMP_F64, \
-    &&DO_J_CMP_PTR, \
+    &&DO_J_CMP_PTR,    \
+    &&DO_LOOP, \
     &&DO_REG_FFI, \
     &&DO_OPEN_FFI, \
     &&DO_LD_FFI, \
     &&DO_CALL_FFI, \
     &&DO_CLOSE_FFI, \
-    &&DO_P_ALLOC, \
-    &&DO_P_DEQUEUE, \
-    &&DO_P_QUEUE_SIZE, \
-    &&DO_P_EMIT, \
-    &&DO_P_WAIT_QUEUE, \
-    &&DO_P_SEND_SIG, \
-    &&DO_P_ID, \
-    &&DO_P_CID, \
-    &&DO_P_STATE, \
     &&DO_PROMISE_ALLOC, \
     &&DO_PROMISE_RESOLVE, \
     &&DO_PROMISE_AWAIT, \
@@ -287,743 +217,689 @@ static void* dispatch_table[] = { \
     &&DO_UNSPILL_REG \
 };
 
-void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
-    uint8_t runInf = iter->maxInstructions == -1;
-    TypeV_Core * core = iter->core;
-    if(core->state == CS_HALTED) {
-        core_resume(core);
-    }
 
-    if((core->state == CS_AWAITING_QUEUE) && (core->lastSignal == CSIG_TERMINATE)){
-        LOG_INFO("Core[%d] Gracefully terminated", iter->core->id);
-        engine_detach_core(engine, core);
-        return;
-    }
-
-    if(core->state == CS_CRASHED){
-        LOG_INFO("Core[%d] Crashed");
-        engine_detach_core(engine, core);
-        return;
-    }
-
-    if(core->state == CS_AWAITING_PROMISE) {
-        core_promise_check_resume(core);
-        if(core->state == CS_AWAITING_PROMISE) {
-            LOG_WARN("Core[%d] is awaiting promise %d, skipping run", iter->core->id, core->awaitingPromise->id);
-        }
-    }
+void engine_run_core(TypeV_Engine *engine, TypeV_Core* core) {
 
     while(1){
 
         DISPATCH_TABLE
-        #define DISPATCH() { \
-            iter->currentInstructions += 1-runInf; \
-            if(!(((core->state == CS_RUNNING) &&\
-        (iter->currentInstructions != iter->maxInstructions) &&\
-        !engine->interruptNextLoop)))    {           \
-            goto END_RUN;                 }\
+#define DISPATCH() { \
             /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]); */\
             goto *dispatch_table[core->codePtr[core->ip++]];                          \
         }
 
         DISPATCH();
         DO_MV_REG_REG:
-            mv_reg_reg(core);
-            DISPATCH();
+        mv_reg_reg(core);
+        DISPATCH();
         DO_MV_REG_REG_PTR:
-            mv_reg_reg_ptr(core);
-            DISPATCH();
+        mv_reg_reg_ptr(core);
+        DISPATCH();
         DO_MV_REG_NULL:
-            mv_reg_null(core);
-            DISPATCH();
+        mv_reg_null(core);
+        DISPATCH();
         DO_MV_REG_I:
-            mv_reg_i(core);
-            DISPATCH();
+        mv_reg_i(core);
+        DISPATCH();
         DO_MV_REG_CONST:
-            mv_reg_const(core);
-            DISPATCH();
+        mv_reg_const(core);
+        DISPATCH();
         DO_MV_REG_CONST_PTR:
-            mv_reg_const_ptr(core);
-            DISPATCH();
+        mv_reg_const_ptr(core);
+        DISPATCH();
         DO_MV_GLOBAL_REG:
-            mv_global_reg(core);
-            DISPATCH();
+        mv_global_reg(core);
+        DISPATCH();
         DO_MV_GLOBAL_REG_PTR:
-            mv_global_reg_ptr(core);
-            DISPATCH();
+        mv_global_reg_ptr(core);
+        DISPATCH();
         DO_MV_REG_GLOBAL:
-            mv_reg_global(core);
-            DISPATCH();
+        mv_reg_global(core);
+        DISPATCH();
         DO_MV_REG_GLOBAL_PTR:
-            mv_reg_global_ptr(core);
-            DISPATCH();
+        mv_reg_global_ptr(core);
+        DISPATCH();
         DO_S_ALLOC:
-            s_alloc(core);
-            DISPATCH();
+        s_alloc(core);
+        DISPATCH();
         DO_S_ALLOC_SHADOW:
-            s_alloc_shadow(core);
-            DISPATCH();
+        s_alloc_shadow(core);
+        DISPATCH();
         DO_S_SET_OFFSET:
-            s_set_offset(core);
-            DISPATCH();
+        s_set_offset(core);
+        DISPATCH();
         DO_S_SET_OFFSET_SHADOW:
-            s_set_offset_shadow(core);
-            DISPATCH();
+        s_set_offset_shadow(core);
+        DISPATCH();
         DO_S_LOADF:
-            s_loadf(core);
-            DISPATCH();
+        s_loadf(core);
+        DISPATCH();
         DO_S_LOADF_PTR:
-            s_loadf_ptr(core);
-            DISPATCH();
+        s_loadf_ptr(core);
+        DISPATCH();
         DO_S_STOREF_CONST:
-            s_storef_const(core);
-            DISPATCH();
+        s_storef_const(core);
+        DISPATCH();
         DO_S_STOREF_CONST_PTR:
-            s_storef_const_ptr(core);
-            DISPATCH();
+        s_storef_const_ptr(core);
+        DISPATCH();
         DO_S_STOREF_REG:
-            s_storef_reg(core);
-            DISPATCH();
+        s_storef_reg(core);
+        DISPATCH();
         DO_S_STOREF_REG_PTR:
-            s_storef_reg_ptr(core);
-            DISPATCH();
+        s_storef_reg_ptr(core);
+        DISPATCH();
         DO_C_ALLOC:
-            c_alloc(core);
-            DISPATCH();
+        c_alloc(core);
+        DISPATCH();
         DO_C_STOREM:
-            c_storem(core);
-            DISPATCH();
+        c_storem(core);
+        DISPATCH();
         DO_C_LOADM:
-            c_loadm(core);
-            DISPATCH();
+        c_loadm(core);
+        DISPATCH();
         DO_C_STOREF_REG:
-            c_storef_reg(core);
-            DISPATCH();
+        c_storef_reg(core);
+        DISPATCH();
         DO_C_STOREF_REG_PTR:
-            c_storef_reg_ptr(core);
-            DISPATCH();
+        c_storef_reg_ptr(core);
+        DISPATCH();
         DO_C_STOREF_CONST:
-            c_storef_const(core);
-            DISPATCH();
+        c_storef_const(core);
+        DISPATCH();
         DO_C_STOREF_CONST_PTR:
-            c_storef_const_ptr(core);
-            DISPATCH();
+        c_storef_const_ptr(core);
+        DISPATCH();
         DO_C_LOADF:
-            c_loadf(core);
-            DISPATCH();
+        c_loadf(core);
+        DISPATCH();
         DO_C_LOADF_PTR:
-            c_loadf_ptr(core);
-            DISPATCH();
+        c_loadf_ptr(core);
+        DISPATCH();
         DO_I_ALLOC:
-            i_alloc(core);
-            DISPATCH();
+        i_alloc(core);
+        DISPATCH();
         DO_I_ALLOC_I:
-            i_alloc_i(core);
-            DISPATCH();
+        i_alloc_i(core);
+        DISPATCH();
         DO_I_SET_OFFSET:
-            i_set_offset(core);
-            DISPATCH();
+        i_set_offset(core);
+        DISPATCH();
         DO_I_SET_OFFSET_I:
-            i_set_offset_i(core);
-            DISPATCH();
+        i_set_offset_i(core);
+        DISPATCH();
         DO_I_SET_OFFSET_M:
-            i_set_offset_m(core);
-            DISPATCH();
+        i_set_offset_m(core);
+        DISPATCH();
         DO_I_LOADM:
-            i_loadm(core);
-            DISPATCH();
+        i_loadm(core);
+        DISPATCH();
         DO_I_IS_C:
-            i_is_c(core);
-            DISPATCH();
+        i_is_c(core);
+        DISPATCH();
         DO_I_IS_I:
-            i_is_i(core);
-            DISPATCH();
+        i_is_i(core);
+        DISPATCH();
         DO_I_GET_C:
-            i_get_c(core);
-            DISPATCH();
+        i_get_c(core);
+        DISPATCH();
         DO_A_ALLOC:
-            a_alloc(core);
-            DISPATCH();
+        a_alloc(core);
+        DISPATCH();
         DO_A_EXTEND:
-            a_extend(core);
-            DISPATCH();
+        a_extend(core);
+        DISPATCH();
         DO_A_LEN:
-            a_len(core);
-            DISPATCH();
+        a_len(core);
+        DISPATCH();
         DO_A_SLICE:
-            a_slice(core);
-            DISPATCH();
+        a_slice(core);
+        DISPATCH();
         DO_A_STOREF_REG:
-            a_storef_reg(core);
-            DISPATCH();
+        a_storef_reg(core);
+        DISPATCH();
         DO_A_STOREF_REG_PTR:
-            a_storef_reg_ptr(core);
-            DISPATCH();
+        a_storef_reg_ptr(core);
+        DISPATCH();
         DO_A_STOREF_CONST:
-            a_storef_const(core);
-            DISPATCH();
+        a_storef_const(core);
+        DISPATCH();
         DO_A_STOREF_CONST_PTR:
-            a_storef_const_ptr(core);
-            DISPATCH();
+        a_storef_const_ptr(core);
+        DISPATCH();
         DO_A_LOADF:
-            a_loadf(core);
-            DISPATCH();
+        a_loadf(core);
+        DISPATCH();
         DO_A_LOADF_PTR:
-            a_loadf_ptr(core);
-            DISPATCH();
+        a_loadf_ptr(core);
+        DISPATCH();
         DO_PUSH:
-            push(core);
-            DISPATCH();
+        push(core);
+        DISPATCH();
         DO_PUSH_PTR:
-            push_ptr(core);
-            DISPATCH();
+        push_ptr(core);
+        DISPATCH();
         DO_PUSH_CONST:
-            push_const(core);
-            DISPATCH();
+        push_const(core);
+        DISPATCH();
         DO_POP:
-            pop(core);
-            DISPATCH();
+        pop(core);
+        DISPATCH();
         DO_POP_PTR:
-            pop_ptr(core);
-            DISPATCH();
+        pop_ptr(core);
+        DISPATCH();
         DO_FN_ALLOC:
-            fn_alloc(core);
-            DISPATCH();
+        fn_alloc(core);
+        DISPATCH();
         DO_FN_SET_REG:
-            fn_set_reg(core);
-            DISPATCH();
+        fn_set_reg(core);
+        DISPATCH();
         DO_FN_SET_REG_PTR:
-            fn_set_reg_ptr(core);
-            DISPATCH();
+        fn_set_reg_ptr(core);
+        DISPATCH();
         DO_FN_CALL:
-            fn_call(core);
-            DISPATCH();
+        fn_call(core);
+        DISPATCH();
         DO_FN_CALLI:
-            fn_calli(core);
-            DISPATCH();
+        fn_calli(core);
+        DISPATCH();
         DO_FN_RET:
-            fn_ret(core);
-            DISPATCH();
+        fn_ret(core);
+        DISPATCH();
         DO_FN_GET_RET_REG:
-            fn_get_ret_reg(core);
-            DISPATCH();
+        fn_get_ret_reg(core);
+        DISPATCH();
         DO_FN_GET_RET_REG_PTR:
-            fn_get_ret_reg_ptr(core);
-            DISPATCH();
+        fn_get_ret_reg_ptr(core);
+        DISPATCH();
         DO_CAST_I8_U8:
-            cast_i8_u8(core);
-            DISPATCH();
+        cast_i8_u8(core);
+        DISPATCH();
         DO_CAST_U8_I8:
-            cast_u8_i8(core);
-            DISPATCH();
+        cast_u8_i8(core);
+        DISPATCH();
         DO_CAST_I16_U16:
-            cast_i16_u16(core);
-            DISPATCH();
+        cast_i16_u16(core);
+        DISPATCH();
         DO_CAST_U16_I16:
-            cast_u16_i16(core);
-            DISPATCH();
+        cast_u16_i16(core);
+        DISPATCH();
         DO_CAST_I32_U32:
-            cast_i32_u32(core);
-            DISPATCH();
+        cast_i32_u32(core);
+        DISPATCH();
         DO_CAST_U32_I32:
-            cast_u32_i32(core);
-            DISPATCH();
+        cast_u32_i32(core);
+        DISPATCH();
         DO_CAST_I64_U64:
-            cast_i64_u64(core);
-            DISPATCH();
+        cast_i64_u64(core);
+        DISPATCH();
         DO_CAST_U64_I64:
-            cast_u64_i64(core);
-            DISPATCH();
+        cast_u64_i64(core);
+        DISPATCH();
         DO_CAST_I32_F32:
-            cast_i32_f32(core);
-            DISPATCH();
+        cast_i32_f32(core);
+        DISPATCH();
         DO_CAST_F32_I32:
-            cast_f32_i32(core);
-            DISPATCH();
+        cast_f32_i32(core);
+        DISPATCH();
         DO_CAST_I64_F64:
-            cast_i64_f64(core);
-            DISPATCH();
+        cast_i64_f64(core);
+        DISPATCH();
         DO_CAST_F64_I64:
-            cast_f64_i64(core);
-            DISPATCH();
+        cast_f64_i64(core);
+        DISPATCH();
         DO_UPCAST_I:
-            upcast_i(core);
-            DISPATCH();
+        upcast_i(core);
+        DISPATCH();
         DO_UPCAST_U:
-            upcast_u(core);
-            DISPATCH();
+        upcast_u(core);
+        DISPATCH();
         DO_UPCAST_F:
-            upcast_f(core);
-            DISPATCH();
+        upcast_f(core);
+        DISPATCH();
         DO_DCAST_I:
-            dcast_i(core);
-            DISPATCH();
+        dcast_i(core);
+        DISPATCH();
         DO_DCAST_U:
-            dcast_u(core);
-            DISPATCH();
+        dcast_u(core);
+        DISPATCH();
         DO_DCAST_F:
-            dcast_f(core);
-            DISPATCH();
+        dcast_f(core);
+        DISPATCH();
         DO_ADD_I8:
-            add_i8(core);
-            DISPATCH();
+        add_i8(core);
+        DISPATCH();
         DO_ADD_U8:
-            add_u8(core);
-            DISPATCH();
+        add_u8(core);
+        DISPATCH();
         DO_ADD_I16:
-            add_i16(core);
-            DISPATCH();
+        add_i16(core);
+        DISPATCH();
         DO_ADD_U16:
-            add_u16(core);
-            DISPATCH();
+        add_u16(core);
+        DISPATCH();
         DO_ADD_I32:
-            add_i32(core);
-            DISPATCH();
+        add_i32(core);
+        DISPATCH();
         DO_ADD_U32:
-            add_u32(core);
-            DISPATCH();
+        add_u32(core);
+        DISPATCH();
         DO_ADD_I64:
-            add_i64(core);
-            DISPATCH();
+        add_i64(core);
+        DISPATCH();
         DO_ADD_U64:
-            add_u64(core);
-            DISPATCH();
+        add_u64(core);
+        DISPATCH();
         DO_ADD_F32:
-            add_f32(core);
-            DISPATCH();
+        add_f32(core);
+        DISPATCH();
         DO_ADD_F64:
-            add_f64(core);
-            DISPATCH();
+        add_f64(core);
+        DISPATCH();
         DO_ADD_PTR_U8:
-            add_ptr_u8(core);
-            DISPATCH();
+        add_ptr_u8(core);
+        DISPATCH();
         DO_ADD_PTR_U16:
-            add_ptr_u16(core);
-            DISPATCH();
+        add_ptr_u16(core);
+        DISPATCH();
         DO_ADD_PTR_U32:
-            add_ptr_u32(core);
-            DISPATCH();
+        add_ptr_u32(core);
+        DISPATCH();
         DO_ADD_PTR_U64:
-            add_ptr_u64(core);
-            DISPATCH();
+        add_ptr_u64(core);
+        DISPATCH();
         DO_SUB_I8:
-            sub_i8(core);
-            DISPATCH();
+        sub_i8(core);
+        DISPATCH();
         DO_SUB_U8:
-            sub_u8(core);
-            DISPATCH();
+        sub_u8(core);
+        DISPATCH();
         DO_SUB_I16:
-            sub_i16(core);
-            DISPATCH();
+        sub_i16(core);
+        DISPATCH();
         DO_SUB_U16:
-            sub_u16(core);
-            DISPATCH();
+        sub_u16(core);
+        DISPATCH();
         DO_SUB_I32:
-            sub_i32(core);
-            DISPATCH();
+        sub_i32(core);
+        DISPATCH();
         DO_SUB_U32:
-            sub_u32(core);
-            DISPATCH();
+        sub_u32(core);
+        DISPATCH();
         DO_SUB_I64:
-            sub_i64(core);
-            DISPATCH();
+        sub_i64(core);
+        DISPATCH();
         DO_SUB_U64:
-            sub_u64(core);
-            DISPATCH();
+        sub_u64(core);
+        DISPATCH();
         DO_SUB_F32:
-            sub_f32(core);
-            DISPATCH();
+        sub_f32(core);
+        DISPATCH();
         DO_SUB_F64:
-            sub_f64(core);
-            DISPATCH();
+        sub_f64(core);
+        DISPATCH();
         DO_SUB_PTR_U8:
-            sub_ptr_u8(core);
-            DISPATCH();
+        sub_ptr_u8(core);
+        DISPATCH();
         DO_SUB_PTR_U16:
-            sub_ptr_u16(core);
-            DISPATCH();
+        sub_ptr_u16(core);
+        DISPATCH();
         DO_SUB_PTR_U32:
-            sub_ptr_u32(core);
-            DISPATCH();
+        sub_ptr_u32(core);
+        DISPATCH();
         DO_SUB_PTR_U64:
-            sub_ptr_u64(core);
-            DISPATCH();
+        sub_ptr_u64(core);
+        DISPATCH();
         DO_MUL_I8:
-            mul_i8(core);
-            DISPATCH();
+        mul_i8(core);
+        DISPATCH();
         DO_MUL_U8:
-            mul_u8(core);
-            DISPATCH();
+        mul_u8(core);
+        DISPATCH();
         DO_MUL_I16:
-            mul_i16(core);
-            DISPATCH();
+        mul_i16(core);
+        DISPATCH();
         DO_MUL_U16:
-            mul_u16(core);
-            DISPATCH();
+        mul_u16(core);
+        DISPATCH();
         DO_MUL_I32:
-            mul_i32(core);
-            DISPATCH();
+        mul_i32(core);
+        DISPATCH();
         DO_MUL_U32:
-            mul_u32(core);
-            DISPATCH();
+        mul_u32(core);
+        DISPATCH();
         DO_MUL_I64:
-            mul_i64(core);
-            DISPATCH();
+        mul_i64(core);
+        DISPATCH();
         DO_MUL_U64:
-            mul_u64(core);
-            DISPATCH();
+        mul_u64(core);
+        DISPATCH();
         DO_MUL_F32:
-            mul_f32(core);
-            DISPATCH();
+        mul_f32(core);
+        DISPATCH();
         DO_MUL_F64:
-            mul_f64(core);
-            DISPATCH();
+        mul_f64(core);
+        DISPATCH();
         DO_DIV_I8:
-            div_i8(core);
-            DISPATCH();
+        div_i8(core);
+        DISPATCH();
         DO_DIV_U8:
-            div_u8(core);
-            DISPATCH();
+        div_u8(core);
+        DISPATCH();
         DO_DIV_I16:
-            div_i16(core);
-            DISPATCH();
+        div_i16(core);
+        DISPATCH();
         DO_DIV_U16:
-            div_u16(core);
-            DISPATCH();
+        div_u16(core);
+        DISPATCH();
         DO_DIV_I32:
-            div_i32(core);
-            DISPATCH();
+        div_i32(core);
+        DISPATCH();
         DO_DIV_U32:
-            div_u32(core);
-            DISPATCH();
+        div_u32(core);
+        DISPATCH();
         DO_DIV_I64:
-            div_i64(core);
-            DISPATCH();
+        div_i64(core);
+        DISPATCH();
         DO_DIV_U64:
-            div_u64(core);
-            DISPATCH();
+        div_u64(core);
+        DISPATCH();
         DO_DIV_F32:
-            div_f32(core);
-            DISPATCH();
+        div_f32(core);
+        DISPATCH();
         DO_DIV_F64:
-            div_f64(core);
-            DISPATCH();
+        div_f64(core);
+        DISPATCH();
         DO_MOD_I8:
-            mod_i8(core);
-            DISPATCH();
+        mod_i8(core);
+        DISPATCH();
         DO_MOD_U8:
-            mod_u8(core);
-            DISPATCH();
+        mod_u8(core);
+        DISPATCH();
         DO_MOD_I16:
-            mod_i16(core);
-            DISPATCH();
+        mod_i16(core);
+        DISPATCH();
         DO_MOD_U16:
-            mod_u16(core);
-            DISPATCH();
+        mod_u16(core);
+        DISPATCH();
         DO_MOD_I32:
-            mod_i32(core);
-            DISPATCH();
+        mod_i32(core);
+        DISPATCH();
         DO_MOD_U32:
-            mod_u32(core);
-            DISPATCH();
+        mod_u32(core);
+        DISPATCH();
         DO_MOD_I64:
-            mod_i64(core);
-            DISPATCH();
+        mod_i64(core);
+        DISPATCH();
         DO_MOD_U64:
-            mod_u64(core);
-            DISPATCH();
+        mod_u64(core);
+        DISPATCH();
         DO_LSHIFT_I8:
-            lshift_i8(core);
-            DISPATCH();
+        lshift_i8(core);
+        DISPATCH();
         DO_LSHIFT_U8:
-            lshift_u8(core);
-            DISPATCH();
+        lshift_u8(core);
+        DISPATCH();
         DO_LSHIFT_I16:
-            lshift_i16(core);
-            DISPATCH();
+        lshift_i16(core);
+        DISPATCH();
         DO_LSHIFT_U16:
-            lshift_u16(core);
-            DISPATCH();
+        lshift_u16(core);
+        DISPATCH();
         DO_LSHIFT_I32:
-            lshift_i32(core);
-            DISPATCH();
+        lshift_i32(core);
+        DISPATCH();
         DO_LSHIFT_U32:
-            lshift_u32(core);
-            DISPATCH();
+        lshift_u32(core);
+        DISPATCH();
         DO_LSHIFT_I64:
-            lshift_i64(core);
-            DISPATCH();
+        lshift_i64(core);
+        DISPATCH();
         DO_LSHIFT_U64:
-            lshift_u64(core);
-            DISPATCH();
+        lshift_u64(core);
+        DISPATCH();
         DO_RSHIFT_I8:
-            rshift_i8(core);
-            DISPATCH();
+        rshift_i8(core);
+        DISPATCH();
         DO_RSHIFT_U8:
-            rshift_u8(core);
-            DISPATCH();
+        rshift_u8(core);
+        DISPATCH();
         DO_RSHIFT_I16:
-            rshift_i16(core);
-            DISPATCH();
+        rshift_i16(core);
+        DISPATCH();
         DO_RSHIFT_U16:
-            rshift_u16(core);
-            DISPATCH();
+        rshift_u16(core);
+        DISPATCH();
         DO_RSHIFT_I32:
-            rshift_i32(core);
-            DISPATCH();
+        rshift_i32(core);
+        DISPATCH();
         DO_RSHIFT_U32:
-            rshift_u32(core);
-            DISPATCH();
+        rshift_u32(core);
+        DISPATCH();
         DO_RSHIFT_I64:
-            rshift_i64(core);
-            DISPATCH();
+        rshift_i64(core);
+        DISPATCH();
         DO_RSHIFT_U64:
-            rshift_u64(core);
-            DISPATCH();
+        rshift_u64(core);
+        DISPATCH();
         DO_BAND_8:
-            band_8(core);
-            DISPATCH();
+        band_8(core);
+        DISPATCH();
         DO_BAND_16:
-            band_16(core);
-            DISPATCH();
+        band_16(core);
+        DISPATCH();
         DO_BAND_32:
-            band_32(core);
-            DISPATCH();
+        band_32(core);
+        DISPATCH();
         DO_BAND_64:
-            band_64(core);
-            DISPATCH();
+        band_64(core);
+        DISPATCH();
         DO_BOR_8:
-            bor_8(core);
-            DISPATCH();
+        bor_8(core);
+        DISPATCH();
         DO_BOR_16:
-            bor_16(core);
-            DISPATCH();
+        bor_16(core);
+        DISPATCH();
         DO_BOR_32:
-            bor_32(core);
-            DISPATCH();
+        bor_32(core);
+        DISPATCH();
         DO_BOR_64:
-            bor_64(core);
-            DISPATCH();
+        bor_64(core);
+        DISPATCH();
         DO_BXOR_8:
-            bxor_8(core);
-            DISPATCH();
+        bxor_8(core);
+        DISPATCH();
         DO_BXOR_16:
-            bxor_16(core);
-            DISPATCH();
+        bxor_16(core);
+        DISPATCH();
         DO_BXOR_32:
-            bxor_32(core);
-            DISPATCH();
+        bxor_32(core);
+        DISPATCH();
         DO_BXOR_64:
-            bxor_64(core);
-            DISPATCH();
+        bxor_64(core);
+        DISPATCH();
         DO_BNOT_8:
-            bnot_8(core);
-            DISPATCH();
+        bnot_8(core);
+        DISPATCH();
         DO_BNOT_16:
-            bnot_16(core);
-            DISPATCH();
+        bnot_16(core);
+        DISPATCH();
         DO_BNOT_32:
-            bnot_32(core);
-            DISPATCH();
+        bnot_32(core);
+        DISPATCH();
         DO_BNOT_64:
-            bnot_64(core);
-            DISPATCH();
+        bnot_64(core);
+        DISPATCH();
         DO_AND:
-            and(core);
-            DISPATCH();
+        and(core);
+        DISPATCH();
         DO_OR:
-            or(core);
-            DISPATCH();
+        or(core);
+        DISPATCH();
         DO_NOT:
-            not(core);
-            DISPATCH();
+        not(core);
+        DISPATCH();
         DO_J:
-            jmp(core);
-            DISPATCH();
+        jmp(core);
+        DISPATCH();
         DO_J_CMP_U8:
-            j_cmp_u8(core);
-            DISPATCH();
+        j_cmp_u8(core);
+        DISPATCH();
         DO_J_CMP_I8:
-            j_cmp_i8(core);
-            DISPATCH();
+        j_cmp_i8(core);
+        DISPATCH();
         DO_J_CMP_U16:
-            j_cmp_u16(core);
-            DISPATCH();
+        j_cmp_u16(core);
+        DISPATCH();
         DO_J_CMP_I16:
-            j_cmp_i16(core);
-            DISPATCH();
+        j_cmp_i16(core);
+        DISPATCH();
         DO_J_CMP_U32:
-            j_cmp_u32(core);
-            DISPATCH();
+        j_cmp_u32(core);
+        DISPATCH();
         DO_J_CMP_I32:
-            j_cmp_i32(core);
-            DISPATCH();
+        j_cmp_i32(core);
+        DISPATCH();
         DO_J_CMP_U64:
-            j_cmp_u64(core);
-            DISPATCH();
+        j_cmp_u64(core);
+        DISPATCH();
         DO_J_CMP_I64:
-            j_cmp_i64(core);
-            DISPATCH();
+        j_cmp_i64(core);
+        DISPATCH();
         DO_J_CMP_F32:
-            j_cmp_f32(core);
-            DISPATCH();
+        j_cmp_f32(core);
+        DISPATCH();
         DO_J_CMP_F64:
-            j_cmp_f64(core);
-            DISPATCH();
+        j_cmp_f64(core);
+        DISPATCH();
         DO_J_CMP_PTR:
-            j_cmp_ptr(core);
-            DISPATCH();
+        j_cmp_ptr(core);
+        DISPATCH();
+        DO_LOOP:
+        loop(core);
+        DISPATCH();
         DO_REG_FFI:
-            reg_ffi(core);
-            DISPATCH();
+        reg_ffi(core);
+        DISPATCH();
         DO_OPEN_FFI:
-            open_ffi(core);
-            DISPATCH();
+        open_ffi(core);
+        DISPATCH();
         DO_LD_FFI:
-            ld_ffi(core);
-            DISPATCH();
+        ld_ffi(core);
+        DISPATCH();
         DO_CALL_FFI:
-            call_ffi(core);
-            DISPATCH();
+        call_ffi(core);
+        DISPATCH();
         DO_CLOSE_FFI:
-            close_ffi(core);
-            DISPATCH();
-        DO_P_ALLOC:
-            p_alloc(core);
-            DISPATCH();
-        DO_P_DEQUEUE:
-            p_dequeue(core);
-            DISPATCH();
-        DO_P_QUEUE_SIZE:
-            p_queue_size(core);
-            DISPATCH();
-        DO_P_EMIT:
-            p_emit(core);
-            DISPATCH();
-        DO_P_WAIT_QUEUE:
-            p_wait_queue(core);
-            DISPATCH();
-        DO_P_SEND_SIG:
-            p_send_sig(core);
-            DISPATCH();
-        DO_P_ID:
-            p_id(core);
-            DISPATCH();
-        DO_P_CID:
-            p_cid(core);
-            DISPATCH();
-        DO_P_STATE:
-            p_state(core);
-            DISPATCH();
+        close_ffi(core);
+        DISPATCH();
         DO_PROMISE_ALLOC:
-            promise_alloc(core);
-            DISPATCH();
+        promise_alloc(core);
+        DISPATCH();
         DO_PROMISE_RESOLVE:
-            promise_resolve(core);
-            DISPATCH();
+        promise_resolve(core);
+        DISPATCH();
         DO_PROMISE_AWAIT:
-            promise_await(core);
-            DISPATCH();
+        promise_await(core);
+        DISPATCH();
         DO_PROMISE_DATA:
-            promise_data(core);
-            DISPATCH();
+        promise_data(core);
+        DISPATCH();
         DO_LOCK_ALLOC:
-            lock_alloc(core);
-            DISPATCH();
+        lock_alloc(core);
+        DISPATCH();
         DO_LOCK_ACQUIRE:
-            lock_acquire(core);
-            DISPATCH();
+        lock_acquire(core);
+        DISPATCH();
         DO_LOCK_RELEASE:
-            lock_release(core);
-            DISPATCH();
+        lock_release(core);
+        DISPATCH();
         DO_DEBUG_REG:
-            debug_reg(core);
-            DISPATCH();
+        debug_reg(core);
+        DISPATCH();
+
         DO_HALT:
-            halt(core);
-            DISPATCH();
+        halt(core);
+        // goto end of run manually
+        goto END_RUN;
+
+        // probably not needed
+        // DISPATCH();
         DO_LOAD_STD:
-            load_std(core);
-            DISPATCH();
+        load_std(core);
+        DISPATCH();
         DO_VM_HEALTH:
-            vm_health(core);
-            DISPATCH();
+        vm_health(core);
+        DISPATCH();
         DO_SPILL_ALLOC:
-            spill_alloc(core);
-            DISPATCH();
+        spill_alloc(core);
+        DISPATCH();
         DO_SPILL_REG:
-            spill_reg(core);
-            DISPATCH();
+        spill_reg(core);
+        DISPATCH();
         DO_UNSPILL_REG:
-            unspill_reg(core);
-            DISPATCH();
+        unspill_reg(core);
+        DISPATCH();
 
     }
+
     END_RUN:
+    // if we reach this point and the core is not awaiting a promise, we will halt it
 
-    // set process to halted, if was gracefully done
-    if(core->state == CS_RUNNING && core->lastSignal == CSIG_NONE) {
-        core_halt(core);
-    }
+    engine_detach_core(core->engineRef, core);
+
+
+    // otherwise we just exit and the core will re-execute when the promise is resolved
 }
+
+
+void engine_init(TypeV_Engine *engine) {
+    // we will allocate memory for cores later
+    engine->coreCount = 0;
+    engine->runningCoresCount = 0;
+    engine->health = EH_OK;
+    engine->coreIterator = calloc(1, sizeof(TypeV_CoreIterator));
+
+    // init main core
+    engine->coreIterator->core = calloc(1, sizeof(TypeV_Core));
+    engine->coreIterator->next = NULL;
+
+    engine->ffi = malloc(sizeof(TypeV_FFI*));
+    engine->ffiCount = 0;
+
+    core_init(engine->coreIterator->core, engine_generateNewCoreID(engine), engine);
+    engine->coreCount++;
+}
+
+void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit){
+    core_setup(engine->coreIterator->core, program, constantPool, globalPool);
+}
+
+void engine_deallocate(TypeV_Engine *engine) {
+    // free cores
+    TypeV_CoreIterator* iterator = engine->coreIterator;
+    while(iterator != NULL) {
+        TypeV_CoreIterator* next = iterator->next;
+        core_deallocate(iterator->core);
+        free(iterator->core);
+        free(iterator);
+        iterator = next;
+    }
+    engine->coreIterator = NULL;
+    engine->coreCount = 0;
+}
+
+void engine_run(TypeV_Engine *engine) {
+    engine_run_core(engine, engine->coreIterator->core);
+}
+
 
 uint32_t engine_generateNewCoreID(TypeV_Engine *engine) {
     return engine->coreCount+1;
 }
 
-void engine_update_scheduler(TypeV_Engine *engine) {
-    engine->interruptNextLoop = 1;
-    if(!engine->coreCount){return;}
-    if(engine->coreCount == 1) {
-        engine->coreIterator->maxInstructions = -1;
-        engine->coreIterator->currentInstructions = 0;
-    }
-    else {
-        // iterate over all cores and set maxInstructions to 1
-        TypeV_CoreIterator* iter = engine->coreIterator;
-        while(iter != NULL){
-            iter->maxInstructions = 2;
-            iter->currentInstructions = 0;
-            iter = iter->next;
-        }
-    }
-}
-
 TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint64_t ip) {
-    uint32_t id = engine_generateNewCoreID(engine);
-    TypeV_Core* newCore = malloc(sizeof(TypeV_Core));
-
-
-    core_init(newCore, id, engine);
-    engine->coreCount++;
-
-    newCore->ip = ip;
-
-    core_setup(newCore,
-               parentCore->codePtr,
-               parentCore->constPtr,
-               parentCore->globalPtr);
-
-    // add iterator and attack to engine
-    TypeV_CoreIterator* newCoreIterator = calloc(1, sizeof(TypeV_CoreIterator));
-    newCoreIterator->next = NULL;
-    newCoreIterator->currentInstructions = 0;
-    newCoreIterator->maxInstructions = 0;
-    newCoreIterator->core = newCore;
-
-    if(engine->coreIterator == NULL) {
-        engine->coreIterator = newCoreIterator;
-    } else {
-        TypeV_CoreIterator* iterator = engine->coreIterator;
-        while(iterator->next != NULL) {
-            iterator = iterator->next;
-        }
-        iterator->next = newCoreIterator;
-    }
-
-    engine_update_scheduler(engine);
-
-    return newCore;
+    // TODO: implement this
 }
 
 void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
@@ -1061,7 +937,6 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
     }
 
     engine->coreCount--;
-    engine_update_scheduler(engine);
 }
 
 void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlibID) {

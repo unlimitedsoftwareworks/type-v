@@ -9,7 +9,6 @@
 
 #include "engine.h"
 #include "core.h"
-#include "queue/queue.h"
 #include "utils/log.h"
 #include "stack/stack.h"
 #include "dynlib/dynlib.h"
@@ -46,8 +45,14 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
 
 
     core->engineRef = engineRef;
-    core->lastSignal = CSIG_NONE;
     core->awaitingPromise = NULL;
+
+    core->loop = malloc(sizeof(uv_loop_t));
+
+    if (core->loop == NULL) {
+        fprintf(stderr, "Failed to allocate memory for loop\n");
+        exit(-1);
+    }
 }
 
 void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, const uint8_t* globalPool){
@@ -57,18 +62,56 @@ void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constan
     core->state = CS_RUNNING;
 }
 
+/**
+ * Callback to be executed when the libuv loop is ready
+ * @param handle
+ */
+void startup_cb(uv_idle_t* handle) {
+    TypeV_Core* core = (TypeV_Core *)handle->data;
+    pthread_mutex_lock(&core->sync_mutex);
+    core->loop_ready = 1;
+    pthread_cond_signal(&core->sync_cond);
+    pthread_mutex_unlock(&core->sync_mutex);
+    uv_idle_stop(handle); // Stop the idle handle after signaling
+}
+
+void *run_libuv_loop(void *arg) {
+    TypeV_Core* core = (TypeV_Core *)arg;
+    uv_loop_t *loop = core->loop;
+
+    // setup an idle handle to trigger the startup callback
+    uv_idle_t idle;
+    uv_idle_init(loop, &idle);
+    idle.data = core;
+    uv_idle_start(&idle, startup_cb);
+
+    uv_run(loop, UV_RUN_DEFAULT);
+    uv_loop_close(loop);
+    return NULL;
+}
+
+void core_run_uv(TypeV_Core* core) {
+    if (uv_loop_init(core->loop) != 0) {
+        fprintf(stderr, "Failed to initialize loop\n");
+        exit(-1);
+    }
+
+    // Running libuv loop in a separate thread
+    pthread_create(&core->uvThreadID, NULL, run_libuv_loop, core);
+    pthread_mutex_lock(&core->sync_mutex);
+    while (!core->loop_ready) {
+        pthread_cond_wait(&core->sync_cond, &core->sync_mutex);
+    }
+    pthread_mutex_unlock(&core->sync_mutex);
+}
+
 
 void core_deallocate(TypeV_Core *core) {
-    stack_free(core);
-
-    queue_deallocate(&(core->messageInputQueue));
-
+    pthread_join(core->uvThreadID, NULL);
+    //stack_free(core);
     // TODO: free mem objects
-
-
     // free stack
-    stack_free(core);
-
+    stack_free(core->funcState);
     // Note: Program deallocation depends on how programs are loaded and managed
 }
 
@@ -92,7 +135,6 @@ void* core_gc_alloc(TypeV_Core* core, size_t size) {
 void core_gc_update_alloc(TypeV_Core* core, size_t mem) {
     core->gc.allocsSincePastGC += mem;
     core->gc.totalAllocs += mem;
-
 }
 
 TypeV_ObjectHeader* get_header_from_pointer(void* objectPtr) {
@@ -512,67 +554,51 @@ size_t core_mem_alloc(TypeV_Core* core, size_t size) {
     return (size_t)core_gc_alloc(core, size);
 }
 
-void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message) {
-    queue_enqueue(&(core->messageInputQueue), message);
-    core_queue_resolve(core);
-}
-
 void core_resume(TypeV_Core* core) {
     core->state = CS_RUNNING;
 }
 
-void core_halt(TypeV_Core* core) {
-    core->state = CS_HALTED;
+void core_promise_std_callback(TypeV_Core* core, TypeV_Promise* promise, uintptr_t cb_address) {
+    LOG_INFO("CORE[%d]: Performing Promise %d callback with value %d", core->id, promise->id, value);
+    /**
+     * A promise callback is executed when the promise has been resolved.
+     */
+    // TODO: change func state to the target address.
+    // fill the registers with the value
+    // set the instruction pointer to the callback address
+    // set the state to running
 }
-
-void core_queue_await(TypeV_Core* core) {
-    core->state = CS_AWAITING_QUEUE;
-}
-
-void core_queue_resolve(TypeV_Core* core) {
-    core->state = CS_RUNNING;
-}
-
-void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal) {
-    LOG_WARN("CORE[%d]: Received signal %s", core->id, signal == CSIG_KILL ? "KILL" : (signal == CSIG_TERMINATE ? "TERMINATE" : "NONE"));
-    if(signal == CSIG_NONE) {return;}
-    if(signal == CSIG_KILL) {
-        core->lastSignal = CSIG_KILL;
-    }
-    if(signal == CSIG_TERMINATE){
-        core->lastSignal = CSIG_TERMINATE;
-    }
-}
-
 
 TypeV_Promise* core_promise_alloc(TypeV_Core* core) {
     static size_t promiseId = 0;
     TypeV_Promise* promise = calloc(1, sizeof(TypeV_Promise));
-    promise->resolved = 0;
+    promise->status = PS_PENDING;
     promise->value = 0;
     promise->id  = promiseId++;
+
+    pthread_mutex_init(&promise->mutex, NULL);
+    pthread_cond_init(&promise->cond, NULL);
+
     return promise;
 }
 
 void core_promise_resolve(TypeV_Core* core, TypeV_Promise* promise, size_t value) {
-    LOG_INFO("CORE[%d]: Resolving promise", core->id);
-    promise->resolved = 1;
+    LOG_INFO("CORE[%d]: Resolving promise %d with value %d", core->id, promise->id, value);
+    pthread_mutex_lock(&promise->mutex);
+    promise->status = PS_FULFILLED;
     promise->value = value;
+    pthread_cond_signal(&promise->cond);
+    pthread_mutex_unlock(&promise->mutex);
 }
 
 void core_promise_await(TypeV_Core* core, TypeV_Promise* promise) {
     LOG_INFO("CORE[%d]: Awaiting promise %d", core->id, promise->id);
-    core->state = CS_AWAITING_PROMISE;
-    core->awaitingPromise = promise;
-}
-
-void core_promise_check_resume(TypeV_Core* core) {
-    if(core->state == CS_AWAITING_PROMISE && core->awaitingPromise->resolved) {
-        LOG_INFO("CORE[%d]: Resuming from promise %d", core->id, core->awaitingPromise->id);
-        core->state = CS_RUNNING;
+    pthread_mutex_lock(&promise->mutex);
+    while (promise->status != PS_FULFILLED) {
+        pthread_cond_wait(&promise->cond, &promise->mutex);
     }
+    pthread_mutex_unlock(&promise->mutex);
 }
-
 
 TypeV_Lock* core_lock_alloc(TypeV_Core* core, size_t value){
     TypeV_Lock* lock = calloc(1, sizeof(TypeV_Lock));

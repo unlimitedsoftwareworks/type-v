@@ -64,7 +64,7 @@ typedef struct TypeV_Engine {
 void engine_init(TypeV_Engine *engine);
 
 /**
- * @brief engine_run Run the engine
+ * @brief engine_run Run the engine's main core
  * @param engine
  */
 void engine_run(TypeV_Engine *engine);
@@ -74,7 +74,7 @@ void engine_run(TypeV_Engine *engine);
  * @param engine
  * @param core
  */
-void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter);
+void engine_run_core(TypeV_Engine *engine, TypeV_Core* core);
 
 /**
  * @brief engine_setmain Set the main core

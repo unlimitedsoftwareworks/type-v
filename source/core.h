@@ -10,11 +10,9 @@
 #define TYPE_V_CORE_H
 
 #include <stdint.h>
-#include "queue/queue.h"
 
 #define PTR_SIZE 8
 #define MAX_REG 256
-
 
 typedef struct TypeV_Struct {
     uint16_t* fieldOffsets;                 //< Field offsets table
@@ -43,10 +41,21 @@ typedef struct TypeV_Array {
     uint8_t* data;            ///< Array data
 }TypeV_Array;
 
+typedef enum TypeV_PromiseState {
+    PS_PENDING = 0,
+    PS_FULFILLED
+} TypeV_PromiseState;
+
 typedef struct TypeV_Promise {
-    uint8_t resolved;       ///< resolved flag
-    size_t value;           ///< Promise value
-    uint32_t id;            ///< Promise ID, for debugging
+    TypeV_PromiseState status; ///< resolved flag
+    uintptr_t value;           ///< Promise value
+    uint32_t id;               ///< Promise ID, for debugging
+
+    pthread_mutex_t mutex;     ///< Promise locking mutex
+    pthread_cond_t cond;       ///< Promise condition variable
+
+    void (*cb)(struct TypeV_Core*, size_t); ///< Callback function
+    struct TypeV_Promise** dependencies; ///< Promise dependencies
 }TypeV_Promise;
 
 typedef struct TypeV_Lock {
@@ -56,7 +65,6 @@ typedef struct TypeV_Lock {
     size_t value;           ///< Lock value
     TypeV_Promise *promise; ///< Promise that the lock is awaiting, NULL if none
 }TypeV_Lock;
-
 
 
 /**
@@ -81,21 +89,11 @@ typedef union {
  */
 typedef enum {
     CS_INITIALIZED = 0,   ///< Initialized state
-    CS_HALTED = 1,        ///< Halted as the VM is running another core, or process
-    CS_AWAITING_QUEUE,    ///< Process is awaiting for a queue
     CS_AWAITING_PROMISE,  ///< Process is awaiting for a promise
     CS_RUNNING,           ///< Process is Running
-    CS_FINISHING,         ///< Process has received terminate signal and is no longer accepting messages
     CS_TERMINATED,        ///< Process has been gracefully terminated
-    CS_KILLED   ,          ///< Process has been killed
     CS_CRASHED            ///< Process has crashed
 }TypeV_CoreState;
-
-typedef enum {
-    CSIG_NONE = 0,      ///< No signal
-    CSIG_TERMINATE = 1, ///< Terminate signal
-    CSIG_KILL = 2       ///< Kill signal
-}TypeV_CoreSignal;
 
 /**
  * @brief TypeV Program bytecode
@@ -174,7 +172,6 @@ typedef struct TypeV_GC {
     void** memObjects;
     uint64_t memObjectCount;
     uint64_t memObjectCapacity;
-
     uint64_t totalAllocs;
     uint64_t allocsSincePastGC;
 }TypeV_GC;
@@ -218,28 +215,32 @@ typedef struct TypeV_Closure {
  */
 typedef struct TypeV_Core {
     uint32_t id;                              ///< Core ID
-    uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
 
-    TypeV_IOMessageQueue messageInputQueue;   ///< Message input queue
-    TypeV_GC gc;                      ///< Future Garbage collector
+    TypeV_GC gc;                              ///< GC
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
-    TypeV_CoreSignal lastSignal;              ///< Last signal received
     TypeV_Promise* awaitingPromise;           ///< Promise that the core is awaiting, NULL if none
 
     uint32_t exitCode;                        ///< Exit code
 
-    const uint8_t* constPtr;                        ///< Constant pointer
-    const uint8_t* templatePtr;                     ///< Template pointer
-    const uint8_t* codePtr;                         ///< Code pointer
+    const uint8_t* constPtr;                  ///< Constant pointer
+    const uint8_t* templatePtr;               ///< Template pointer
+    const uint8_t* codePtr;                   ///< Code pointer
 
-    const uint8_t* globalPtr;                       ///< Global pointer
+    const uint8_t* globalPtr;                 ///< Global pointer
     uint64_t ip;                              ///< Instruction pointer
 
     TypeV_Register* regs;                     ///< Registers, pointer to current function state registers for faster access.
     uint16_t* flags;                          ///< Flags, pointer to current function state flags for faster access.
     TypeV_FuncState* funcState;               ///< Function state
+
+    uv_loop_t *loop;                          ///< Event loop
+    pthread_t uvThreadID;                     ///< UV thread ID, since uv runs on a separate thread
+
+    pthread_mutex_t sync_mutex;               ///< Sync mutex, used to synchronize the core with the main thread
+    pthread_cond_t sync_cond;                 ///< Blocks the core until the event thread starts
+    uint8_t loop_ready;                       ///< Loop ready flag
 }TypeV_Core;
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev);
@@ -253,19 +254,11 @@ void core_destroy_function_state(TypeV_Core* core, TypeV_FuncState** state);
  */
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef);
 void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, const uint8_t* globalPool);
-
 /**
  * Deallocates a core
  * @param core
  */
 void core_deallocate(TypeV_Core *core);
-
-
-/**
- * Main loop of core execution
- * @param core
- */
-void core_vm(TypeV_Core *core);
 
 /**
  * Resumes the execution of a halted core
@@ -275,22 +268,11 @@ void core_resume(TypeV_Core *core);
 
 
 /**
- * Halts the execution of a core, usually to switch to another core
+ * Halts the execution of a core, marking its state as awaiting promise
  * @param core
  */
-void core_halt(TypeV_Core *core);
+void core_await_promise(TypeV_Core *core);
 
-/**
- * Sets core to await for a queue
- * @param core
- */
-void core_queue_await(TypeV_Core* core);
-
-/**
- * Awakes process
- * @param core
- */
-void core_queue_resolve(TypeV_Core* core);
 
 
 /**
@@ -401,20 +383,6 @@ void core_process_alloc(TypeV_Core* core, uint64_t ip);
 
 
 /**
- * Sends a message to the core's queue
- * @param core
- * @param message
- */
-void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message);
-
-/**
- * Handles the reception of a signal
- * @param core
- * @param signal
- */
-void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal);
-
-/**
  * Allocates a new lock
  * @param core
  * @return
@@ -437,11 +405,27 @@ void core_lock_release(TypeV_Core* core, TypeV_Lock* lock);
 
 
 /**
- * Allocates new core
+ * Allocates new promise object, used by APIs
  * @param core
  * @return
  */
 TypeV_Promise* core_promise_alloc(TypeV_Core* core);
+
+/**
+ * A standard callback function for promises.
+ * When a promise is resolved and the promise has one or multiple callbacks,
+ * this function is called to execute the callback.
+ * A callback is a function that is executed on the original core where the callback was set, it sets
+ * the first register to the value of the promise (which is the value that the promise was resolved with)
+ * and calls the callback function which is defined by its address.
+ * @param core
+ * @param promise
+ * @param cb_address
+ */
+void core_promise_std_callback(TypeV_Core* core, TypeV_Promise* promise, uintptr_t cb_address);
+
+TypeV_Promise* core_promise_set_cb(TypeV_Core* core, TypeV_Promise* promise, void (*cb)(TypeV_Core*, size_t));
+
 
 /**
  * Resolves a promise
@@ -499,7 +483,6 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state);
 
 void core_gc_update_struct_field(TypeV_Core* core, TypeV_Struct* structPtr, void* ptr, uint16_t fieldIndex);
 void core_gc_update_class_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex);
-void core_gc_update_process_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex);
 void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* ptr, uint64_t fieldIndex);
 TypeV_ObjectHeader* get_header_from_pointer(void* ptr);
 void core_gc_sweep_all(TypeV_Core* core);

@@ -11,7 +11,7 @@
 #include "../stack/stack.h"
 
 
-size_t typev_api_register_lib(const TypeV_FFIFunc methods[]) {
+uintptr_t typev_api_register_lib(const TypeV_FFIFunc methods[]) {
     // get the number of methods
     uint8_t methodCount = 0;
     while(methods[methodCount] != NULL) {
@@ -22,11 +22,11 @@ size_t typev_api_register_lib(const TypeV_FFIFunc methods[]) {
     ffi->functions = methods;
     ffi->functionCount = methodCount;
 
-    return (size_t)ffi;
+    return (uintptr_t)ffi;
 }
 
-size_t typev_api_get_const_address(struct TypeV_Core* core, size_t vm_adr) {
-    return (size_t)core->constPtr+ vm_adr;
+uintptr_t typev_api_get_const_address(struct TypeV_Core* core, uintptr_t vm_adr) {
+    return (uintptr_t)core->constPtr+ vm_adr;
 }
 
 uint64_t typev_api_stack_getSize(TypeV_Core* core) {
@@ -82,8 +82,8 @@ uint64_t typev_api_stack_pop_u64(TypeV_Core* core) {
     return value;
 }
 
-size_t typev_api_stack_pop_ptr(struct TypeV_Core* core){
-    size_t value;
+uintptr_t typev_api_stack_pop_ptr(struct TypeV_Core* core){
+    uintptr_t value;
     stack_pop_ptr(core->funcState, &value);
     return value;
 }
@@ -102,26 +102,26 @@ double typev_api_stack_pop_f64(TypeV_Core* core) {
 
 TypeV_Struct* typev_api_stack_pop_struct(TypeV_Core* core){
     TypeV_Struct* value;
-    stack_pop_ptr(core->funcState, (size_t*)&value);
+    stack_pop_ptr(core->funcState, (uintptr_t*)&value);
     return value;
 }
 
 TypeV_Class* typev_api_stack_pop_class(TypeV_Core* core) {
     TypeV_Class* value;
-    stack_pop_ptr(core->funcState, (size_t*)&value);
+    stack_pop_ptr(core->funcState, (uintptr_t*)&value);
     return value;
 }
 
 TypeV_Interface* typev_api_stack_pop_interface(TypeV_Core* core) {
     TypeV_Interface* value;
-    stack_pop_ptr(core->funcState, (size_t*)&value);
+    stack_pop_ptr(core->funcState, (uintptr_t*)&value);
     return value;
 }
 
 
 TypeV_Array* typev_api_stack_pop_array(TypeV_Core* core) {
     TypeV_Array* value;
-    stack_pop_ptr(core->funcState, (size_t*)&value);
+    stack_pop_ptr(core->funcState, (uintptr_t*)&value);
     return value;
 }
 
@@ -157,7 +157,7 @@ void typev_api_return_u64(TypeV_Core* core, uint64_t value) {
 }
 
 
-void typev_api_return_ptr(TypeV_Core* core, size_t value) {
+void typev_api_return_ptr(TypeV_Core* core, uintptr_t value) {
     stack_push_ptr(core->funcState, value);
 }
 
@@ -170,25 +170,25 @@ void typev_api_return_f64(TypeV_Core* core, double value) {
 }
 
 void typev_api_return_struct(TypeV_Core* core, TypeV_Struct* value) {
-    stack_push_ptr(core->funcState, (size_t)value);
+    stack_push_ptr(core->funcState, (uintptr_t)value);
 }
 
 void typev_api_return_class(TypeV_Core* core, TypeV_Class* value) {
-    stack_push_ptr(core->funcState, (size_t)value);
+    stack_push_ptr(core->funcState, (uintptr_t)value);
 }
 
 void typev_api_return_interface(TypeV_Core* core, TypeV_Interface* value) {
-    stack_push_ptr(core->funcState, (size_t)value);
+    stack_push_ptr(core->funcState, (uintptr_t)value);
 }
 
 void typev_api_return_array(TypeV_Core* core, TypeV_Array* value){
-    stack_push_ptr(core->funcState, (size_t)value);
+    stack_push_ptr(core->funcState, (uintptr_t)value);
 }
 
 /**
 * Structs
 */
-TypeV_Struct *typev_api_struct_create(TypeV_Core *core, uint16_t fieldCount, size_t structSize) {
+TypeV_Struct *typev_api_struct_create(TypeV_Core *core, uint16_t fieldCount, uintptr_t structSize) {
     // allocate memory for the struct
     TypeV_Struct *structPtr = calloc(1, sizeof(TypeV_Struct) + structSize);
     // set the field count
@@ -204,7 +204,7 @@ void typev_api_struct_set_offset(TypeV_Core *core, TypeV_Struct *structPtr, uint
     structPtr->fieldOffsets[fieldIndex] = offset;
 }
 
-void typev_api_struct_set_field(TypeV_Core *core, TypeV_Struct *structPtr, uint16_t fieldIndex, void *value, size_t valueSize) {
+void typev_api_struct_set_field(TypeV_Core *core, TypeV_Struct *structPtr, uint16_t fieldIndex, void *value, uintptr_t valueSize) {
     memcpy(structPtr->data + structPtr->fieldOffsets[fieldIndex], value, valueSize);
 }
 

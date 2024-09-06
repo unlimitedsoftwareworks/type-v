@@ -4,7 +4,6 @@ project(type_v C)
 set(CMAKE_C_STANDARD 11)
 
 add_subdirectory(stdio)
-add_subdirectory(string)
 add_subdirectory(stdcore)
 
 
@@ -25,8 +24,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
 add_executable(
         type_v source/main.c
         source/core.c
-        source/queue/queue.c
-        source/queue/queue.h
         source/engine.c
         source/engine.h
         source/instructions/instructions.c
@@ -52,5 +49,30 @@ add_executable(
         source/vendor/cpu_info/cpu_info.h
 )
 
-add_dependencies(type_v stdio string stdcore)
-target_link_libraries(type_v stdio string stdcore)
+
+# Find libuv package
+find_path(LIBUV_INCLUDE_DIR NAMES uv.h)
+find_library(LIBUV_LIBRARY NAMES uv libuv)
+
+# Handle the QUIETLY/REQUIRED arguments, set LIBUV_FOUND if all variables are found
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(LIBUV
+        REQUIRED_VARS
+        LIBUV_LIBRARY
+        LIBUV_INCLUDE_DIR
+)
+
+# Set standard variables
+if(LIBUV_FOUND)
+    set(LIBUV_INCLUDE_DIRS "${LIBUV_INCLUDE_DIR}")
+    set(LIBUV_LIBRARIES "${LIBUV_LIBRARY}")
+endif()
+
+# Include directories for libuv
+include_directories(${LIBUV_INCLUDE_DIRS})
+
+add_dependencies(type_v stdio stdcore)
+target_link_libraries(type_v ${LIBUV_LIBRARIES})
+
+# Hide internal variables
+mark_as_advanced(LIBUV_INCLUDE_DIR LIBUV_LIBRARY)
