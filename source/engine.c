@@ -265,7 +265,6 @@ static void* dispatch_table[] = { \
     &&DO_DEBUG_REG, \
     &&DO_HALT, \
     &&DO_LOAD_STD, \
-    &&DO_VM_HEALTH, \
     &&DO_SPILL_ALLOC, \
     &&DO_SPILL_REG, \
     &&DO_UNSPILL_REG \
@@ -292,7 +291,7 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         (iter->currentInstructions != iter->maxInstructions) &&\
         !engine->interruptNextLoop)))    {           \
             goto END_RUN;                 }\
-            /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]); */\
+            /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]);*/ \
             goto *dispatch_table[core->codePtr[core->ip++]];                          \
         }
 
@@ -868,9 +867,6 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_LOAD_STD:
             load_std(core);
-            DISPATCH();
-        DO_VM_HEALTH:
-            vm_health(core);
             DISPATCH();
         DO_SPILL_ALLOC:
             spill_alloc(core);

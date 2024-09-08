@@ -238,13 +238,11 @@ static op_func op_funcs[] = {
         &call_ffi,
         &close_ffi,
 
-
         &debug_reg,
         &halt,
 
         &load_std,
 
-        &vm_health,
         &spill_alloc,
         &spill_reg,
         &unspill_reg

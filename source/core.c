@@ -208,7 +208,8 @@ void core_gc_sweep(TypeV_Core* core) {
 
 void core_gc_collect(TypeV_Core* core) {
     LOG_INFO("Collecting state for core %d", core->id);
-    core_gc_collect_state(core, core->funcState);
+    // TODO: uncomment and identify bugs
+    //core_gc_collect_state(core, core->funcState);
 }
 
 void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {

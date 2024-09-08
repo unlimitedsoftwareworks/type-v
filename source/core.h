@@ -201,12 +201,24 @@ typedef struct TypeV_FuncState {
  * @brief Closure, a closure is a function that has captured its environment.
  * TODO: closures are still not implemented
  */
-
 typedef struct TypeV_Closure {
     void* fnPtr; ///< Function pointer
     TypeV_Register* upvalues; ///< Captured registers
     uint32_t envSize; ///< Environment size
 }TypeV_Closure;
+
+
+/**
+ * @brief Coroutine, a coroutine is a function that can be paused and resumed.
+ */
+typedef struct TypeV_Coroutine {
+    // A coroutine persists the state of the function
+    TypeV_FuncState* state;
+    uint8_t isRunning;
+    uint8_t isFinished;
+    // maybe add last instruction pointer
+}TypeV_Coroutine;
+
 
 /**
  * @brief Core structure, a core is the equivalent of a process in type-c.
@@ -396,7 +408,8 @@ typedef struct TypeV_FFI {
     uint8_t functionCount;   ///< FFI function count
 }TypeV_FFI;
 
-
+TypeV_Closure* core_closure_alloc(TypeV_Core* core, void* fnPtr, uint32_t envSize);
+void core_closure_free(TypeV_Core* core, TypeV_Closure* closure);
 
 void* core_gc_alloc(TypeV_Core* core, size_t size);
 

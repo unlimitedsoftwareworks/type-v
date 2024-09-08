@@ -571,18 +571,18 @@ typedef enum TypeV_OpCode {
     OP_UNSPILL_REG,
 
     /**
-     * OP_CLOSURE_ALLOC, dest:R, fn_address: R, env-size: I
+     * OP_CLOSURE_ALLOC, dest:R, fn_address: R, env-size: I[4bytes]
      * Allocates a closure, setting its function pointer to the address in
      * function-address and preparing an environment of environment-size slots.
      */
     OP_CLOSURE_ALLOC,
 
     /**
-     * OP_CAPTURE_VAR, closure: R, source-reg: R, env-slot: I
+     * OP_CLOSURE_CAPTURE, closure: R, env-slot: I, source-reg: R,
      * Copies the value from the specified register in the current function
      * state to the specified environment slot in the closure.
      */
-    OP_CAPTURE_VAR,
+    OP_CLOSURE_CAPTURE,
 
     /**
      * OP_CLOSURE_CALL, closure: R
@@ -611,7 +611,17 @@ typedef enum TypeV_OpCode {
      * Retrieves a value from the specified slot in the closure's
      * environment and stores it in the specified register.
      */
-    OP_GET_CLOSURE_VAR,
+
+    OP_MV_REG_UPVALUE,
+    OP_MV_REG_UPVALUE_PTR,
+
+    OP_MV_UPVALUE_REG,
+    OP_MV_UPVALUE_REG_PTR,
+
+    OP_COROUTINE_ALLOC,
+    OP_COROUTINE_SET_ARG, // sets an argument, one by one
+    OP_COROUTINE_CALL, // calls to resume the coroutine
+    OP_COROUTINE_YIELD, // yields the coroutine
 }TypeV_OpCode;
 
 #endif //TYPE_V_OPCODES_H
