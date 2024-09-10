@@ -72,29 +72,14 @@ typedef enum TypeV_OpCode {
      */
     OP_S_ALLOC,
 
-    /**
-     * OP_S_ALLOC_SHADOW Dest: R, copy: R fields-count: I
-     * Creates a shadow copy of a struct (who's address is stored in copy),
-     * a shadow copy is a copy that points to the same data but with different
-     * offset table. Copy address is stored given register
-     */
-    OP_S_ALLOC_SHADOW,
 
     /**
-     * OP_S_SET_OFFSET dest: R, fieldIndex: I, offset-value: I (2 bytes)
-     * Sets the offset value of field I, of the struct stored in dest
-     * to the given offset value
+     * OP_S_REG_FIELD: dest: R, local_field_index: I(1byte), globalFieldID: I (4 bytes), field offset: I (2 bytes)
+     * Registers a new field in the struct stored in dest, with the given global field ID
+     * and field offset (local), must not exceed the total fields count of the struct
      */
-    OP_S_SET_OFFSET,
+    OP_S_REG_FIELD,
 
-    /**
-     * OP_S_SET_OFFSET_SHADOW src: R, fieldIndexSrc: I, fieldIndexTarget: I
-     * Sets the offset value of field index fieldIndexSrc, of the struct
-     * stored in src to the offset value of field index fieldIndexTarget,
-     * of the original struct referenced by the shadow copy
-     * ie. shadow_copy.offsets[fieldIndexSrc] = original.offsets[fieldIndexTarget]
-     */
-    OP_S_SET_OFFSET_SHADOW,
 
     /**
      * OP_S_LOADF_[size] dest: R, src: R fieldIndex: I, byteSize: S

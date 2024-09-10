@@ -30,10 +30,7 @@ static op_func op_funcs[] = {
         &mv_reg_global_ptr,
 
         &s_alloc,
-        &s_alloc_shadow,
-        &s_set_offset,
-        &s_set_offset_shadow,
-
+        &s_reg_field,
         &s_loadf,
         &s_loadf_ptr,
 

@@ -222,6 +222,7 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
             core_gc_mark_object(core, header);
 
             // Mark original struct if shadow struct
+            /*
             if(header->type == OT_STRUCT_SHADOW) {
                 TypeV_Struct* structPtr = (TypeV_Struct*)(header + 1);
                 if(structPtr->originalStruct != NULL) {
@@ -229,6 +230,7 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
                     core_gc_mark_object(core, originalHeader);
                 }
             }
+             */
             // mark original class if interface
             if(header->type == OT_INTERFACE) {
                 TypeV_Interface* interfacePtr = (TypeV_Interface*)(header + 1);
@@ -328,8 +330,9 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
 
     // Get a pointer to the actual struct, which comes after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
+    struct_ptr->numFields = numfields;
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
-    struct_ptr->originalStruct = NULL;
+    struct_ptr->globalFields = calloc(numfields, sizeof(uint32_t));
     struct_ptr->dataPointer = &struct_ptr->data;
 
     core_gc_update_alloc(core, totalAllocationSize);
@@ -337,30 +340,24 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     return (size_t)struct_ptr;
 }
 
-size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct) {
-    TypeV_Struct* original = (TypeV_Struct*)originalStruct;
-    LOG_INFO("CORE[%d]: Allocating struct shadow of %p with %d fields", core->id, (void*)originalStruct, numfields);
+uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID) {
+    int left = 0;
+    int right = structData->numFields - 1;
 
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
 
-    // Set header information
-    header->marked = 0;
-    header->type = OT_STRUCT_SHADOW;  // Assuming you have an enum value for shadow structs
-    header->size = totalAllocationSize;
-    header->ptrsCount = numfields;
-    header->ptrs = calloc(numfields, sizeof(void*));
+        if (structData->globalFields[mid] == globalID) {
+            return (uint8_t)mid;  // Return the index where the global ID is found
+        } else if (structData->globalFields[mid] < globalID) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
 
-    // Get a pointer to the actual struct, which comes after the header
-    TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
-    struct_ptr->dataPointer = original->data;  // Point to original struct's data
-    struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));  // Allocate field offsets
-    struct_ptr->originalStruct = original;
 
-    // Track the allocation with the GC
-    core_gc_update_alloc(core, totalAllocationSize);
-
-    return (size_t)struct_ptr;
+    return (uint8_t)-1;  // Return -1 if the global ID is not found
 }
 
 size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {

@@ -16,11 +16,11 @@
 
 
 typedef struct TypeV_Struct {
+    uint8_t numFields;                      //< Number of fields in the struct, needed for search
     uint16_t* fieldOffsets;                 //< Field offsets table
-    struct TypeV_Struct* originalStruct;    //< Pointer to the original struct, NULL if this is not a shadow struct
+    uint32_t* globalFields;                 //< Global fields table, contains ids of global fields, sorted
     uint8_t* dataPointer;                   //< Pointer to the data
     uint8_t data[];                         //< Data block, if this is a shadow struct,
-                                            // this is a pointer to the original struct's data
 }TypeV_Struct;
 
 typedef struct TypeV_Class{
@@ -295,16 +295,16 @@ void core_halt(TypeV_Core *core);
  * @param totalsize Total size of the struct
  * @return Pointer to the allocated struct
  */
-uintptr_t  core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
+uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
 
 /**
- * Allocates a struct object as shadow to another struct
- * @param core
- * @param numfields Number of struct fieldOffsets
- * @param totalsize Total size of the struct
- * @return Pointer to the allocated struct
+ * @brief Find the index of the global ID in the globalFields array using binary search.
+ *
+ * @param structData Pointer to the TypeV_Struct containing the sorted globalFields.
+ * @param globalID The global field ID to search for.
+ * @return uint8_t The index of the global field ID within the globalFields array, or -1 if not found.
  */
-uintptr_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct);
+uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID);
 
 /**
  * Allocates a class object

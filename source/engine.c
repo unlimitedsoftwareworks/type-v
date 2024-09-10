@@ -86,9 +86,7 @@ static void* dispatch_table[] = { \
     &&DO_MV_REG_GLOBAL, \
     &&DO_MV_REG_GLOBAL_PTR, \
     &&DO_S_ALLOC, \
-    &&DO_S_ALLOC_SHADOW, \
-    &&DO_S_SET_OFFSET, \
-    &&DO_S_SET_OFFSET_SHADOW, \
+    &&DO_S_REG_FIELD, \
     &&DO_S_LOADF, \
     &&DO_S_LOADF_PTR, \
     &&DO_S_STOREF_CONST, \
@@ -329,14 +327,8 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_S_ALLOC:
             s_alloc(core);
             DISPATCH();
-        DO_S_ALLOC_SHADOW:
-            s_alloc_shadow(core);
-            DISPATCH();
-        DO_S_SET_OFFSET:
-            s_set_offset(core);
-            DISPATCH();
-        DO_S_SET_OFFSET_SHADOW:
-            s_set_offset_shadow(core);
+        DO_S_REG_FIELD:
+            s_reg_field(core);
             DISPATCH();
         DO_S_LOADF:
             s_loadf(core);
