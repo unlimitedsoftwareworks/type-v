@@ -48,9 +48,7 @@ static char* instructions[] = {
         "mv_reg_global_ptr",
 
         "s_alloc",
-        "s_alloc_shadow",
-        "s_set_offset",
-        "s_set_offset_shadow",
+        "s_reg_field",
 
         "s_loadf",
         "s_loadf_ptr",
@@ -73,16 +71,8 @@ static char* instructions[] = {
 
         "c_loadf",
         "c_loadf_ptr",
-
-        "i_alloc",
-        "i_alloc_i",
-        "i_set_offset",
-        "i_set_offset_i",
-        "i_set_offset_m",
-        "i_loadm",
         "i_is_c",
-        "i_is_i",
-        "i_get_c",
+        "i_has_m",
 
         "a_alloc",
         "a_extend",
@@ -261,7 +251,6 @@ static char* instructions[] = {
 
         "load_std",
 
-        "vm_health",
         "spill_alloc",
         "spill_reg",
         "unspill_reg"

@@ -273,7 +273,7 @@ static inline void s_loadf_ptr(TypeV_Core* core){
 
     const uint8_t source = core->codePtr[core->ip++];
 
-    const uint8_t field_index = 0;
+    uint32_t field_index = 0;
     typev_memcpy_u64_ptr(&field_index, &core->codePtr[core->ip],  4);
     core->ip += 4;
 
@@ -369,26 +369,36 @@ static inline void c_alloc(TypeV_Core* core){
 static inline void c_storem(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
-    const uint8_t method_index = core->codePtr[core->ip++];
-    size_t methd_address = 0; /* we do not increment methd_address here*/
-    typev_memcpy_u64_ptr(&methd_address, &core->codePtr[core->ip], 8);
+    const uint8_t local_method_index = core->codePtr[core->ip++];
+    uint32_t global_method_index = 0;
+    typev_memcpy_u64_ptr(&global_method_index, &core->codePtr[core->ip],  4);
+    core->ip += 4;
+
+    size_t method_address = 0; /* we do not increment method_address here*/
+    typev_memcpy_u64_ptr(&method_address, &core->codePtr[core->ip], 8);
     core->ip += 8;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[dest_reg].ptr;
-    LOG_INFO("Storing method %d at method_address %d in class %p", method_index, methd_address, (void*)c);
-    c->methods[method_index] = methd_address;
+    LOG_INFO("Storing method %d at method_address %d in class %p", method_index, method_address, (void*)c);
+    c->globalMethods[local_method_index] = global_method_index;
+    c->methods[local_method_index] = method_address;
 }
 
 static inline void c_loadm(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
-    const uint8_t method_index = core->codePtr[core->ip++];
+    uint32_t method_index = 0;
+
+    typev_memcpy_u64_ptr(&method_index, &core->codePtr[core->ip],  4);
+    core->ip += 4;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
 
+    uint8_t idx = class_find_global_index(c, method_index);
+
     LOG_INFO("Loading method %d from class %p", method_index, (void*)c);
 
-    size_t offset = c->methods[method_index];
+    size_t offset = c->methods[idx];
     core->regs[target].ptr = offset;
 }
 
@@ -471,99 +481,6 @@ static inline void c_loadf_ptr(TypeV_Core* core){
     typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, PTR_SIZE);
 }
 
-static inline void i_alloc(TypeV_Core* core){
-    const uint8_t dest_reg = core->codePtr[core->ip++];
-    const uint8_t fields_count = core->codePtr[core->ip++];
-    const uint8_t class_reg = core->codePtr[core->ip++];
-
-    TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    // allocate memory for struct
-    size_t mem = core_interface_alloc(core, fields_count, c);
-    // move the pointer to R18
-    core->regs[dest_reg].ptr = mem;
-}
-
-static inline void i_alloc_i(TypeV_Core* core){
-    const uint8_t dest_reg = core->codePtr[core->ip++];
-    const uint8_t methods_count = core->codePtr[core->ip++];
-    const uint8_t interface_reg = core->codePtr[core->ip++];
-
-    TypeV_Interface* i = (TypeV_Interface*)core->regs[interface_reg].ptr;
-    size_t interface_new = core_interface_alloc_i(core, methods_count, i);
-    core->regs[dest_reg].ptr = interface_new;
-}
-
-static inline void i_set_offset(TypeV_Core* core){
-    const uint8_t dest_reg = core->codePtr[core->ip++];
-    const uint8_t field_index = core->codePtr[core->ip++];
-    size_t offset = 0;
-    typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 2);
-    core->ip += 2;
-
-    TypeV_Interface* i = (TypeV_Interface*)core->regs[dest_reg].ptr;
-    i->methodsOffset[field_index] = offset;
-}
-
-static inline void i_set_offset_i(TypeV_Core* core) {
-    const uint8_t dest = core->codePtr[core->ip++];
-    const uint8_t field_source = core->codePtr[core->ip++];
-    const uint8_t field_target = core->codePtr[core->ip++];
-    const uint8_t interface_reg = core->codePtr[core->ip++];
-
-    TypeV_Interface* i = (TypeV_Interface*)core->regs[dest].ptr;
-    TypeV_Interface* v = (TypeV_Interface*)core->regs[interface_reg].ptr;
-
-    uint16_t z = i->methodsOffset[field_target];
-    uint16_t y = v->methodsOffset[field_source];
-
-    i->methodsOffset[field_target] = v->methodsOffset[field_source];
-}
-
-
-static inline void i_set_offset_m(TypeV_Core* core){
-    uint64_t lookUpMethodId = 0;
-    typev_memcpy_u64_ptr(&lookUpMethodId, &core->codePtr[core->ip],  8);
-    core->ip += 8;
-
-    uint16_t field_number = 0;
-    typev_memcpy_u64_ptr(&field_number, &core->codePtr[core->ip],  2);
-    core->ip += 2;
-
-    uint64_t jumpFailureAddress = 0;
-    typev_memcpy_u64_ptr(&jumpFailureAddress, &core->codePtr[core->ip],  8);
-    core->ip += 8;
-
-    TypeV_Interface* interface = (TypeV_Interface*)core->regs[16].ptr;
-    TypeV_Class * class_ = interface->classPtr;
-
-    uint8_t found = 0;
-    for(size_t i = 0; i < class_->num_methods; i++) {
-        uint64_t methodId = 0;
-        typev_memcpy_u64_ptr(&methodId, &core->codePtr[class_->methods[i]],  8);
-        if(lookUpMethodId == methodId) {
-            found = 1;
-            uint16_t offset = i;
-            typev_memcpy_u64_ptr(&interface->methodsOffset[field_number], &offset, 2);
-            break;
-        }
-    }
-
-    if(!found){
-        core->ip = jumpFailureAddress;
-    }
-}
-
-static inline void i_loadm(TypeV_Core* core){
-    const uint8_t target = core->codePtr[core->ip++];
-    const uint8_t interface_reg = core->codePtr[core->ip++];
-    const uint8_t method_index = core->codePtr[core->ip++];
-
-    TypeV_Interface* i = (TypeV_Interface*)core->regs[interface_reg].ptr;
-    size_t offset = i->methodsOffset[method_index];
-
-    core->regs[target].ptr = i->classPtr->methods[offset];
-}
-
 static inline void i_is_c(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t interface_reg = core->codePtr[core->ip++];
@@ -572,16 +489,15 @@ static inline void i_is_c(TypeV_Core* core){
     typev_memcpy_u64_ptr(&classId, &core->codePtr[core->ip],  8);
     core->ip += 8;
 
-    TypeV_Interface* interface = (TypeV_Interface*)core->regs[interface_reg].ptr;
-    TypeV_Class * class_ = interface->classPtr;
+    TypeV_Class* class_ = (TypeV_Class*)core->regs[interface_reg].ptr;
 
     core->regs[target].u8 = class_->uid == classId;
 }
 
-static inline void i_is_i(TypeV_Core* core){
-    uint64_t lookUpMethodId = 0;
-    typev_memcpy_u64_ptr(&lookUpMethodId, &core->codePtr[core->ip],  8);
-    core->ip += 8;
+static inline void i_has_m(TypeV_Core* core){
+    uint32_t lookUpMethodId = 0;
+    typev_memcpy_u64_ptr(&lookUpMethodId, &core->codePtr[core->ip],  4);
+    core->ip += 4;
 
     const uint8_t interface_reg = core->codePtr[core->ip++];
 
@@ -589,14 +505,15 @@ static inline void i_is_i(TypeV_Core* core){
     typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
 
-    TypeV_Interface* interface = (TypeV_Interface*)core->regs[interface_reg].ptr;
-    TypeV_Class * class_ = interface->classPtr;
+    TypeV_Class * class_ = (TypeV_Class*)core->regs[interface_reg].ptr;
 
     uint8_t found = 0;
-    for(size_t i = 0; i < class_->num_methods; i++) {
-        uint64_t methodId = 0;
-        typev_memcpy_u64_ptr(&methodId, &core->codePtr[class_->methods[i]]-8,  8);
-        if(lookUpMethodId == methodId) {
+
+    // TODO: use bloom filters
+    // or use other optimization, for its a naive search
+
+    for(uint32_t i = 0; i < class_->num_methods; i++){
+        if(class_->globalMethods[i] == lookUpMethodId){
             found = 1;
             break;
         }
@@ -605,14 +522,6 @@ static inline void i_is_i(TypeV_Core* core){
     if(!found){
         core->ip = offset;
     }
-}
-
-static inline void i_get_c(TypeV_Core* core) {
-    const uint8_t dest_reg = core->codePtr[core->ip++];
-    const uint8_t src_reg = core->codePtr[core->ip++];
-
-    TypeV_Interface* interface = (TypeV_Interface*)core->regs[src_reg].ptr;
-    core->regs[dest_reg].ptr = (size_t)interface->classPtr;
 }
 
 static inline void a_alloc(TypeV_Core* core){

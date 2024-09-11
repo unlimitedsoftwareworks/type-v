@@ -159,19 +159,9 @@ void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
 
             break;
         }
-        case OT_STRUCT_SHADOW: {
-            TypeV_Struct *s = (TypeV_Struct *) (header + 1);
-            //free(s->fieldOffsets);
-
-            break;
-        }
         case OT_CLASS: {
             TypeV_Class* c = (TypeV_Class *)(header + 1);
             //free(c->methods);
-            break;
-        }
-        case OT_INTERFACE: {
-            TypeV_Interface* i = (TypeV_Interface*)(header + 1);
             break;
         }
         case OT_ARRAY: {
@@ -231,12 +221,6 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
                 }
             }
              */
-            // mark original class if interface
-            if(header->type == OT_INTERFACE) {
-                TypeV_Interface* interfacePtr = (TypeV_Interface*)(header + 1);
-                TypeV_ObjectHeader* classHeader = get_header_from_pointer(interfacePtr->classPtr);
-                core_gc_mark_object(core, classHeader);
-            }
         }
     }
 
@@ -356,8 +340,30 @@ uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID) {
         }
     }
 
+    // unreachable, in theory
+    LOG_ERROR("Global ID not found in struct");
+    exit(-1);
+}
 
-    return (uint8_t)-1;  // Return -1 if the global ID is not found
+uint8_t class_find_global_index(TypeV_Class* classData, uint32_t globalID) {
+    int left = 0;
+    int right = classData->num_methods - 1;
+
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+
+        if (classData->globalMethods[mid] == globalID) {
+            return (uint8_t)mid;  // Return the index where the global ID is found
+        } else if (classData->globalMethods[mid] < globalID) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    // unreachable, in theory
+    LOG_ERROR("Global ID not found in class");
+    exit(-1);
 }
 
 size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {
@@ -378,6 +384,7 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
     class_ptr->num_methods = num_methods;
     class_ptr->uid = classId;
     class_ptr->methods = calloc(num_methods, sizeof(size_t));
+    class_ptr->globalMethods = calloc(num_methods, sizeof(uint32_t));
 
     // Initialize other class fields here if needed
 
@@ -385,40 +392,6 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
     core_gc_update_alloc(core, totalAllocationSize);
 
     return (size_t)class_ptr;
-}
-
-size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class *class_ptr) {
-    LOG_INFO("CORE[%d]: Allocating interface from class %p with %d methods", core->id, (void*)class_ptr, num_methods);
-
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Interface) + sizeof(uint16_t) * num_methods;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
-    header->marked = 0;
-    header->type = OT_INTERFACE;
-    header->size = totalAllocationSize;
-
-    TypeV_Interface* interface_ptr = (TypeV_Interface*)(header + 1);
-    interface_ptr->classPtr = class_ptr;
-
-    core_gc_update_alloc(core, totalAllocationSize);
-
-    return (size_t)interface_ptr;
-}
-
-size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* original_interface_ptr) {
-    LOG_INFO("CORE[%d]: Allocating interface from interface %p with %d methods", core->id, (void*)original_interface_ptr, num_methods);
-
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Interface) + sizeof(uint16_t) * num_methods;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
-    header->marked = 0;
-    header->type = OT_INTERFACE;
-    header->size = totalAllocationSize;
-
-    TypeV_Interface* interface_ptr_new = (TypeV_Interface*)(header + 1);
-    interface_ptr_new->classPtr = original_interface_ptr->classPtr;
-
-    core_gc_update_alloc(core, totalAllocationSize);
-
-    return (size_t)interface_ptr_new;
 }
 
 size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {

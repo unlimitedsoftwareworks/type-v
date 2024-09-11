@@ -24,17 +24,14 @@ typedef struct TypeV_Struct {
 }TypeV_Struct;
 
 typedef struct TypeV_Class{
-    uint64_t uid;             ///< Unique ID
-    uint8_t num_methods;      ///< number of methods
-    size_t* methods;          ///< A pointer to the method table
+    uint64_t uid;             //< Unique ID
+    uint8_t num_methods;      //< number of methods
+    uint32_t* globalMethods;  //< Global fields table, contains ids of global fields, sorted
+    size_t* methods;          //< A pointer to the method table
     /** data */
-    uint8_t data[];            ///< Fields start from here, direct access
+    uint8_t data[];           //< Fields start from here, direct access
 }TypeV_Class;
 
-typedef struct TypeV_Interface {
-    TypeV_Class* classPtr;    ///< Pointer to the class that implements this interface
-    uint16_t methodsOffset[];  ///< method offset table
-}TypeV_Interface;
 
 typedef struct TypeV_Array {
     uint8_t elementSize;      ///< Size of each element
@@ -147,9 +144,7 @@ typedef struct TypeV_GlobalPool {
 typedef enum {
     OT_CLASS = 0,
     OT_PROCESS,
-    OT_INTERFACE,
     OT_STRUCT,
-    OT_STRUCT_SHADOW,
     OT_ARRAY,
     OT_RAWMEM,
 }TypeV_ObjectType;
@@ -306,6 +301,15 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
  */
 uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID);
 
+
+/**
+ * @brief Find the index of the global ID in the globalMethods array using binary search.
+ * @param classData
+ * @param globalID
+ * @return
+ */
+uint8_t class_find_global_index(TypeV_Class* classData, uint32_t globalID);
+
 /**
  * Allocates a class object
  * @param core
@@ -315,23 +319,6 @@ uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID);
  */
 uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId);
 
-/**
- * Allocates an interface object
- * @param core
- * @param num_methods number of methods
- * @param class_ptr class reference
- */
-uintptr_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
-
-/**
- * Allocates an interface object from another interface
- * inheriting its parent class
- * @param core
- * @param num_methods
- * @param interface_ptr
- * @return
- */
-uintptr_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* interface_ptr);
 /**
  * Allocates an array object
  * @param core

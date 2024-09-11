@@ -104,21 +104,20 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG_PTR,
 
     /**
-     * OP_C_ALLOC dest:
-     * R num-methods: I, class-fields-size: I (2 bytes), classId-size: Z, classId: I
+     * OP_C_ALLOC dest: R num-methods: I, class-fields-size: I (2 bytes), num_methods: I(1b) classId-size: Z, classId: I
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into dest.
      */
     OP_C_ALLOC,
 
     /**
-     * OP_C_STOREM destReg: R, methodIndex: I, methodAddress: I(8 bytes)
+     * OP_C_STOREM destReg: R, localMethodIndex: I (1b), globalMethodIndex: I(4bytes), methodAddress: I(8 bytes)
      * Stores methodAddress into method table index methodIndex of class stored in destReg
      */
     OP_C_STOREM,
 
     /**
-     * OP_C_LOADM dest: R, classReg: R methodIndex: I
+     * OP_C_LOADM dest: R, classReg: R, global method index: I
      * Loads method address from method table of class stored in classReg to register R
      */
     OP_C_LOADM,
@@ -144,70 +143,21 @@ typedef enum TypeV_OpCode {
     OP_C_LOADF,
     OP_C_LOADF_PTR,
 
-
     /**
-     * OP_I_ALLOC dest: R, num_methods: I, class: R
-     * Allocates new interface method table of given total methods count (arg1),
-     * interface is based on class stored in dest. Interface address is
-     * stored in class
-     */
-    OP_I_ALLOC,
-
-    /**
-     * OP_I_ALLOC_I dest: R, num_methods: I, interface: R
-     * Allocates new interface from another interface,
-     * inheriting its parent class, and storing the new interface
-     * address in dest
-     */
-    OP_I_ALLOC_I,
-
-    /**
-     * OP_I_SET_OFFSET dest: R, methodIndex: I, offset-value: I (2bytes)
-     * Sets the offset value of method I, of the interface stored in dest
-     */
-    OP_I_SET_OFFSET,
-
-    /**
-     * OP_I_SET_OFFSET_I dest: R, methodIndexSrc: I, methodIndexTarget: I, src interface: R
-     * Updates the offset value of method index methodIndexSrc, of the interface src in
-     * to the offset value of method index methodIndexTarget, of the interface stored in dest
-     */
-    OP_I_SET_OFFSET_I,
-
-    /**
-     * OP_I_SET_OFFSET_M dest: R, methodID: I (8bytes), methodIndex: I (2 bytes) jumpFailure: I (8 bytes)
-     * find the method methodID from the base class of the interface stored in dest,
-     * sets its offset in the current interface's methodIndex to the given offset value. If the methodID
-     * is not found, it jumps to the given address
-     */
-    OP_I_SET_OFFSET_M,
-
-    /**
-     * OP_I_LOADM dest: R, src: R methodIndex: I
-     * Loads method address from method table of interface stored in src to register dest
-     */
-    OP_I_LOADM,
-
-    /**
-     * OP_C_IS_C dest: R, src: R, classId: I (8 bytes)
+     * OP_I_IS_C dest: R, src: R, classId: I (8 bytes)
      * Checks if the given interface who's stored in src class id is the
-     * same as the given id. Stores the result in R
+     * same as the given id. Storecls the result in R
      */
     OP_I_IS_C,
 
     /**
-     * OP_I_IS_I method_id: I (8 bytes), src: R, jump-address: I (8 bytes)
+     * OP_I_HAS_M method_id: I (4 bytes), src: R, jump-address: I (8 bytes)
      * Checks if the base class of the interface which is stored in src has
      * a method with the same given ID. If a method with the same ID is found,
      * it continues. Otherwise, it jumps to the given address.
      */
-    OP_I_IS_I,
+    OP_I_HAS_M,
 
-    /**
-     * OP_I_GET_C dest: R, interface: R
-     * Gets the class of the given interface, stores the address of the class in R
-     */
-    OP_I_GET_C,
 
     /**
      * OP_A_ALLOC dest: R, num_elements: I (8 bytes), element_size: Z

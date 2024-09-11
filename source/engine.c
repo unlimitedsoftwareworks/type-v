@@ -102,15 +102,8 @@ static void* dispatch_table[] = { \
     &&DO_C_STOREF_CONST_PTR, \
     &&DO_C_LOADF, \
     &&DO_C_LOADF_PTR, \
-    &&DO_I_ALLOC, \
-    &&DO_I_ALLOC_I, \
-    &&DO_I_SET_OFFSET, \
-    &&DO_I_SET_OFFSET_I, \
-    &&DO_I_SET_OFFSET_M, \
-    &&DO_I_LOADM, \
     &&DO_I_IS_C, \
-    &&DO_I_IS_I, \
-    &&DO_I_GET_C, \
+    &&DO_I_HAS_M, \
     &&DO_A_ALLOC, \
     &&DO_A_EXTEND, \
     &&DO_A_LEN,        \
@@ -284,11 +277,6 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
 
         DISPATCH_TABLE
         #define DISPATCH() { \
-            iter->currentInstructions += 1-runInf; \
-            if(!(((core->state == CS_RUNNING) &&\
-        (iter->currentInstructions != iter->maxInstructions) &&\
-        !engine->interruptNextLoop)))    {           \
-            goto END_RUN;                 }\
             /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]);*/ \
             goto *dispatch_table[core->codePtr[core->ip++]];                          \
         }
@@ -375,32 +363,11 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_C_LOADF_PTR:
             c_loadf_ptr(core);
             DISPATCH();
-        DO_I_ALLOC:
-            i_alloc(core);
-            DISPATCH();
-        DO_I_ALLOC_I:
-            i_alloc_i(core);
-            DISPATCH();
-        DO_I_SET_OFFSET:
-            i_set_offset(core);
-            DISPATCH();
-        DO_I_SET_OFFSET_I:
-            i_set_offset_i(core);
-            DISPATCH();
-        DO_I_SET_OFFSET_M:
-            i_set_offset_m(core);
-            DISPATCH();
-        DO_I_LOADM:
-            i_loadm(core);
-            DISPATCH();
         DO_I_IS_C:
             i_is_c(core);
             DISPATCH();
-        DO_I_IS_I:
-            i_is_i(core);
-            DISPATCH();
-        DO_I_GET_C:
-            i_get_c(core);
+        DO_I_HAS_M:
+            i_has_m(core);
             DISPATCH();
         DO_A_ALLOC:
             a_alloc(core);

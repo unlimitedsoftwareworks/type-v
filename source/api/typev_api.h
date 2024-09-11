@@ -31,7 +31,6 @@ float typev_api_stack_pop_f32(struct TypeV_Core* core);
 double typev_api_stack_pop_f64(struct TypeV_Core* core);
 TypeV_Struct* typev_api_stack_pop_struct(struct TypeV_Core* core);
 TypeV_Class* typev_api_stack_pop_class(struct TypeV_Core* core);
-TypeV_Interface* typev_api_stack_pop_interface(struct TypeV_Core* core);
 TypeV_Array* typev_api_stack_pop_array(struct TypeV_Core* core);
 
 void typev_api_return_i8(struct TypeV_Core* core, int8_t value);
@@ -47,7 +46,6 @@ void typev_api_return_f32(struct TypeV_Core* core, float value);
 void typev_api_return_f64(struct TypeV_Core* core, double value);
 void typev_api_return_struct(struct TypeV_Core* core, TypeV_Struct* value);
 void typev_api_return_class(struct TypeV_Core* core, TypeV_Class* value);
-void typev_api_return_interface(struct TypeV_Core* core, TypeV_Interface* value);
 void typev_api_return_array(struct TypeV_Core* core, TypeV_Array* value);
 
 /**
