@@ -10,6 +10,7 @@ add_subdirectory(stdcore)
 
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 
+# disable inlining for easier debugging
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
 
@@ -22,11 +23,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-overflow")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=bounds")
 
-add_executable(
-        type_v source/main.c
+add_executable(type_v
+        source/main.c
         source/core.c
-        source/queue/queue.c
-        source/queue/queue.h
         source/engine.c
         source/engine.h
         source/instructions/instructions.c

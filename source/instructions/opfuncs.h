@@ -30,10 +30,7 @@ static op_func op_funcs[] = {
         &mv_reg_global_ptr,
 
         &s_alloc,
-        &s_alloc_shadow,
-        &s_set_offset,
-        &s_set_offset_shadow,
-
+        &s_reg_field,
         &s_loadf,
         &s_loadf_ptr,
 
@@ -56,15 +53,8 @@ static op_func op_funcs[] = {
         &c_loadf,
         &c_loadf_ptr,
 
-        &i_alloc,
-        &i_alloc_i,
-        &i_set_offset,
-        &i_set_offset_i,
-        &i_set_offset_m,
-        &i_loadm,
         &i_is_c,
-        &i_is_i,
-        &i_get_c,
+        &i_has_m,
 
         &a_alloc,
         &a_extend,
@@ -238,31 +228,11 @@ static op_func op_funcs[] = {
         &call_ffi,
         &close_ffi,
 
-        &p_alloc,
-        &p_dequeue,
-        &p_queue_size,
-        &p_emit,
-        &p_wait_queue,
-        &p_send_sig,
-        &p_id,
-        &p_cid,
-        &p_state,
-
-        &promise_alloc,
-        &promise_resolve,
-        &promise_await,
-        &promise_data,
-
-        &lock_alloc,
-        &lock_acquire,
-        &lock_release,
-
         &debug_reg,
         &halt,
 
         &load_std,
 
-        &vm_health,
         &spill_alloc,
         &spill_reg,
         &unspill_reg

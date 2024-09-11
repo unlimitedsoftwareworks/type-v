@@ -61,8 +61,8 @@ uint8_t *readSegment(FILE *file, uint64_t offset, size_t size);
 
 int main(int argc, char **argv) {
 
-    char *filePath = "../../type-c/output/bin.tcv"; // Change to your file's path
-    char *srcMapFile = "../../type-c/output/src_map.map.txt";
+    char *filePath = "/Users/praisethemoon/projects/type-c/type-c/output/bin.tcv"; // Change to your file's path
+    char *srcMapFile = "/Users/praisethemoon/projects/type-c/type-c/output/src_map.map.txt";
     if (argc > 1){
         filePath = argv[1];
     }

@@ -72,29 +72,14 @@ typedef enum TypeV_OpCode {
      */
     OP_S_ALLOC,
 
-    /**
-     * OP_S_ALLOC_SHADOW Dest: R, copy: R fields-count: I
-     * Creates a shadow copy of a struct (who's address is stored in copy),
-     * a shadow copy is a copy that points to the same data but with different
-     * offset table. Copy address is stored given register
-     */
-    OP_S_ALLOC_SHADOW,
 
     /**
-     * OP_S_SET_OFFSET dest: R, fieldIndex: I, offset-value: I (2 bytes)
-     * Sets the offset value of field I, of the struct stored in dest
-     * to the given offset value
+     * OP_S_REG_FIELD: dest: R, local_field_index: I(1byte), globalFieldID: I (4 bytes), field offset: I (2 bytes)
+     * Registers a new field in the struct stored in dest, with the given global field ID
+     * and field offset (local), must not exceed the total fields count of the struct
      */
-    OP_S_SET_OFFSET,
+    OP_S_REG_FIELD,
 
-    /**
-     * OP_S_SET_OFFSET_SHADOW src: R, fieldIndexSrc: I, fieldIndexTarget: I
-     * Sets the offset value of field index fieldIndexSrc, of the struct
-     * stored in src to the offset value of field index fieldIndexTarget,
-     * of the original struct referenced by the shadow copy
-     * ie. shadow_copy.offsets[fieldIndexSrc] = original.offsets[fieldIndexTarget]
-     */
-    OP_S_SET_OFFSET_SHADOW,
 
     /**
      * OP_S_LOADF_[size] dest: R, src: R fieldIndex: I, byteSize: S
@@ -119,21 +104,20 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG_PTR,
 
     /**
-     * OP_C_ALLOC dest:
-     * R num-methods: I, class-fields-size: I (2 bytes), classId-size: Z, classId: I
+     * OP_C_ALLOC dest: R num-methods: I, class-fields-size: I (2 bytes), num_methods: I(1b) classId-size: Z, classId: I
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into dest.
      */
     OP_C_ALLOC,
 
     /**
-     * OP_C_STOREM destReg: R, methodIndex: I, methodAddress: I(8 bytes)
+     * OP_C_STOREM destReg: R, localMethodIndex: I (1b), globalMethodIndex: I(4bytes), methodAddress: I(8 bytes)
      * Stores methodAddress into method table index methodIndex of class stored in destReg
      */
     OP_C_STOREM,
 
     /**
-     * OP_C_LOADM dest: R, classReg: R methodIndex: I
+     * OP_C_LOADM dest: R, classReg: R, global method index: I
      * Loads method address from method table of class stored in classReg to register R
      */
     OP_C_LOADM,
@@ -159,70 +143,21 @@ typedef enum TypeV_OpCode {
     OP_C_LOADF,
     OP_C_LOADF_PTR,
 
-
     /**
-     * OP_I_ALLOC dest: R, num_methods: I, class: R
-     * Allocates new interface method table of given total methods count (arg1),
-     * interface is based on class stored in dest. Interface address is
-     * stored in class
-     */
-    OP_I_ALLOC,
-
-    /**
-     * OP_I_ALLOC_I dest: R, num_methods: I, interface: R
-     * Allocates new interface from another interface,
-     * inheriting its parent class, and storing the new interface
-     * address in dest
-     */
-    OP_I_ALLOC_I,
-
-    /**
-     * OP_I_SET_OFFSET dest: R, methodIndex: I, offset-value: I (2bytes)
-     * Sets the offset value of method I, of the interface stored in dest
-     */
-    OP_I_SET_OFFSET,
-
-    /**
-     * OP_I_SET_OFFSET_I dest: R, methodIndexSrc: I, methodIndexTarget: I, src interface: R
-     * Updates the offset value of method index methodIndexSrc, of the interface src in
-     * to the offset value of method index methodIndexTarget, of the interface stored in dest
-     */
-    OP_I_SET_OFFSET_I,
-
-    /**
-     * OP_I_SET_OFFSET_M dest: R, methodID: I (8bytes), methodIndex: I (2 bytes) jumpFailure: I (8 bytes)
-     * find the method methodID from the base class of the interface stored in dest,
-     * sets its offset in the current interface's methodIndex to the given offset value. If the methodID
-     * is not found, it jumps to the given address
-     */
-    OP_I_SET_OFFSET_M,
-
-    /**
-     * OP_I_LOADM dest: R, src: R methodIndex: I
-     * Loads method address from method table of interface stored in src to register dest
-     */
-    OP_I_LOADM,
-
-    /**
-     * OP_C_IS_C dest: R, src: R, classId: I (8 bytes)
+     * OP_I_IS_C dest: R, src: R, classId: I (8 bytes)
      * Checks if the given interface who's stored in src class id is the
-     * same as the given id. Stores the result in R
+     * same as the given id. Storecls the result in R
      */
     OP_I_IS_C,
 
     /**
-     * OP_I_IS_I method_id: I (8 bytes), src: R, jump-address: I (8 bytes)
+     * OP_I_HAS_M method_id: I (4 bytes), src: R, jump-address: I (8 bytes)
      * Checks if the base class of the interface which is stored in src has
      * a method with the same given ID. If a method with the same ID is found,
      * it continues. Otherwise, it jumps to the given address.
      */
-    OP_I_IS_I,
+    OP_I_HAS_M,
 
-    /**
-     * OP_I_GET_C dest: R, interface: R
-     * Gets the class of the given interface, stores the address of the class in R
-     */
-    OP_I_GET_C,
 
     /**
      * OP_A_ALLOC dest: R, num_elements: I (8 bytes), element_size: Z
@@ -541,117 +476,6 @@ typedef enum TypeV_OpCode {
 
     OP_CLOSE_FFI,
 
-    /**
-     * OP_P_ALLOC dest: R, initfn-offset-size: Z, initfn-offset: I
-     * Allocates a new process, storing its address in R
-     * and calls the init function at the given offset
-     */
-    OP_P_ALLOC,
-
-
-    /**
-     * OP_P_DEQUEUE dest: R, promise: Rm
-     * gets a message from the current process message queue,
-     * stores the message in dest and the address of the promise
-     * in the given register
-     */
-    OP_P_DEQUEUE,
-
-    /**
-     * OP_P_QUEUE_SIZE dest: R,
-     */
-    OP_P_QUEUE_SIZE,
-
-    /**
-     * OP_P_EMIT targetProcess: Rm, data: Rm, Promise: Rm
-     * Emits data from the current process to the target
-     * process message queue. Rm stores the address of the
-     * allocated promise
-     */
-    OP_P_EMIT,
-
-
-    /**
-     * OP_P_WAIT_QUEUE,
-     * Waits for the current process queue to receive a message
-     */
-    OP_P_WAIT_QUEUE,
-
-
-    /**
-     * OP_P_SEND_SEG targetProcess: Rm, data: I (<255)
-     * Sends a signal to the target process,
-     * Signals include KILL, PAUSE, RESUME, etc.
-     */
-    OP_P_SEND_SIG,
-
-    /**
-     * OP_P_ID dest: R
-     */
-    /**
-     * OP_P_ID dest: R, process: Pm
-     * Returns process id into dest reg R[u32] of process Pm
-     */
-    OP_P_ID,
-
-    /**
-     * Returns current process ID
-     * OP_P_CID dest: R
-     */
-    OP_P_CID,
-
-    /**
-     * OP_P_STATUS dest: R, process: Pm
-     * Returns process status into dest reg R[u8] of process Pm
-     */
-    OP_P_STATE,
-
-
-    /**
-     * OP_PROMISE_ALLOC dest: Rm
-     * Allocates a new promise, stores its address in dest
-     */
-    OP_PROMISE_ALLOC,
-
-    /**
-     * OP_PROMISE_RESOLVE promise: Rm, payload: Rm
-     * Resolves the given promise with the given payload
-     */
-    OP_PROMISE_RESOLVE,
-
-    /**
-     * OP_PROMISE_AWAIT promise: Rm
-     * Awaits the given promise
-     */
-    OP_PROMISE_AWAIT,
-
-    /**
-     * OP_PROMISE_DATA dest: R, promise: Rm,
-     * Returns promise data into dest reg R of promise Pm
-     * Promise must have been resolved, otherwise fails
-     */
-    OP_PROMISE_DATA,
-
-    /**
-     * OP_LOCK_ALLOC dest: Rm, data: Rm
-     * Allocates a new lock, containing data, stores its address in dest
-     */
-    OP_LOCK_ALLOC,
-
-    /**
-     * OP_LOCK_ACQUIRE lock: Rm, data: R,
-     * Acquires the given lock. Will block if the lock is already acquired.
-     * i.e waiting for lock promise to resolve. Stores the lock data in
-     * the given argument
-     */
-    OP_LOCK_ACQUIRE,
-
-    /**
-     * OP_LOCK_RELEASE lock: Rm
-     * Releases the given lock.
-     */
-    OP_LOCK_RELEASE,
-
 
     OP_DEBUG_REG,
 
@@ -665,12 +489,6 @@ typedef enum TypeV_OpCode {
      * Loads a standard library function into dest reg R
      */
     OP_LOAD_STD,
-
-    /**
-     * OP_VM_HEALTH dest: R
-     * Returns VM health into dest reg R[u8]
-     */
-    OP_VM_HEALTH,
 
     /**
      * OP_SPILL_ALLOC size: I (2 bytes)
@@ -688,18 +506,18 @@ typedef enum TypeV_OpCode {
     OP_UNSPILL_REG,
 
     /**
-     * OP_CLOSURE_ALLOC, dest:R, fn_address: R, env-size: I
+     * OP_CLOSURE_ALLOC, dest:R, fn_address: R, env-size: I[4bytes]
      * Allocates a closure, setting its function pointer to the address in
      * function-address and preparing an environment of environment-size slots.
      */
     OP_CLOSURE_ALLOC,
 
     /**
-     * OP_CAPTURE_VAR, closure: R, source-reg: R, env-slot: I
+     * OP_CLOSURE_CAPTURE, closure: R, env-slot: I, source-reg: R,
      * Copies the value from the specified register in the current function
      * state to the specified environment slot in the closure.
      */
-    OP_CAPTURE_VAR,
+    OP_CLOSURE_CAPTURE,
 
     /**
      * OP_CLOSURE_CALL, closure: R
@@ -728,7 +546,17 @@ typedef enum TypeV_OpCode {
      * Retrieves a value from the specified slot in the closure's
      * environment and stores it in the specified register.
      */
-    OP_GET_CLOSURE_VAR,
+
+    OP_MV_REG_UPVALUE,
+    OP_MV_REG_UPVALUE_PTR,
+
+    OP_MV_UPVALUE_REG,
+    OP_MV_UPVALUE_REG_PTR,
+
+    OP_COROUTINE_ALLOC,
+    OP_COROUTINE_SET_ARG, // sets an argument, one by one
+    OP_COROUTINE_CALL, // calls to resume the coroutine
+    OP_COROUTINE_YIELD, // yields the coroutine
 }TypeV_OpCode;
 
 #endif //TYPE_V_OPCODES_H

@@ -10,32 +10,28 @@
 #define TYPE_V_CORE_H
 
 #include <stdint.h>
-#include "queue/queue.h"
 
 #define PTR_SIZE 8
 #define MAX_REG 256
 
 
 typedef struct TypeV_Struct {
+    uint8_t numFields;                      //< Number of fields in the struct, needed for search
     uint16_t* fieldOffsets;                 //< Field offsets table
-    struct TypeV_Struct* originalStruct;    //< Pointer to the original struct, NULL if this is not a shadow struct
+    uint32_t* globalFields;                 //< Global fields table, contains ids of global fields, sorted
     uint8_t* dataPointer;                   //< Pointer to the data
     uint8_t data[];                         //< Data block, if this is a shadow struct,
-                                            // this is a pointer to the original struct's data
 }TypeV_Struct;
 
 typedef struct TypeV_Class{
-    uint64_t uid;             ///< Unique ID
-    uint8_t num_methods;      ///< number of methods
-    size_t* methods;          ///< A pointer to the method table
+    uint64_t uid;             //< Unique ID
+    uint8_t num_methods;      //< number of methods
+    uint32_t* globalMethods;  //< Global fields table, contains ids of global fields, sorted
+    size_t* methods;          //< A pointer to the method table
     /** data */
-    uint8_t data[];            ///< Fields start from here, direct access
+    uint8_t data[];           //< Fields start from here, direct access
 }TypeV_Class;
 
-typedef struct TypeV_Interface {
-    TypeV_Class* classPtr;    ///< Pointer to the class that implements this interface
-    uint16_t methodsOffset[];  ///< method offset table
-}TypeV_Interface;
 
 typedef struct TypeV_Array {
     uint8_t elementSize;      ///< Size of each element
@@ -82,12 +78,10 @@ typedef union {
 typedef enum {
     CS_INITIALIZED = 0,   ///< Initialized state
     CS_HALTED = 1,        ///< Halted as the VM is running another core, or process
-    CS_AWAITING_QUEUE,    ///< Process is awaiting for a queue
-    CS_AWAITING_PROMISE,  ///< Process is awaiting for a promise
     CS_RUNNING,           ///< Process is Running
     CS_FINISHING,         ///< Process has received terminate signal and is no longer accepting messages
     CS_TERMINATED,        ///< Process has been gracefully terminated
-    CS_KILLED   ,          ///< Process has been killed
+    CS_KILLED,          ///< Process has been killed
     CS_CRASHED            ///< Process has crashed
 }TypeV_CoreState;
 
@@ -150,9 +144,7 @@ typedef struct TypeV_GlobalPool {
 typedef enum {
     OT_CLASS = 0,
     OT_PROCESS,
-    OT_INTERFACE,
     OT_STRUCT,
-    OT_STRUCT_SHADOW,
     OT_ARRAY,
     OT_RAWMEM,
 }TypeV_ObjectType;
@@ -204,12 +196,24 @@ typedef struct TypeV_FuncState {
  * @brief Closure, a closure is a function that has captured its environment.
  * TODO: closures are still not implemented
  */
-
 typedef struct TypeV_Closure {
     void* fnPtr; ///< Function pointer
     TypeV_Register* upvalues; ///< Captured registers
     uint32_t envSize; ///< Environment size
 }TypeV_Closure;
+
+
+/**
+ * @brief Coroutine, a coroutine is a function that can be paused and resumed.
+ */
+typedef struct TypeV_Coroutine {
+    // A coroutine persists the state of the function
+    TypeV_FuncState* state;
+    uint8_t isRunning;
+    uint8_t isFinished;
+    // maybe add last instruction pointer
+}TypeV_Coroutine;
+
 
 /**
  * @brief Core structure, a core is the equivalent of a process in type-c.
@@ -221,7 +225,6 @@ typedef struct TypeV_Core {
     uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
 
-    TypeV_IOMessageQueue messageInputQueue;   ///< Message input queue
     TypeV_GC gc;                      ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
@@ -281,35 +284,31 @@ void core_resume(TypeV_Core *core);
 void core_halt(TypeV_Core *core);
 
 /**
- * Sets core to await for a queue
- * @param core
- */
-void core_queue_await(TypeV_Core* core);
-
-/**
- * Awakes process
- * @param core
- */
-void core_queue_resolve(TypeV_Core* core);
-
-
-/**
  * Allocates a struct object
  * @param core
  * @param numfields Number of struct fieldOffsets
  * @param totalsize Total size of the struct
  * @return Pointer to the allocated struct
  */
-uintptr_t  core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
+uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
 
 /**
- * Allocates a struct object as shadow to another struct
- * @param core
- * @param numfields Number of struct fieldOffsets
- * @param totalsize Total size of the struct
- * @return Pointer to the allocated struct
+ * @brief Find the index of the global ID in the globalFields array using binary search.
+ *
+ * @param structData Pointer to the TypeV_Struct containing the sorted globalFields.
+ * @param globalID The global field ID to search for.
+ * @return uint8_t The index of the global field ID within the globalFields array, or -1 if not found.
  */
-uintptr_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct);
+uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID);
+
+
+/**
+ * @brief Find the index of the global ID in the globalMethods array using binary search.
+ * @param classData
+ * @param globalID
+ * @return
+ */
+uint8_t class_find_global_index(TypeV_Class* classData, uint32_t globalID);
 
 /**
  * Allocates a class object
@@ -320,23 +319,6 @@ uintptr_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t o
  */
 uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId);
 
-/**
- * Allocates an interface object
- * @param core
- * @param num_methods number of methods
- * @param class_ptr class reference
- */
-uintptr_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class* class_ptr);
-
-/**
- * Allocates an interface object from another interface
- * inheriting its parent class
- * @param core
- * @param num_methods
- * @param interface_ptr
- * @return
- */
-uintptr_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* interface_ptr);
 /**
  * Allocates an array object
  * @param core
@@ -397,74 +379,6 @@ uintptr_t core_mem_alloc(TypeV_Core* core, size_t size);
  */
 void core_update_flags(TypeV_Core *core, uint64_t value);
 
-void core_process_alloc(TypeV_Core* core, uint64_t ip);
-
-
-/**
- * Sends a message to the core's queue
- * @param core
- * @param message
- */
-void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message);
-
-/**
- * Handles the reception of a signal
- * @param core
- * @param signal
- */
-void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal);
-
-/**
- * Allocates a new lock
- * @param core
- * @return
- */
-TypeV_Lock* core_lock_alloc(TypeV_Core* core, size_t value);
-
-/**
- * Acquires a lock
- * @param core
- * @param lock
- */
-void core_lock_acquire(TypeV_Core* core, TypeV_Lock* lock);
-
-/**
- * Releases a lock
- * @param core
- * @param lock
- */
-void core_lock_release(TypeV_Core* core, TypeV_Lock* lock);
-
-
-/**
- * Allocates new core
- * @param core
- * @return
- */
-TypeV_Promise* core_promise_alloc(TypeV_Core* core);
-
-/**
- * Resolves a promise
- * @param core
- * @param promise
- * @param value
- */
-void core_promise_resolve(TypeV_Core* core, TypeV_Promise* promise, size_t value);
-
-/**
- * Halts the core to await a promise
- * @param core
- * @param promise
- */
-void core_promise_await(TypeV_Core* core, TypeV_Promise* promise);
-
-/**
- * Checks if the core's waiting promise has been resolved
- * and can be resumed
- * @param core
- */
-void core_promise_check_resume(TypeV_Core* core);
-
 /**
  * Throws an error and terminates the core
  * @param core
@@ -481,7 +395,8 @@ typedef struct TypeV_FFI {
     uint8_t functionCount;   ///< FFI function count
 }TypeV_FFI;
 
-
+TypeV_Closure* core_closure_alloc(TypeV_Core* core, void* fnPtr, uint32_t envSize);
+void core_closure_free(TypeV_Core* core, TypeV_Closure* closure);
 
 void* core_gc_alloc(TypeV_Core* core, size_t size);
 

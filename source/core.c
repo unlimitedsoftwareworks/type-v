@@ -9,7 +9,6 @@
 
 #include "engine.h"
 #include "core.h"
-#include "queue/queue.h"
 #include "utils/log.h"
 #include "stack/stack.h"
 #include "dynlib/dynlib.h"
@@ -61,7 +60,6 @@ void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constan
 void core_deallocate(TypeV_Core *core) {
     stack_free(core);
 
-    queue_deallocate(&(core->messageInputQueue));
 
     // TODO: free mem objects
 
@@ -161,19 +159,9 @@ void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
 
             break;
         }
-        case OT_STRUCT_SHADOW: {
-            TypeV_Struct *s = (TypeV_Struct *) (header + 1);
-            //free(s->fieldOffsets);
-
-            break;
-        }
         case OT_CLASS: {
             TypeV_Class* c = (TypeV_Class *)(header + 1);
             //free(c->methods);
-            break;
-        }
-        case OT_INTERFACE: {
-            TypeV_Interface* i = (TypeV_Interface*)(header + 1);
             break;
         }
         case OT_ARRAY: {
@@ -210,7 +198,8 @@ void core_gc_sweep(TypeV_Core* core) {
 
 void core_gc_collect(TypeV_Core* core) {
     LOG_INFO("Collecting state for core %d", core->id);
-    core_gc_collect_state(core, core->funcState);
+    // TODO: uncomment and identify bugs
+    //core_gc_collect_state(core, core->funcState);
 }
 
 void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
@@ -223,6 +212,7 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
             core_gc_mark_object(core, header);
 
             // Mark original struct if shadow struct
+            /*
             if(header->type == OT_STRUCT_SHADOW) {
                 TypeV_Struct* structPtr = (TypeV_Struct*)(header + 1);
                 if(structPtr->originalStruct != NULL) {
@@ -230,12 +220,7 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
                     core_gc_mark_object(core, originalHeader);
                 }
             }
-            // mark original class if interface
-            if(header->type == OT_INTERFACE) {
-                TypeV_Interface* interfacePtr = (TypeV_Interface*)(header + 1);
-                TypeV_ObjectHeader* classHeader = get_header_from_pointer(interfacePtr->classPtr);
-                core_gc_mark_object(core, classHeader);
-            }
+             */
         }
     }
 
@@ -329,8 +314,9 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
 
     // Get a pointer to the actual struct, which comes after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
+    struct_ptr->numFields = numfields;
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
-    struct_ptr->originalStruct = NULL;
+    struct_ptr->globalFields = calloc(numfields, sizeof(uint32_t));
     struct_ptr->dataPointer = &struct_ptr->data;
 
     core_gc_update_alloc(core, totalAllocationSize);
@@ -338,30 +324,46 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     return (size_t)struct_ptr;
 }
 
-size_t core_struct_alloc_shadow(TypeV_Core *core, uint8_t numfields, size_t originalStruct) {
-    TypeV_Struct* original = (TypeV_Struct*)originalStruct;
-    LOG_INFO("CORE[%d]: Allocating struct shadow of %p with %d fields", core->id, (void*)originalStruct, numfields);
+uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID) {
+    int left = 0;
+    int right = structData->numFields - 1;
 
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
 
-    // Set header information
-    header->marked = 0;
-    header->type = OT_STRUCT_SHADOW;  // Assuming you have an enum value for shadow structs
-    header->size = totalAllocationSize;
-    header->ptrsCount = numfields;
-    header->ptrs = calloc(numfields, sizeof(void*));
+        if (structData->globalFields[mid] == globalID) {
+            return (uint8_t)mid;  // Return the index where the global ID is found
+        } else if (structData->globalFields[mid] < globalID) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
 
-    // Get a pointer to the actual struct, which comes after the header
-    TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
-    struct_ptr->dataPointer = original->data;  // Point to original struct's data
-    struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));  // Allocate field offsets
-    struct_ptr->originalStruct = original;
+    // unreachable, in theory
+    LOG_ERROR("Global ID not found in struct");
+    exit(-1);
+}
 
-    // Track the allocation with the GC
-    core_gc_update_alloc(core, totalAllocationSize);
+uint8_t class_find_global_index(TypeV_Class* classData, uint32_t globalID) {
+    int left = 0;
+    int right = classData->num_methods - 1;
 
-    return (size_t)struct_ptr;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+
+        if (classData->globalMethods[mid] == globalID) {
+            return (uint8_t)mid;  // Return the index where the global ID is found
+        } else if (classData->globalMethods[mid] < globalID) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    // unreachable, in theory
+    LOG_ERROR("Global ID not found in class");
+    exit(-1);
 }
 
 size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {
@@ -382,6 +384,7 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
     class_ptr->num_methods = num_methods;
     class_ptr->uid = classId;
     class_ptr->methods = calloc(num_methods, sizeof(size_t));
+    class_ptr->globalMethods = calloc(num_methods, sizeof(uint32_t));
 
     // Initialize other class fields here if needed
 
@@ -389,40 +392,6 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
     core_gc_update_alloc(core, totalAllocationSize);
 
     return (size_t)class_ptr;
-}
-
-size_t core_interface_alloc(TypeV_Core *core, uint8_t num_methods, TypeV_Class *class_ptr) {
-    LOG_INFO("CORE[%d]: Allocating interface from class %p with %d methods", core->id, (void*)class_ptr, num_methods);
-
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Interface) + sizeof(uint16_t) * num_methods;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
-    header->marked = 0;
-    header->type = OT_INTERFACE;
-    header->size = totalAllocationSize;
-
-    TypeV_Interface* interface_ptr = (TypeV_Interface*)(header + 1);
-    interface_ptr->classPtr = class_ptr;
-
-    core_gc_update_alloc(core, totalAllocationSize);
-
-    return (size_t)interface_ptr;
-}
-
-size_t core_interface_alloc_i(TypeV_Core *core, uint8_t num_methods, TypeV_Interface* original_interface_ptr) {
-    LOG_INFO("CORE[%d]: Allocating interface from interface %p with %d methods", core->id, (void*)original_interface_ptr, num_methods);
-
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Interface) + sizeof(uint16_t) * num_methods;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
-    header->marked = 0;
-    header->type = OT_INTERFACE;
-    header->size = totalAllocationSize;
-
-    TypeV_Interface* interface_ptr_new = (TypeV_Interface*)(header + 1);
-    interface_ptr_new->classPtr = original_interface_ptr->classPtr;
-
-    core_gc_update_alloc(core, totalAllocationSize);
-
-    return (size_t)interface_ptr_new;
 }
 
 size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
@@ -512,98 +481,12 @@ size_t core_mem_alloc(TypeV_Core* core, size_t size) {
     return (size_t)core_gc_alloc(core, size);
 }
 
-void core_enqueue_message(TypeV_Core* core, TypeV_IOMessage* message) {
-    queue_enqueue(&(core->messageInputQueue), message);
-    core_queue_resolve(core);
-}
-
 void core_resume(TypeV_Core* core) {
     core->state = CS_RUNNING;
 }
 
 void core_halt(TypeV_Core* core) {
     core->state = CS_HALTED;
-}
-
-void core_queue_await(TypeV_Core* core) {
-    core->state = CS_AWAITING_QUEUE;
-}
-
-void core_queue_resolve(TypeV_Core* core) {
-    core->state = CS_RUNNING;
-}
-
-void core_receive_signal(TypeV_Core* core, TypeV_CoreSignal signal) {
-    LOG_WARN("CORE[%d]: Received signal %s", core->id, signal == CSIG_KILL ? "KILL" : (signal == CSIG_TERMINATE ? "TERMINATE" : "NONE"));
-    if(signal == CSIG_NONE) {return;}
-    if(signal == CSIG_KILL) {
-        core->lastSignal = CSIG_KILL;
-    }
-    if(signal == CSIG_TERMINATE){
-        core->lastSignal = CSIG_TERMINATE;
-    }
-}
-
-
-TypeV_Promise* core_promise_alloc(TypeV_Core* core) {
-    static size_t promiseId = 0;
-    TypeV_Promise* promise = calloc(1, sizeof(TypeV_Promise));
-    promise->resolved = 0;
-    promise->value = 0;
-    promise->id  = promiseId++;
-    return promise;
-}
-
-void core_promise_resolve(TypeV_Core* core, TypeV_Promise* promise, size_t value) {
-    LOG_INFO("CORE[%d]: Resolving promise", core->id);
-    promise->resolved = 1;
-    promise->value = value;
-}
-
-void core_promise_await(TypeV_Core* core, TypeV_Promise* promise) {
-    LOG_INFO("CORE[%d]: Awaiting promise %d", core->id, promise->id);
-    core->state = CS_AWAITING_PROMISE;
-    core->awaitingPromise = promise;
-}
-
-void core_promise_check_resume(TypeV_Core* core) {
-    if(core->state == CS_AWAITING_PROMISE && core->awaitingPromise->resolved) {
-        LOG_INFO("CORE[%d]: Resuming from promise %d", core->id, core->awaitingPromise->id);
-        core->state = CS_RUNNING;
-    }
-}
-
-
-TypeV_Lock* core_lock_alloc(TypeV_Core* core, size_t value){
-    TypeV_Lock* lock = calloc(1, sizeof(TypeV_Lock));
-    lock->locked = 0;
-    lock->holder = 0;
-    lock->value = value;
-    lock->promise = core_promise_alloc(core);
-    return lock;
-}
-
-void core_lock_acquire(TypeV_Core* core, TypeV_Lock* lock) {
-    //ASSERT(lock->locked == 0, "Lock %p is already locked", lock->id);
-    if(lock->locked == 1) {
-        LOG_INFO("CORE[%d]: Lock %p is already locked, awaiting", core->id, lock->id);
-        core_promise_await(core, lock->promise);
-        return;
-    }
-    lock->locked = 1;
-    lock->holder = core->id;
-    // set promise
-    lock->promise = core_promise_alloc(core);
-}
-
-void core_lock_release(TypeV_Core* core, TypeV_Lock* lock) {
-    ASSERT(lock->holder == core->id, "Lock %p is not held by core %d", lock->id, core->id);
-    lock->locked = 0;
-    lock->holder = 0;
-    // reset promise
-    // TODO: request GC cleanup?
-    core_promise_resolve(core, lock->promise, lock->value);
-    lock->promise = NULL;
 }
 
 void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {

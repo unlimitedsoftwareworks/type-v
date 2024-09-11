@@ -86,9 +86,7 @@ static void* dispatch_table[] = { \
     &&DO_MV_REG_GLOBAL, \
     &&DO_MV_REG_GLOBAL_PTR, \
     &&DO_S_ALLOC, \
-    &&DO_S_ALLOC_SHADOW, \
-    &&DO_S_SET_OFFSET, \
-    &&DO_S_SET_OFFSET_SHADOW, \
+    &&DO_S_REG_FIELD, \
     &&DO_S_LOADF, \
     &&DO_S_LOADF_PTR, \
     &&DO_S_STOREF_CONST, \
@@ -104,15 +102,8 @@ static void* dispatch_table[] = { \
     &&DO_C_STOREF_CONST_PTR, \
     &&DO_C_LOADF, \
     &&DO_C_LOADF_PTR, \
-    &&DO_I_ALLOC, \
-    &&DO_I_ALLOC_I, \
-    &&DO_I_SET_OFFSET, \
-    &&DO_I_SET_OFFSET_I, \
-    &&DO_I_SET_OFFSET_M, \
-    &&DO_I_LOADM, \
     &&DO_I_IS_C, \
-    &&DO_I_IS_I, \
-    &&DO_I_GET_C, \
+    &&DO_I_HAS_M, \
     &&DO_A_ALLOC, \
     &&DO_A_EXTEND, \
     &&DO_A_LEN,        \
@@ -262,26 +253,9 @@ static void* dispatch_table[] = { \
     &&DO_LD_FFI, \
     &&DO_CALL_FFI, \
     &&DO_CLOSE_FFI, \
-    &&DO_P_ALLOC, \
-    &&DO_P_DEQUEUE, \
-    &&DO_P_QUEUE_SIZE, \
-    &&DO_P_EMIT, \
-    &&DO_P_WAIT_QUEUE, \
-    &&DO_P_SEND_SIG, \
-    &&DO_P_ID, \
-    &&DO_P_CID, \
-    &&DO_P_STATE, \
-    &&DO_PROMISE_ALLOC, \
-    &&DO_PROMISE_RESOLVE, \
-    &&DO_PROMISE_AWAIT, \
-    &&DO_PROMISE_DATA, \
-    &&DO_LOCK_ALLOC, \
-    &&DO_LOCK_ACQUIRE, \
-    &&DO_LOCK_RELEASE, \
     &&DO_DEBUG_REG, \
     &&DO_HALT, \
     &&DO_LOAD_STD, \
-    &&DO_VM_HEALTH, \
     &&DO_SPILL_ALLOC, \
     &&DO_SPILL_REG, \
     &&DO_UNSPILL_REG \
@@ -294,35 +268,16 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         core_resume(core);
     }
 
-    if((core->state == CS_AWAITING_QUEUE) && (core->lastSignal == CSIG_TERMINATE)){
-        LOG_INFO("Core[%d] Gracefully terminated", iter->core->id);
-        engine_detach_core(engine, core);
-        return;
-    }
-
     if(core->state == CS_CRASHED){
         LOG_INFO("Core[%d] Crashed");
         engine_detach_core(engine, core);
         return;
     }
-
-    if(core->state == CS_AWAITING_PROMISE) {
-        core_promise_check_resume(core);
-        if(core->state == CS_AWAITING_PROMISE) {
-            LOG_WARN("Core[%d] is awaiting promise %d, skipping run", iter->core->id, core->awaitingPromise->id);
-        }
-    }
-
     while(1){
 
         DISPATCH_TABLE
         #define DISPATCH() { \
-            iter->currentInstructions += 1-runInf; \
-            if(!(((core->state == CS_RUNNING) &&\
-        (iter->currentInstructions != iter->maxInstructions) &&\
-        !engine->interruptNextLoop)))    {           \
-            goto END_RUN;                 }\
-            /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]); */\
+            /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]);*/ \
             goto *dispatch_table[core->codePtr[core->ip++]];                          \
         }
 
@@ -360,14 +315,8 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_S_ALLOC:
             s_alloc(core);
             DISPATCH();
-        DO_S_ALLOC_SHADOW:
-            s_alloc_shadow(core);
-            DISPATCH();
-        DO_S_SET_OFFSET:
-            s_set_offset(core);
-            DISPATCH();
-        DO_S_SET_OFFSET_SHADOW:
-            s_set_offset_shadow(core);
+        DO_S_REG_FIELD:
+            s_reg_field(core);
             DISPATCH();
         DO_S_LOADF:
             s_loadf(core);
@@ -414,32 +363,11 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_C_LOADF_PTR:
             c_loadf_ptr(core);
             DISPATCH();
-        DO_I_ALLOC:
-            i_alloc(core);
-            DISPATCH();
-        DO_I_ALLOC_I:
-            i_alloc_i(core);
-            DISPATCH();
-        DO_I_SET_OFFSET:
-            i_set_offset(core);
-            DISPATCH();
-        DO_I_SET_OFFSET_I:
-            i_set_offset_i(core);
-            DISPATCH();
-        DO_I_SET_OFFSET_M:
-            i_set_offset_m(core);
-            DISPATCH();
-        DO_I_LOADM:
-            i_loadm(core);
-            DISPATCH();
         DO_I_IS_C:
             i_is_c(core);
             DISPATCH();
-        DO_I_IS_I:
-            i_is_i(core);
-            DISPATCH();
-        DO_I_GET_C:
-            i_get_c(core);
+        DO_I_HAS_M:
+            i_has_m(core);
             DISPATCH();
         DO_A_ALLOC:
             a_alloc(core);
@@ -888,54 +816,8 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_CLOSE_FFI:
             close_ffi(core);
             DISPATCH();
-        DO_P_ALLOC:
-            p_alloc(core);
-            DISPATCH();
-        DO_P_DEQUEUE:
-            p_dequeue(core);
-            DISPATCH();
-        DO_P_QUEUE_SIZE:
-            p_queue_size(core);
-            DISPATCH();
-        DO_P_EMIT:
-            p_emit(core);
-            DISPATCH();
-        DO_P_WAIT_QUEUE:
-            p_wait_queue(core);
-            DISPATCH();
-        DO_P_SEND_SIG:
-            p_send_sig(core);
-            DISPATCH();
-        DO_P_ID:
-            p_id(core);
-            DISPATCH();
-        DO_P_CID:
-            p_cid(core);
-            DISPATCH();
-        DO_P_STATE:
-            p_state(core);
-            DISPATCH();
-        DO_PROMISE_ALLOC:
-            promise_alloc(core);
-            DISPATCH();
-        DO_PROMISE_RESOLVE:
-            promise_resolve(core);
-            DISPATCH();
-        DO_PROMISE_AWAIT:
-            promise_await(core);
-            DISPATCH();
-        DO_PROMISE_DATA:
-            promise_data(core);
-            DISPATCH();
-        DO_LOCK_ALLOC:
-            lock_alloc(core);
-            DISPATCH();
-        DO_LOCK_ACQUIRE:
-            lock_acquire(core);
-            DISPATCH();
-        DO_LOCK_RELEASE:
-            lock_release(core);
-            DISPATCH();
+
+
         DO_DEBUG_REG:
             debug_reg(core);
             DISPATCH();
@@ -944,9 +826,6 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_LOAD_STD:
             load_std(core);
-            DISPATCH();
-        DO_VM_HEALTH:
-            vm_health(core);
             DISPATCH();
         DO_SPILL_ALLOC:
             spill_alloc(core);

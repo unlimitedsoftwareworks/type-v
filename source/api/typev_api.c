@@ -112,12 +112,6 @@ TypeV_Class* typev_api_stack_pop_class(TypeV_Core* core) {
     return value;
 }
 
-TypeV_Interface* typev_api_stack_pop_interface(TypeV_Core* core) {
-    TypeV_Interface* value;
-    stack_pop_ptr(core->funcState, (size_t*)&value);
-    return value;
-}
-
 
 TypeV_Array* typev_api_stack_pop_array(TypeV_Core* core) {
     TypeV_Array* value;
@@ -174,10 +168,6 @@ void typev_api_return_struct(TypeV_Core* core, TypeV_Struct* value) {
 }
 
 void typev_api_return_class(TypeV_Core* core, TypeV_Class* value) {
-    stack_push_ptr(core->funcState, (size_t)value);
-}
-
-void typev_api_return_interface(TypeV_Core* core, TypeV_Interface* value) {
     stack_push_ptr(core->funcState, (size_t)value);
 }
 
