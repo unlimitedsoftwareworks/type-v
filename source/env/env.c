@@ -46,7 +46,7 @@ void typev_env_init(char* sourceMapFile){
         perror("getcwd() error");
         exit(-1);
     } else {
-        env.cwd = cwd;
+        env.cwd = strdup(cwd);
     }
 
     env.searchPaths = calloc(3, sizeof(char*));
