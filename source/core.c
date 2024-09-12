@@ -324,16 +324,16 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     return (size_t)struct_ptr;
 }
 
-uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID) {
+uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint8_t numFields , uint32_t globalID) {
     int left = 0;
-    int right = structData->numFields - 1;
+    int right = numFields - 1;
 
     while (left <= right) {
-        int mid = left + (right - left) / 2;
+       int mid = left + (right - left) / 2;
 
-        if (structData->globalFields[mid] == globalID) {
+        if (globalFields[mid] == globalID) {
             return (uint8_t)mid;  // Return the index where the global ID is found
-        } else if (structData->globalFields[mid] < globalID) {
+        } else if (globalFields[mid] < globalID) {
             left = mid + 1;
         } else {
             right = mid - 1;
@@ -341,30 +341,10 @@ uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID) {
     }
 
     // unreachable, in theory
-    LOG_ERROR("Global ID not found in struct");
+    core_panic(core, -1, "Global ID %d not found in field array", globalID);
     exit(-1);
 }
 
-uint8_t class_find_global_index(TypeV_Class* classData, uint32_t globalID) {
-    int left = 0;
-    int right = classData->num_methods - 1;
-
-    while (left <= right) {
-        int mid = left + (right - left) / 2;
-
-        if (classData->globalMethods[mid] == globalID) {
-            return (uint8_t)mid;  // Return the index where the global ID is found
-        } else if (classData->globalMethods[mid] < globalID) {
-            left = mid + 1;
-        } else {
-            right = mid - 1;
-        }
-    }
-
-    // unreachable, in theory
-    LOG_ERROR("Global ID not found in class");
-    exit(-1);
-}
 
 size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {
     LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, uid: %d", core->id, num_methods, total_fields_size, classId);
@@ -381,7 +361,7 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
 
     // Get a pointer to the actual class, which comes after the header
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
-    class_ptr->num_methods = num_methods;
+    class_ptr->numMethods = num_methods;
     class_ptr->uid = classId;
     class_ptr->methods = calloc(num_methods, sizeof(size_t));
     class_ptr->globalMethods = calloc(num_methods, sizeof(uint32_t));

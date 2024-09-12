@@ -252,10 +252,13 @@ static inline void s_reg_field(TypeV_Core* core){
 
 
 static inline void s_loadf(TypeV_Core* core){
+    uint32_t ip_start = core->ip;
+
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t source = core->codePtr[core->ip++];
     uint32_t field_index = 0;
     typev_memcpy_u64_ptr(&field_index, &core->codePtr[core->ip],  4);
+
     core->ip += 4;
 
     uint8_t byteSize = core->codePtr[core->ip++];
@@ -264,7 +267,9 @@ static inline void s_loadf(TypeV_Core* core){
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
     //TypeV_ObjectHeader *header = (TypeV_ObjectHeader *)core->regs[source].ptr;
 
-    uint8_t index = struct_find_global_index(struct_ptr, field_index);
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
+
+
     typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], byteSize);
 }
 
@@ -278,7 +283,7 @@ static inline void s_loadf_ptr(TypeV_Core* core){
     core->ip += 4;
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
-    uint8_t index = struct_find_global_index(struct_ptr, field_index);
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], PTR_SIZE);
 }
 
@@ -294,7 +299,7 @@ static inline void s_storef_const(TypeV_Core* core){
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    uint8_t index = struct_find_global_index(struct_ptr, field_index);
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], &core->constPtr[offset], byteSize);
 }
 
@@ -309,7 +314,7 @@ static inline void s_storef_const_ptr(TypeV_Core* core){
     typev_memcpy_u64_ptr(&offset, &core->codePtr[core->ip], 8);
     core->ip += 8;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    uint8_t index = struct_find_global_index(struct_ptr, field_index);
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], &core->constPtr[offset], PTR_SIZE);
 }
 
@@ -326,7 +331,7 @@ static inline void s_storef_reg(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    uint8_t index = struct_find_global_index(struct_ptr, field_index);
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[index], &core->regs[source], byteSize);
 }
 
@@ -341,7 +346,7 @@ static inline void s_storef_reg_ptr(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    uint8_t index = struct_find_global_index(struct_ptr, field_index);
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[index], &core->regs[source], 8);
     core_gc_update_struct_field(core, struct_ptr, (void*)core->regs[source].ptr, index);
 }
@@ -379,7 +384,7 @@ static inline void c_storem(TypeV_Core* core){
     core->ip += 8;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[dest_reg].ptr;
-    LOG_INFO("Storing method %d at method_address %d in class %p", method_index, method_address, (void*)c);
+    //LOG_INFO("Storing method %d at method_address %d in class %p", method_index, method_address, (void*)c);
     c->globalMethods[local_method_index] = global_method_index;
     c->methods[local_method_index] = method_address;
 }
@@ -394,7 +399,8 @@ static inline void c_loadm(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
 
-    uint8_t idx = class_find_global_index(c, method_index);
+    //uint8_t idx = class_find_global_index(c, method_index);
+    uint8_t idx = object_find_global_index(core, c->globalMethods, c->numMethods, method_index);
 
     LOG_INFO("Loading method %d from class %p", method_index, (void*)c);
 
@@ -512,7 +518,7 @@ static inline void i_has_m(TypeV_Core* core){
     // TODO: use bloom filters
     // or use other optimization, for its a naive search
 
-    for(uint32_t i = 0; i < class_->num_methods; i++){
+    for(uint32_t i = 0; i < class_->numMethods; i++){
         if(class_->globalMethods[i] == lookUpMethodId){
             found = 1;
             break;
@@ -1548,7 +1554,7 @@ static inline void halt(TypeV_Core* core) {
 
     uint32_t code = core->regs[code_reg].u32;
 
-    core_gc_sweep_all(core);
+    //core_gc_sweep_all(core);
 
     exit(code);
 }

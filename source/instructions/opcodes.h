@@ -104,7 +104,7 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG_PTR,
 
     /**
-     * OP_C_ALLOC dest: R num-methods: I, class-fields-size: I (2 bytes), num_methods: I(1b) classId-size: Z, classId: I
+     * OP_C_ALLOC dest: R num-methods: I, class-fields-size: I (2 bytes), numMethods: I(1b) classId-size: Z, classId: I
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into dest.
      */

@@ -25,7 +25,7 @@ typedef struct TypeV_Struct {
 
 typedef struct TypeV_Class{
     uint64_t uid;             //< Unique ID
-    uint8_t num_methods;      //< number of methods
+    uint8_t numMethods;      //< number of methods
     uint32_t* globalMethods;  //< Global fields table, contains ids of global fields, sorted
     size_t* methods;          //< A pointer to the method table
     /** data */
@@ -293,22 +293,15 @@ void core_halt(TypeV_Core *core);
 uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
 
 /**
- * @brief Find the index of the global ID in the globalFields array using binary search.
- *
- * @param structData Pointer to the TypeV_Struct containing the sorted globalFields.
- * @param globalID The global field ID to search for.
- * @return uint8_t The index of the global field ID within the globalFields array, or -1 if not found.
+ * @brief Find the index of the global ID in the globalFields of a class/struct/variant
+ * @param core Core
+ * @param globalFields Global fields table
+ * @param numFields Number of fields
+ * @param globalID Global ID to find
+ * @return Index of the global ID in the globalFields array
  */
-uint8_t struct_find_global_index(TypeV_Struct* structData, uint32_t globalID);
+uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint8_t numFields , uint32_t globalID);
 
-
-/**
- * @brief Find the index of the global ID in the globalMethods array using binary search.
- * @param classData
- * @param globalID
- * @return
- */
-uint8_t class_find_global_index(TypeV_Class* classData, uint32_t globalID);
 
 /**
  * Allocates a class object
