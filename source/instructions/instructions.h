@@ -1339,7 +1339,7 @@ static inline void j_cmp_##name(TypeV_Core* core) {\
             if(v1 <= v2) core->ip = offset;\
             break;\
         default:\
-            CORE_ASSERT(0, "Invalid comparison type");\
+            core_panic(core, -1, "Invalid comparison type");\
             exit(-1);\
     }\
 }\
@@ -1375,7 +1375,7 @@ static inline void j_cmp_u8(TypeV_Core* core) {
             if(v1 <= v2) core->ip = offset;
             break;
         default:
-            CORE_ASSERT(0, "Invalid comparison type");\
+            core_panic(core, -1, "Invalid comparison type");\
             exit(-1);
     }
 }
@@ -1413,7 +1413,7 @@ static inline void j_cmp_u32(TypeV_Core* core) {
             if(v1 <= v2) core->ip = offset;
             break;
         default:
-            CORE_ASSERT(0, "Invalid comparison type");\
+            core_panic(core, -1, "Invalid comparison type");\
             exit(-1);
     }
 }
@@ -1453,12 +1453,41 @@ static inline void j_cmp_ptr(TypeV_Core* core) {
             if(v1 <= v2) core->ip = offset;
             break;
         default:
-            CORE_ASSERT(0, "Invalid comparison type");\
+            core_panic(core, -1, "Invalid comparison type");\
             exit(-1);
     }
 }
 
 #undef OP_CMP
+
+
+static inline void j_cmp_bool(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    uint8_t cmpType = core->codePtr[core->ip++];
+    size_t offset = typev_memcpy_u64(&core->codePtr[core->ip], 8);
+    core->ip += 8;
+    // Fetch the register values once, store them in registers
+    uint8_t v1 = core->regs[op1].u8;
+    uint8_t v2 = core->regs[op2].u8;
+
+    // Compute the comparison result using bitwise XOR for == and !=
+    uint8_t result = !v1 == !v2; // result will be 0 if v1 == v2, non-zero otherwise
+
+
+    // Now result is 0 if the condition is true (either == or !=)
+
+    // If the result is zero, jump to the offset by setting the instruction pointer
+    //core->ip = core->ip + (result ? 0 : (offset - core->ip));
+    if(result && (cmpType == 0)){
+        core->ip = offset;
+    }
+    else if(!result && (cmpType == 1)){
+        core->ip = offset;
+    }else {
+        core_panic(core, -1, "Invalid comparison type");
+    }
+}
 
 
 static inline void reg_ffi(TypeV_Core* core){

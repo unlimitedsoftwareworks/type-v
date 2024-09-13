@@ -451,6 +451,11 @@ typedef enum TypeV_OpCode {
     OP_J_CMP_PTR,
 
     /**
+     * OP_CMP_BOOL arg1: R, arg2: R, cmpType 0 or 1, jump-address: I (8 bytes)
+     */
+    OP_J_CMP_BOOL,
+
+    /**
      * OP_REG_FFI nnameconst-offset-size: I, nameconst-offset: I, ID: I (2 bytes),
      * registers an FFI of the given name at code offset and with the given ID
      */

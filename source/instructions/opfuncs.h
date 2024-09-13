@@ -221,6 +221,7 @@ static op_func op_funcs[] = {
         &j_cmp_f32,
         &j_cmp_f64,
         &j_cmp_ptr,
+        &j_cmp_bool,
 
         &reg_ffi,
         &open_ffi,
