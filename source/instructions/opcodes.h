@@ -184,6 +184,13 @@ typedef enum TypeV_OpCode {
     OP_A_SLICE,
 
     /**
+     * OP_A_INSERT_A inserted_count: R, dest_arr: R, source_arr: R, index: R
+     * inserts source_arr into dest_arr at the given index,
+     * Returns the new position pointing at the end of the inserted elements
+     */
+     OP_A_INSERT_A,
+
+    /**
      * OP_A_STOREF_REG_[size] dest: R, index: R, source: R, byteSize: S
      * Stores [size] bytes from register src to field
      * index of array dest

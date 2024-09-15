@@ -78,6 +78,7 @@ static char* instructions[] = {
         "a_extend",
         "a_len",
         "a_slice",
+        "a_insert_a",
 
         "a_storef_reg",
         "a_storef_reg_ptr",
@@ -239,6 +240,7 @@ static char* instructions[] = {
         "j_cmp_f32",
         "j_cmp_f64",
         "j_cmp_ptr",
+        "j_cmp_bool",
 
         "reg_ffi",
         "open_ffi",

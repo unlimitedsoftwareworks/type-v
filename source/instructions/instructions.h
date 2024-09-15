@@ -579,6 +579,19 @@ static inline void a_slice(TypeV_Core* core){
     core->regs[target].ptr = mem;
 }
 
+static inline void a_insert_a(TypeV_Core* core){
+    const uint8_t count_target = core->codePtr[core->ip++];
+    const uint8_t arr_target = core->codePtr[core->ip++];
+    const uint8_t arr_source = core->codePtr[core->ip++];
+    const uint8_t index = core->codePtr[core->ip++];
+
+    TypeV_Array* src_array = (TypeV_Array*)core->regs[arr_source].ptr;
+    TypeV_Array* target_array = (TypeV_Array*)core->regs[arr_target].ptr;
+    uint64_t idx = core->regs[index].u64;
+
+    core->regs[count_target].u64 = core_array_insert(core, target_array, src_array, idx);
+}
+
 static inline void a_storef_reg(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     const uint8_t index = core->codePtr[core->ip++];
@@ -1419,7 +1432,40 @@ static inline void j_cmp_u32(TypeV_Core* core) {
 }
 
 OP_CMP(i32, int32_t)
-OP_CMP(u64, uint64_t)
+
+static inline void j_cmp_u64(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    uint8_t cmpType = core->codePtr[core->ip++];
+    size_t offset = typev_memcpy_u64(&core->codePtr[core->ip], 8);
+    core->ip += 8;
+    uint64_t v1 = core->regs[op1].u32;
+    uint64_t v2 = core->regs[op2].u32;
+    switch(cmpType) {
+        case 0:
+            if(v1 == v2) core->ip = offset;
+            break;
+        case 1:
+            if(v1 != v2) core->ip = offset;
+            break;
+        case 2:
+            if(v1 > v2) core->ip = offset;
+            break;
+        case 3:
+            if(v1 >= v2) core->ip = offset;
+            break;
+        case 4:
+            if(v1 < v2) core->ip = offset;
+            break;
+        case 5:
+            if(v1 <= v2) core->ip = offset;
+            break;
+        default:
+            core_panic(core, -1, "Invalid comparison type");\
+            exit(-1);
+    }
+}
+
 OP_CMP(i64, int64_t)
 OP_CMP(f32, float)
 OP_CMP(f64, double)

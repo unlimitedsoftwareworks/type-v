@@ -439,6 +439,43 @@ size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elemen
     return array_ptr;
 }
 
+uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src, uint64_t position) {
+    // If the source array has no elements, return the original position
+    if (src->length == 0) {
+        return position;
+    }
+
+    // Save the previous length and calculate the new length
+    uint64_t prevLength = dest->length;
+    uint64_t newLength = dest->length + src->length;
+
+    // Extend the destination array to accommodate the new elements
+    core_array_extend(core, (size_t)dest, newLength);
+
+    // Shift the existing elements in the destination array to the right
+    // memmove is used here to handle overlapping memory regions safely
+    memmove(
+            dest->data + (position + src->length) * dest->elementSize,  // Move from this position (shifted by src's length)
+            dest->data + position * dest->elementSize,                  // Move the data starting from 'position'
+            (prevLength - position) * dest->elementSize                 // Move the rest of the elements after 'position'
+    );
+
+    // Copy the new elements from the source array to the destination array at 'position'
+    memcpy(
+            dest->data + position * dest->elementSize,                  // Destination position to start copying
+            src->data,                                                  // Source data to copy from
+            src->length * dest->elementSize                             // Size of the data to copy
+    );
+
+    // Update the length of the destination array
+    dest->length = newLength;
+
+    // Return the new position pointing at the end of the inserted elements
+    return position + src->length;
+}
+
+
+
 size_t core_ffi_load(TypeV_Core* core, size_t namePointer){
     char* name = (char*)namePointer;
     LOG_INFO("CORE[%d]: Loading FFI %s", core->id, name);

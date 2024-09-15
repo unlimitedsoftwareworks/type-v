@@ -107,7 +107,8 @@ static void* dispatch_table[] = { \
     &&DO_A_ALLOC, \
     &&DO_A_EXTEND, \
     &&DO_A_LEN,        \
-    &&DO_A_SLICE, \
+    &&DO_A_SLICE,      \
+    &&DO_A_INSERT_A, \
     &&DO_A_STOREF_REG, \
     &&DO_A_STOREF_REG_PTR, \
     &&DO_A_STOREF_CONST, \
@@ -381,6 +382,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_A_SLICE:
             a_slice(core);
+            DISPATCH();
+        DO_A_INSERT_A:
+            a_insert_a(core);
             DISPATCH();
         DO_A_STOREF_REG:
             a_storef_reg(core);

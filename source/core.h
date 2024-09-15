@@ -341,6 +341,18 @@ uintptr_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_ele
  */
 uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start, uint64_t end);
 
+
+/**
+ * Insert a src array into a dest array at a given position,
+ * Returns the new position pointing at the end of the inserted elements
+ * @param core
+ * @param dest
+ * @param src
+ * @param position
+ * @return
+ */
+uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src, uint64_t position);
+
 /**
  * Load a FFI library
  * @param core
