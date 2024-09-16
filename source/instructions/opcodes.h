@@ -45,6 +45,11 @@ typedef enum TypeV_OpCode {
     OP_MV_REG_I,
 
     /**
+     * OP_MV_REG_I_ptr: dest: R, value: I (8 bytes)
+     */
+    OP_MV_REG_I_PTR,
+
+    /**
      * OP_MV_REG_CONST dest: R, offset-size: Z, offset: I, byteSize: S
      */
     OP_MV_REG_CONST,

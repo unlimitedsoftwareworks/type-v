@@ -19,6 +19,7 @@ static op_func op_funcs[] = {
         mv_reg_null,
 
         &mv_reg_i,
+        &mv_reg_i_ptr,
 
         &mv_reg_const,
         &mv_reg_const_ptr,

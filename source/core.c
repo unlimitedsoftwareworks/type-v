@@ -169,6 +169,7 @@ void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
             //free(a->data);
             break;
         }
+        case OT_CLOSURE:
         case OT_PROCESS:
         case OT_RAWMEM:
             break;
@@ -537,4 +538,26 @@ void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
 void core_spill_alloc(TypeV_Core* core, uint16_t size) {
     core->funcState->spillSlots = realloc(core->funcState->spillSlots, sizeof(TypeV_Register)*(size));
     core->funcState->spillSize = size;
+}
+
+TypeV_Closure* core_closure_alloc(TypeV_Core* core, void* fnPtr, uint32_t envSize) {
+    LOG_INFO("CORE[%d]: Allocating closure with %d bytes", core->id, envSize);
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Closure) + envSize;
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+
+    // Set header information
+    header->marked = 0;
+    header->type = OT_CLOSURE;
+    header->size = totalAllocationSize;
+    header->ptrsCount = envSize;
+    header->ptrs = calloc(envSize, sizeof(void*));
+
+    // Get a pointer to the actual closure, which comes after the header
+    TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
+    //closure_ptr->fnPtr = fnPtr;
+    closure_ptr->envSize = envSize;
+
+    core_gc_update_alloc(core, totalAllocationSize);
+
+    return closure_ptr;
 }

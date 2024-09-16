@@ -147,6 +147,7 @@ typedef enum {
     OT_STRUCT,
     OT_ARRAY,
     OT_RAWMEM,
+    OT_CLOSURE,
 }TypeV_ObjectType;
 
 
@@ -190,6 +191,7 @@ typedef struct TypeV_FuncState {
     uint16_t spillSize; ///< Spill size
     struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
     struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
+    struct TypeV_Closure* closure; ///< Closure, if the function is a closure
 }TypeV_FuncState;
 
 /**
@@ -197,7 +199,7 @@ typedef struct TypeV_FuncState {
  * TODO: closures are still not implemented
  */
 typedef struct TypeV_Closure {
-    void* fnPtr; ///< Function pointer
+    TypeV_FuncState* state; ///< Function state
     TypeV_Register* upvalues; ///< Captured registers
     uint32_t envSize; ///< Environment size
 }TypeV_Closure;

@@ -79,6 +79,7 @@ static void* dispatch_table[] = { \
     &&DO_MV_REG_REG_PTR, \
     &&DO_MV_REG_NULL, \
     &&DO_MV_REG_I, \
+    &&DO_MV_REG_I_PTR, \
     &&DO_MV_REG_CONST, \
     &&DO_MV_REG_CONST_PTR, \
     &&DO_MV_GLOBAL_REG, \
@@ -279,7 +280,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
 
         DISPATCH_TABLE
         #define DISPATCH() { \
-            /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]);*/ \
+             \
+            /*if((core->ip >= 42) && (core->ip <= 55))                           */\
+               /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]);*/ \
             goto *dispatch_table[core->codePtr[core->ip++]];                          \
         }
 
@@ -295,6 +298,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_MV_REG_I:
             mv_reg_i(core);
+            DISPATCH();
+        DO_MV_REG_I_PTR:
+            mv_reg_i_ptr(core);
             DISPATCH();
         DO_MV_REG_CONST:
             mv_reg_const(core);

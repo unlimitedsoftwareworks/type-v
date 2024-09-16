@@ -96,6 +96,19 @@ static inline void mv_reg_i(TypeV_Core* core){
     //typev_memcpy_u64_ptr(&core->regs[target], &immediate, 8);
 }
 
+static inline void mv_reg_i_ptr(TypeV_Core* core){
+    const uint8_t target = core->codePtr[core->ip++];
+    //uint8_t immediate_size = core->codePtr[core->ip++];
+    uint64_t immediate = 0;
+    //uint64_t immediate = typev_memcpy_u64(&core->codePtr[core->ip], immediate_size);
+    // data could be unaligned
+    typev_memcpy_u64_ptr(&immediate, &core->codePtr[core->ip], 8);
+    core->ip += 8;
+    core->regs[target].ptr =  immediate;
+    //typev_memcpy_u64_ptr(&core->regs[target], &immediate, immediate_size);
+    //typev_memcpy_u64_ptr(&core->regs[target], &immediate, 8);
+}
+
 
 static inline void mv_reg_const(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
@@ -1675,6 +1688,17 @@ static inline void unspill_reg(TypeV_Core* core){
     uint16_t slot = (uint16_t)typev_memcpy_u64(&core->codePtr[core->ip], 2);
     core->ip += 2;
     core->regs[reg] = core->funcState->spillSlots[slot];
+}
+
+static inline void closure_alloc(TypeV_Core* core) {
+    uint8_t dest = core->codePtr[core->ip++];
+    uint8_t fn_address = core->codePtr[core->ip++];
+
+    uint64_t envSize = 0;
+    typev_memcpy_u64_ptr(&envSize, &core->codePtr[core->ip], 8);
+    core->ip += 8;
+
+    LOG_INFO("Allocating new closure with env size %d", envSize);
 }
 
 #endif //TYPE_V_INSTRUCTIONS_H
