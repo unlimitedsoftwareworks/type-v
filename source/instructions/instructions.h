@@ -903,13 +903,16 @@ static inline void upcast_i(TypeV_Core* core) {
 
     // Perform sign extension without branching
     if (from < 8) {
-        int64_t signExtMask = (value & (1LL << (from * 8 - 1))) ? (-1LL << (from * 8)) : 0;
+        // Create a sign mask to extend the sign bit if needed
+        uint64_t signBit = 1ULL << (from * 8 - 1); // Extract the sign bit position
+        uint64_t signExtMask = -(value & signBit); // Create the mask if sign bit is set
         value |= signExtMask;
     }
 
     // Store the result back in the register
     typev_memcpy_u64_ptr(&core->regs[reg], &value, to);
 }
+
 
 static inline void upcast_u(TypeV_Core* core) {
     uint8_t reg = core->codePtr[core->ip++];
@@ -1043,7 +1046,16 @@ static inline void add_u32(TypeV_Core* core){
 
 OP_BINARY(add, i64, +)
 //OP_BINARY(add, u64, +)
-OP_BINARY(add, f32, +)
+
+static inline void add_f32(TypeV_Core* core){
+    uint8_t target = core->codePtr[core->ip++];
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    //printf("adding %d + %d\n", core->regs[op1].u32, core->regs[op2].u32);
+    core->regs[target].f32 = core->regs[op1].f32 + core->regs[op2].f32;
+}
+
+
 OP_BINARY(add, f64, +)
 
 
