@@ -256,7 +256,13 @@ static char* instructions[] = {
 
         "spill_alloc",
         "spill_reg",
-        "unspill_reg"
+        "unspill_reg",
+
+        "closure_alloc",
+        "closure_push_env",
+        "closure_push_env_ptr",
+        "closure_call",
+        "closure_backup",
 };
 #define MAX_INSTRUCTION 251
 

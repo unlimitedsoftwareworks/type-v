@@ -261,7 +261,12 @@ static void* dispatch_table[] = { \
     &&DO_LOAD_STD, \
     &&DO_SPILL_ALLOC, \
     &&DO_SPILL_REG, \
-    &&DO_UNSPILL_REG \
+    &&DO_UNSPILL_REG,   \
+    &&DO_CLOSURE_ALLOC, \
+    &&DO_CLOSURE_PUSH_ENV,\
+    &&DO_CLOSURE_PUSH_ENV_PTR,\
+    &&DO_CLOSURE_CALL, \
+    &&DO_CLOSURE_BACKUP\
 };
 
 void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
@@ -850,7 +855,21 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_UNSPILL_REG:
             unspill_reg(core);
             DISPATCH();
-
+        DO_CLOSURE_ALLOC:
+            closure_alloc(core);
+            DISPATCH();
+        DO_CLOSURE_PUSH_ENV:
+            closure_push_env(core);
+            DISPATCH();
+        DO_CLOSURE_PUSH_ENV_PTR:
+            closure_push_env_ptr(core);
+            DISPATCH();
+        DO_CLOSURE_CALL:
+            closure_call(core);
+            DISPATCH();
+        DO_CLOSURE_BACKUP:
+            closure_backup(core);
+            DISPATCH();
     }
     END_RUN:
 

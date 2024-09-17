@@ -831,6 +831,8 @@ static inline void fn_set_reg_ptr(TypeV_Core* core){
 static inline void fn_call(TypeV_Core* core){
     // get the register
     const uint8_t target = core->codePtr[core->ip++];
+
+    // read address
     const size_t adr = core->regs[target].ptr;
 
     // back up IP in funcState
@@ -1692,13 +1694,58 @@ static inline void unspill_reg(TypeV_Core* core){
 
 static inline void closure_alloc(TypeV_Core* core) {
     uint8_t dest = core->codePtr[core->ip++];
-    uint8_t fn_address = core->codePtr[core->ip++];
-
-    uint64_t envSize = 0;
-    typev_memcpy_u64_ptr(&envSize, &core->codePtr[core->ip], 8);
+    uint8_t offsetToArgs = core->codePtr[core->ip++];
+    uint8_t envSize = core->codePtr[core->ip++];
+    uintptr_t fnAddressReg = 0;
+    typev_memcpy_u64_ptr(&fnAddressReg, &core->codePtr[core->ip], 8);
     core->ip += 8;
 
-    LOG_INFO("Allocating new closure with env size %d", envSize);
+    core->regs[dest].ptr = (uintptr_t) core_closure_alloc(core, fnAddressReg, offsetToArgs, envSize);
+}
+
+static inline void closure_push_env(TypeV_Core* core) {
+    uint8_t closureReg = core->codePtr[core->ip++];
+    uint8_t regId = core->codePtr[core->ip++];
+    uint8_t byteSize = core->codePtr[core->ip++];
+    TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
+    // = core->regs[regId].ptr;
+    typev_memcpy_u64_ptr(&cl->upvalues[cl->envCounter++], &core->regs[regId], byteSize);
+}
+
+static inline void closure_push_env_ptr(TypeV_Core* core) {
+    uint8_t closureReg = core->codePtr[core->ip++];
+    uint8_t regId = core->codePtr[core->ip++];
+    TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
+    cl->upvalues[cl->envCounter++].ptr = core->regs[regId].ptr;
+}
+
+static inline void closure_call(TypeV_Core* core) {
+    uint8_t closureReg = core->codePtr[core->ip++];
+    TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
+    // sets the enviroment of the core->funcState to the closure's enviroment
+    const size_t adr = cl->fnAddress;
+
+    // back up IP in funcState
+    core->funcState->ip = core->ip;
+    core->ip = adr;
+    core->funcState = core->funcState->next;
+    core->regs = core->funcState->regs;
+
+    uint8_t offset = cl->offset;
+    // copy the closure's environment to the function's environment
+    for (uint8_t i = 0; i < cl->envSize; i++) {
+        core->funcState->regs[i+offset] = cl->upvalues[i];
+    }
+}
+
+static inline void closure_backup(TypeV_Core* core) {
+    uint8_t closureReg = core->codePtr[core->ip++];
+    TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
+    uint8_t offset = cl->offset;
+
+    for(uint8_t i = 0; i < cl->envSize; i++) {
+        cl->upvalues[i] = core->funcState->next->regs[i+offset];
+    }
 }
 
 #endif //TYPE_V_INSTRUCTIONS_H

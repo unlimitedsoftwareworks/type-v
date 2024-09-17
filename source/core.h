@@ -199,9 +199,11 @@ typedef struct TypeV_FuncState {
  * TODO: closures are still not implemented
  */
 typedef struct TypeV_Closure {
-    TypeV_FuncState* state; ///< Function state
+    uintptr_t fnAddress;      ///< Function state
     TypeV_Register* upvalues; ///< Captured registers
-    uint32_t envSize; ///< Environment size
+    uint8_t envSize;          ///< Environment size
+    uint8_t envCounter;       ///< Environment size
+    uint8_t offset;           ///< Upvalues start registers, right after the args
 }TypeV_Closure;
 
 
@@ -402,7 +404,7 @@ typedef struct TypeV_FFI {
     uint8_t functionCount;   ///< FFI function count
 }TypeV_FFI;
 
-TypeV_Closure* core_closure_alloc(TypeV_Core* core, void* fnPtr, uint32_t envSize);
+TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t offset, uint8_t envSize);
 void core_closure_free(TypeV_Core* core, TypeV_Closure* closure);
 
 void* core_gc_alloc(TypeV_Core* core, size_t size);

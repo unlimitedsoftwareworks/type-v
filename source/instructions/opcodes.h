@@ -523,52 +523,36 @@ typedef enum TypeV_OpCode {
     OP_UNSPILL_REG,
 
     /**
-     * OP_CLOSURE_ALLOC, dest:R, fn_address: R, env-size: I[4bytes]
-     * Allocates a closure, setting its function pointer to the address in
-     * function-address and preparing an environment of environment-size slots.
+     * OP_CLOSURE_ALLOC, dest:R, offset_to_args: 1Byte, env_size: 1byte fn_address: I (8 bytes),
+     * Allocates a closure, storing it in dest.
+     * The closure will push its environment in the register starting from offset_to_args.
      */
     OP_CLOSURE_ALLOC,
 
     /**
-     * OP_CLOSURE_CAPTURE, closure: R, env-slot: I, source-reg: R,
-     * Copies the value from the specified register in the current function
-     * state to the specified environment slot in the closure.
+     * OP_CLOSURE_PUSH_ENV: dest: R, source: I 1byte, size: I 1byte
+     * pushes the register I to the closure environment
+     * to be used by the closure when it's called
      */
-    OP_CLOSURE_CAPTURE,
+    OP_CLOSURE_PUSH_ENV,
+    OP_CLOSURE_PUSH_ENV_PTR,
 
     /**
-     * OP_CLOSURE_CALL, closure: R
-     * Similar to OP_FN_RET, but includes additional logic to properly
-     * restore the previous function state's environment.
+     * OP_CLOSURE_CALL: reg: R
+     * calls the closure stored in reg
      */
     OP_CLOSURE_CALL,
 
     /**
-     * OP_CLOSURE_RET
-     * Similar to OP_FN_RET, but includes additional logic to properly restore
-     * the previous function state's environment.
+     * OP_CLOSURE_BACKUP: reg: R
+     * Backs up the changes from the func state to the closure
      */
-    OP_CLOSURE_RET,
+    OP_CLOSURE_BACKUP,
 
     /**
-     * OP_SET_CLOSURE_ENV, closure: R
-     * Used to set up the function state's environment pointer to the environment
-     * of the specified closure.
+     * OP_CLOSURE_APPLY: reg: R
+     * applies the closure stored in reg to the next function state
      */
-
-    OP_SET_CLOSURE_ENV,
-
-    /**
-     * OP_GET_CLOSURE_VAR, dest: R, closure: R, env-slot: I
-     * Retrieves a value from the specified slot in the closure's
-     * environment and stores it in the specified register.
-     */
-
-    OP_MV_REG_UPVALUE,
-    OP_MV_REG_UPVALUE_PTR,
-
-    OP_MV_UPVALUE_REG,
-    OP_MV_UPVALUE_REG_PTR,
 
     OP_COROUTINE_ALLOC,
     OP_COROUTINE_SET_ARG, // sets an argument, one by one
