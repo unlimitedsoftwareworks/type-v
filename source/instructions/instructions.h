@@ -1748,4 +1748,86 @@ static inline void closure_backup(TypeV_Core* core) {
     }
 }
 
+static inline void coroutine_alloc(TypeV_Core* core) {
+    uint8_t destReg = core->codePtr[core->ip++];
+    uint8_t closureReg = core->codePtr[core->ip++];
+    TypeV_Closure* closure = (TypeV_Closure*) core->regs[closureReg].ptr;
+
+    // allocate the coroutine
+    core->regs[destReg].ptr = (uintptr_t) core_coroutine_alloc(core, closure);
+}
+
+
+static inline void coroutine_fn_alloc(TypeV_Core* core) {
+    uint8_t coroutineReg = core->codePtr[core->ip++];
+    TypeV_Coroutine* coroutine = (TypeV_Coroutine*) core->regs[coroutineReg].ptr;
+    // creates a new function context, if needed, else reuse the old one
+    TypeV_FuncState* newState = coroutine->state;
+
+    newState->prev = core->funcState;
+    core->funcState->next = newState;
+}
+
+static inline void coroutine_get_state(TypeV_Core* core) {
+    uint8_t destReg = core->codePtr[core->ip++];
+    uint8_t coroutineReg = core->codePtr[core->ip++];
+
+    core->regs[destReg].u8 = ((TypeV_Coroutine*)core->regs[coroutineReg].ptr)->execState;
+}
+
+static inline void coroutine_call(TypeV_Core* core) {
+    uint8_t coroutineReg = core->codePtr[core->ip++];
+    TypeV_Coroutine* coroutine = (TypeV_Coroutine*) core->regs[coroutineReg].ptr;
+
+    // make sure the coroutine is not finished
+    if(coroutine->execState == TV_COROUTINE_FINISHED) {
+        core_panic(core, -1, "Coroutine finished");
+    }
+
+    coroutine->execState = TV_COROUTINE_RUNNING;
+
+    core->activeCoroutine = coroutine;
+    coroutine->state->ip = core->ip;
+
+    // back up IP in funcState
+    core->funcState->ip = core->ip;
+
+    // point the IP of the coroutine
+    core->ip = coroutine->ip;
+
+    // move the function state to the coroutine's function state
+    core->funcState = core->funcState->next;
+
+    // set the registers to the coroutine's function state
+    core->regs = core->funcState->regs;
+}
+
+static inline void coroutine_yield(TypeV_Core* core) {
+    TypeV_Coroutine* coroutine = core->activeCoroutine;
+    coroutine->execState = TV_COROUTINE_SUSPENDED;
+    coroutine->ip = core->ip;
+
+    core->ip = core->funcState->prev->ip;
+    core->funcState = core->funcState->prev;
+    core->regs = core->funcState->regs;
+
+    coroutine->state = core_duplicate_function_state(coroutine->state);
+}
+
+static inline void coroutine_ret(TypeV_Core* core) {
+    TypeV_Coroutine* coroutine = core->activeCoroutine;
+    core->activeCoroutine->execState = TV_COROUTINE_FINISHED;
+
+    core->ip = core->funcState->prev->ip;
+    core->funcState = core->funcState->prev;
+    core->regs = core->funcState->regs;
+
+    coroutine->state = core_duplicate_function_state(coroutine->state);
+}
+
+static inline void throw_rt(TypeV_Core* core) {
+    uint8_t code = core->codePtr[core->ip++];
+    core_panic(core, code, "Runtime error: %d", code);
+}
+
 #endif //TYPE_V_INSTRUCTIONS_H

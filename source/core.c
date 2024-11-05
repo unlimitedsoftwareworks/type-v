@@ -28,6 +28,29 @@ TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     return state;
 }
 
+TypeV_FuncState* core_duplicate_function_state(TypeV_FuncState* original) {
+    TypeV_FuncState* state = core_create_function_state(original->prev);
+
+    /*
+    state->capacity = original->capacity;
+    for(size_t i = 0; i < 256; i++) {
+        state->regs[i] = original->regs[i];
+    }
+
+    state->spillSize = original->spillSize;
+    for(size_t i = 0; i < state->spillSize; i++) {
+        state->spillSlots[i] = original->spillSlots[i];
+    }
+
+    state->next = original->next;
+    state->flags = original->flags;
+    */
+
+    memcpy(state, original, sizeof(TypeV_FuncState));
+
+    return state;
+}
+
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->id = id;
     core->state = CS_INITIALIZED;
@@ -47,6 +70,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->engineRef = engineRef;
     core->lastSignal = CSIG_NONE;
     core->awaitingPromise = NULL;
+    core->activeCoroutine = NULL;
 }
 
 void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, const uint8_t* globalPool){
@@ -541,7 +565,7 @@ void core_spill_alloc(TypeV_Core* core, uint16_t size) {
 }
 
 TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t argsOffset, uint8_t envSize) {
-    LOG_INFO("CORE[%d]: Allocating closure with %d bytes", core->id, envSize);
+    LOG_WARN("CORE[%d]: Allocating closure with %d bytes", core->id, envSize);
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Closure);
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
 
@@ -564,4 +588,30 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
 
     core_gc_update_alloc(core, totalAllocationSize);
     return closure_ptr;
+}
+
+TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) {
+    LOG_INFO("CORE[%d]: Allocating coroutine", core->id);
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Coroutine);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+
+    // Set header information
+    header->marked = 0;
+    header->type = OT_COROUTINE;
+    header->size = totalAllocationSize;
+    header->ptrsCount = 0;
+    //header->ptrs = calloc(envSize, sizeof(void*));
+
+    TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
+    // create a new function state
+    coroutine_ptr->closure = closure;
+    coroutine_ptr->state = core_create_function_state(core->funcState);
+    coroutine_ptr->state->prev = core->funcState;
+    coroutine_ptr->state->ip = closure->fnAddress;
+    coroutine_ptr->execState = TV_COROUTINE_CREATED;
+
+    // initially, the pointer points to the function address
+    coroutine_ptr->ip = closure->fnAddress;
+
+    return coroutine_ptr;
 }

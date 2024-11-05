@@ -266,7 +266,14 @@ static void* dispatch_table[] = { \
     &&DO_CLOSURE_PUSH_ENV,\
     &&DO_CLOSURE_PUSH_ENV_PTR,\
     &&DO_CLOSURE_CALL, \
-    &&DO_CLOSURE_BACKUP\
+    &&DO_CLOSURE_BACKUP, \
+    &&DO_COROUTINE_ALLOC, \
+    &&DO_COROUTINE_FN_ALLOC, \
+    &&DO_COROUTINE_GET_STATE, \
+    &&DO_COROUTINE_CALL, \
+    &&DO_COROUTINE_YIELD, \
+    &&DO_COROUTINE_RET, \
+    &&DO_THROW_RT \
 };
 
 void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
@@ -287,7 +294,7 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         #define DISPATCH() { \
              \
             /*if((core->ip >= 42) && (core->ip <= 55))                           */\
-               /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]);*/ \
+               /*printf("[%d]=%s\n", core->ip, instructions[core->codePtr[core->ip]]);*/\
             goto *dispatch_table[core->codePtr[core->ip++]];                          \
         }
 
@@ -869,6 +876,27 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_CLOSURE_BACKUP:
             closure_backup(core);
+            DISPATCH();
+        DO_COROUTINE_ALLOC:
+            coroutine_alloc(core);
+            DISPATCH();
+        DO_COROUTINE_FN_ALLOC:
+            coroutine_fn_alloc(core);
+            DISPATCH();
+        DO_COROUTINE_GET_STATE:
+            coroutine_get_state(core);
+            DISPATCH();
+        DO_COROUTINE_CALL:
+            coroutine_call(core);
+            DISPATCH();
+        DO_COROUTINE_YIELD:
+            coroutine_yield(core);
+            DISPATCH();
+        DO_COROUTINE_RET:
+            coroutine_ret(core);
+            DISPATCH();
+        DO_THROW_RT:
+            throw_rt(core);
             DISPATCH();
     }
     END_RUN:

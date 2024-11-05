@@ -148,6 +148,7 @@ typedef enum {
     OT_ARRAY,
     OT_RAWMEM,
     OT_CLOSURE,
+    OT_COROUTINE,
 }TypeV_ObjectType;
 
 
@@ -191,12 +192,10 @@ typedef struct TypeV_FuncState {
     uint16_t spillSize; ///< Spill size
     struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
     struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
-    struct TypeV_Closure* closure; ///< Closure, if the function is a closure
 }TypeV_FuncState;
 
 /**
  * @brief Closure, a closure is a function that has captured its environment.
- * TODO: closures are still not implemented
  */
 typedef struct TypeV_Closure {
     uintptr_t fnAddress;      ///< Function state
@@ -207,15 +206,22 @@ typedef struct TypeV_Closure {
 }TypeV_Closure;
 
 
+typedef enum TypeV_CoroutineExecState {
+    TV_COROUTINE_CREATED = 0,
+    TV_COROUTINE_RUNNING = 1,
+    TV_COROUTINE_SUSPENDED = 2,
+    TV_COROUTINE_FINISHED = 3,
+}TypeV_CoroutineExecState;
+
 /**
  * @brief Coroutine, a coroutine is a function that can be paused and resumed.
  */
 typedef struct TypeV_Coroutine {
     // A coroutine persists the state of the function
     TypeV_FuncState* state;
-    uint8_t isRunning;
-    uint8_t isFinished;
-    // maybe add last instruction pointer
+    TypeV_CoroutineExecState execState;
+    TypeV_Closure* closure;
+    uint64_t ip; // Instruction pointer, used to resume the coroutine. pointing to the next instruction
 }TypeV_Coroutine;
 
 
@@ -229,7 +235,7 @@ typedef struct TypeV_Core {
     uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
 
-    TypeV_GC gc;                      ///< Future Garbage collector
+    TypeV_GC gc;                              ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
     TypeV_CoreSignal lastSignal;              ///< Last signal received
@@ -237,19 +243,21 @@ typedef struct TypeV_Core {
 
     uint32_t exitCode;                        ///< Exit code
 
-    const uint8_t* constPtr;                        ///< Constant pointer
-    const uint8_t* templatePtr;                     ///< Template pointer
-    const uint8_t* codePtr;                         ///< Code pointer
+    const uint8_t* constPtr;                  ///< Constant pointer
+    const uint8_t* templatePtr;               ///< Template pointer
+    const uint8_t* codePtr;                   ///< Code pointer
 
-    const uint8_t* globalPtr;                       ///< Global pointer
+    const uint8_t* globalPtr;                 ///< Global pointer
     uint64_t ip;                              ///< Instruction pointer
 
     TypeV_Register* regs;                     ///< Registers, pointer to current function state registers for faster access.
     uint16_t* flags;                          ///< Flags, pointer to current function state flags for faster access.
     TypeV_FuncState* funcState;               ///< Function state
+    TypeV_Coroutine* activeCoroutine;         ///< Active Coroutine
 }TypeV_Core;
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev);
+TypeV_FuncState* core_duplicate_function_state(TypeV_FuncState* prev);
 void core_destroy_function_state(TypeV_Core* core, TypeV_FuncState** state);
 
 /**
@@ -407,6 +415,9 @@ typedef struct TypeV_FFI {
 TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t offset, uint8_t envSize);
 void core_closure_free(TypeV_Core* core, TypeV_Closure* closure);
 
+TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure);
+
+
 void* core_gc_alloc(TypeV_Core* core, size_t size);
 
 /**
@@ -427,5 +438,14 @@ void core_gc_update_process_field(TypeV_Core* core, TypeV_Class* classPtr, void*
 void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* ptr, uint64_t fieldIndex);
 TypeV_ObjectHeader* get_header_from_pointer(void* ptr);
 void core_gc_sweep_all(TypeV_Core* core);
+
+
+typedef enum TypeV_RTError {
+    /**
+     * Error: Coroutine reached its end and did not yield
+     */
+    TVRT_ERROR_COROUTINE_QUIT_NO_YIELD,
+
+}TypeV_RTError;
 
 #endif //TYPE_V_CORE_H

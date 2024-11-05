@@ -245,6 +245,14 @@ static op_func op_funcs[] = {
         &closure_push_env_ptr,
         &closure_call,
         &closure_backup,
+
+        &coroutine_alloc,
+        &coroutine_fn_alloc,
+        &coroutine_get_state,
+        &coroutine_call,
+        &coroutine_yield,
+        &coroutine_ret,
+        &throw_rt
 };
 
 #endif //TYPE_V_OPFUNCS_H

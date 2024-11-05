@@ -549,15 +549,44 @@ typedef enum TypeV_OpCode {
      */
     OP_CLOSURE_BACKUP,
 
-    /**
-     * OP_CLOSURE_APPLY: reg: R
-     * applies the closure stored in reg to the next function state
-     */
 
+    /**
+     * OP_COROUTINE_ALLOC: dest: R, src-func: I (8bytes)
+     * Allocates a new coroutine for the given function address
+     */
     OP_COROUTINE_ALLOC,
-    OP_COROUTINE_SET_ARG, // sets an argument, one by one
-    OP_COROUTINE_CALL, // calls to resume the coroutine
-    OP_COROUTINE_YIELD, // yields the coroutine
+
+    /**
+     * OP_COROUTINE_FN_ALLOC: coroutine: R
+     * prepare the coroutine to be called
+     */
+    OP_COROUTINE_FN_ALLOC,
+
+    /**
+     * OP_COROUTINE_GET_STATE: dest: R, coroutine: R
+     * Gets the current state of the coroutine stored in Resgiter dest (1byte)
+     */
+    OP_COROUTINE_GET_STATE,
+
+    /**
+     * OP_COROUTINE_CALL: coroutine: R
+     * calls the coroutine stored in reg
+     */
+    OP_COROUTINE_CALL,
+
+    /**
+     * OP_COROUTINE_YIELD
+     * saves the current state of the coroutine and yields the 
+     * control back to the caller
+     */
+    OP_COROUTINE_YIELD,
+
+    /**
+     * OP_COROUTINE_RET:
+     * Same as yield but marks the coroutine as finished
+     */
+    OP_COROUTINE_RET,
+
 }TypeV_OpCode;
 
 #endif //TYPE_V_OPCODES_H
