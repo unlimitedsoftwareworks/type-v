@@ -219,9 +219,9 @@ typedef enum TypeV_CoroutineExecState {
 typedef struct TypeV_Coroutine {
     // A coroutine persists the state of the function
     TypeV_FuncState* state;
-    TypeV_CoroutineExecState execState;
     TypeV_Closure* closure;
     uint64_t ip; // Instruction pointer, used to resume the coroutine. pointing to the next instruction
+    TypeV_CoroutineExecState executionState;
 }TypeV_Coroutine;
 
 

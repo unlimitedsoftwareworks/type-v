@@ -1772,7 +1772,9 @@ static inline void coroutine_get_state(TypeV_Core* core) {
     uint8_t destReg = core->codePtr[core->ip++];
     uint8_t coroutineReg = core->codePtr[core->ip++];
 
-    core->regs[destReg].u8 = ((TypeV_Coroutine*)core->regs[coroutineReg].ptr)->execState;
+    TypeV_Coroutine* coroutine = (TypeV_Coroutine*) core->regs[coroutineReg].ptr;
+
+    core->regs[destReg].u8 = coroutine->executionState;
 }
 
 static inline void coroutine_call(TypeV_Core* core) {
@@ -1780,11 +1782,11 @@ static inline void coroutine_call(TypeV_Core* core) {
     TypeV_Coroutine* coroutine = (TypeV_Coroutine*) core->regs[coroutineReg].ptr;
 
     // make sure the coroutine is not finished
-    if(coroutine->execState == TV_COROUTINE_FINISHED) {
+    if(coroutine->executionState == TV_COROUTINE_FINISHED) {
         core_panic(core, -1, "Coroutine finished");
     }
 
-    coroutine->execState = TV_COROUTINE_RUNNING;
+    coroutine->executionState = TV_COROUTINE_RUNNING;
 
     core->activeCoroutine = coroutine;
     coroutine->state->ip = core->ip;
@@ -1804,7 +1806,7 @@ static inline void coroutine_call(TypeV_Core* core) {
 
 static inline void coroutine_yield(TypeV_Core* core) {
     TypeV_Coroutine* coroutine = core->activeCoroutine;
-    coroutine->execState = TV_COROUTINE_SUSPENDED;
+    coroutine->executionState = TV_COROUTINE_SUSPENDED;
     coroutine->ip = core->ip;
 
     core->ip = core->funcState->prev->ip;
@@ -1816,7 +1818,7 @@ static inline void coroutine_yield(TypeV_Core* core) {
 
 static inline void coroutine_ret(TypeV_Core* core) {
     TypeV_Coroutine* coroutine = core->activeCoroutine;
-    core->activeCoroutine->execState = TV_COROUTINE_FINISHED;
+    core->activeCoroutine->executionState = TV_COROUTINE_FINISHED;
 
     core->ip = core->funcState->prev->ip;
     core->funcState = core->funcState->prev;

@@ -608,7 +608,7 @@ TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) 
     coroutine_ptr->state = core_create_function_state(core->funcState);
     coroutine_ptr->state->prev = core->funcState;
     coroutine_ptr->state->ip = closure->fnAddress;
-    coroutine_ptr->execState = TV_COROUTINE_CREATED;
+    coroutine_ptr->executionState = TV_COROUTINE_CREATED;
 
     // initially, the pointer points to the function address
     coroutine_ptr->ip = closure->fnAddress;
