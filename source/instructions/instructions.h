@@ -27,18 +27,19 @@
 
 
 // for aligned data
-static inline void typev_memcpy_u64_ptr(unsigned char* dest, const unsigned char* src, size_t n) {
-
+static inline void typev_memcpy_u64_ptr(void* dest, const void* src, size_t n) {
+    char* d = dest;
+    const char* s = src;
     static void* dispatch_table[] = {&&DO_1, &&DO_2, &&DO_3, &&DO_4, &&DO_5, &&DO_6, &&DO_7, &&DO_8};
     goto *dispatch_table[n - 1];
-    DO_8: dest[7] = src[7];
-    DO_7: dest[6] = src[6];
-    DO_6: dest[5] = src[5];
-    DO_5: dest[4] = src[4];
-    DO_4: dest[3] = src[3];
-    DO_3: dest[2] = src[2];
-    DO_2: dest[1] = src[1];
-    DO_1: dest[0] = src[0];
+    DO_8: d[7] = s[7];
+    DO_7: d[6] = s[6];
+    DO_6: d[5] = s[5];
+    DO_5: d[4] = s[4];
+    DO_4: d[3] = s[3];
+    DO_3: d[2] = s[2];
+    DO_2: d[1] = s[1];
+    DO_1: d[0] = s[0];
 }
 
 
@@ -53,11 +54,13 @@ static inline uint64_t typev_memcpy_u64(const unsigned char *s, size_t size) {
     return dest;
 }
 
+/*
 static inline void typev_memcpy_u64_ptr_u64_ptr(const unsigned char* dest, const unsigned char *s, size_t size) {
     for (size_t i = 0; i < size; ++i) {
         *(uint64_t*)dest |= (uint64_t)s[i] << (i * 8);
     }
 }
+*/
 
 static inline void mv_reg_reg(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
@@ -65,7 +68,7 @@ static inline void mv_reg_reg(TypeV_Core* core){
 
     core->ip++;
     //uint8_t byteSize = core->codePtr[core->ip++];
-    CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
+    // CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     //typev_memcpy_u64_ptr(&core->regs[target], &core->regs[source], byteSize);
     core->regs[target].ptr = core->regs[source].ptr;
@@ -75,7 +78,7 @@ static inline void mv_reg_reg_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t source = core->codePtr[core->ip++];
 
-    typev_memcpy_u64_ptr(&core->regs[target], &core->regs[source], PTR_SIZE);
+    typev_memcpy_u64_ptr((unsigned char*)&core->regs[target], (unsigned char*)&core->regs[source], PTR_SIZE);
 }
 
 static inline void mv_reg_null(TypeV_Core* core){
@@ -102,7 +105,7 @@ static inline void mv_reg_i_ptr(TypeV_Core* core){
     uint64_t immediate = 0;
     //uint64_t immediate = typev_memcpy_u64(&core->codePtr[core->ip], immediate_size);
     // data could be unaligned
-    typev_memcpy_u64_ptr(&immediate, &core->codePtr[core->ip], 8);
+    typev_memcpy_u64_ptr((unsigned char*)&immediate, &core->codePtr[core->ip], 8);
     core->ip += 8;
     core->regs[target].ptr =  immediate;
     //typev_memcpy_u64_ptr(&core->regs[target], &immediate, immediate_size);
@@ -115,7 +118,7 @@ static inline void mv_reg_const(TypeV_Core* core){
     const uint8_t offset_length = core->codePtr[core->ip++];
     size_t constant_offset = 0;
     // data could be unaligned
-    typev_memcpy_u64_ptr(&constant_offset, &core->codePtr[core->ip],  offset_length);
+    typev_memcpy_u64_ptr((unsigned char*)&constant_offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
 
     uint8_t byteSize = core->codePtr[core->ip++];
@@ -740,19 +743,19 @@ static inline void push_const(TypeV_Core* core){
 
     switch (bytesize) {
         case 0:
-            stack_push_ptr(core, (size_t)&core->constPtr[offset]);
+            stack_push_ptr(core->funcState, (size_t)&core->constPtr[offset]);
             break;
         case 1:
-            stack_push_8(core, core->constPtr[offset]);
+            stack_push_8(core->funcState, core->constPtr[offset]);
             break;
         case 2:
-            stack_push_16(core, *((uint16_t*)&core->constPtr[offset]));
+            stack_push_16(core->funcState, *((uint16_t*)&core->constPtr[offset]));
             break;
         case 4:
-            stack_push_32(core, *((uint32_t*)&core->constPtr[offset]));
+            stack_push_32(core->funcState, *((uint32_t*)&core->constPtr[offset]));
             break;
         case 8:
-            stack_push_64(core, *((uint64_t*)&core->constPtr[offset]));
+            stack_push_64(core->funcState, *((uint64_t*)&core->constPtr[offset]));
             break;
         default:
             LOG_ERROR("Invalid byte size %d", bytesize);
@@ -792,7 +795,7 @@ static inline void pop(TypeV_Core* core){
 
 static inline void pop_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
-    stack_pop_ptr(core, &core->regs[target].ptr);
+    stack_pop_ptr(core->funcState, &core->regs[target].ptr);
 }
 
 static inline void fn_alloc(TypeV_Core* core){
@@ -1573,7 +1576,7 @@ static inline void reg_ffi(TypeV_Core* core){
     memcpy(&id, &core->codePtr[core->ip], 2);
     core->ip += 2;
 
-    const char* namePtr = &core->constPtr[offset];
+    const char* namePtr = (const char*)&core->constPtr[offset];
     char* name = strdup(namePtr);
     engine_ffi_register(core->engineRef, name, id);
 }

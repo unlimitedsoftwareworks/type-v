@@ -180,7 +180,12 @@ void string_append_f64(TypeV_Core* core){
         return;
     }
 
-    int32_t gap = ending - ((char*)str->data+pos);
+    ptrdiff_t gap = ending - ((char*)str->data+pos);
+
+    if (gap < 0 || gap > UINT32_MAX) {
+        typev_api_core_panic(core, 2, "Gap value is out of range for uint32_t\n");
+        return;
+    }
 
     typev_api_return_u32(core, gap);
 }
@@ -207,7 +212,12 @@ void string_append_f32(TypeV_Core* core){
         return;
     }
 
-    int32_t gap = ending - ((char*)str->data+pos);
+    ptrdiff_t gap = ending - ((char*)str->data+pos);
+
+    if (gap < 0 || gap > UINT32_MAX) {
+        typev_api_core_panic(core, 2, "Gap value is out of range for uint32_t\n");
+        return;
+    }
 
     typev_api_return_u32(core, gap);
 }
@@ -231,7 +241,12 @@ void string_append_u64(TypeV_Core* core){
         typev_api_core_panic(core, 1, "Failed to convert uint64_t to string\n");
         return;
     }
-    int32_t gap = ending - ((char*)str->data+pos);
+    ptrdiff_t gap = ending - ((char*)str->data+pos);
+
+    if (gap < 0 || gap > UINT32_MAX) {
+        typev_api_core_panic(core, 2, "Gap value is out of range for uint32_t\n");
+        return;
+    }
 
     typev_api_return_u32(core, gap);
 }
@@ -255,7 +270,13 @@ void string_append_i64(TypeV_Core* core){
         return;
     }
 
-    int32_t gap = ending - ((char*)str->data+pos-1);
+    ptrdiff_t gap = ending - ((char*)str->data+pos-1);
+
+    if (gap < 0 || gap > UINT32_MAX) {
+        typev_api_core_panic(core, 2, "Gap value is out of range for uint32_t\n");
+        return;
+    }
+
     typev_api_return_u32(core, gap);
 }
 
@@ -273,7 +294,12 @@ void string_append_u32(TypeV_Core* core){
 
     // convert the value to string
     char* ending = itoa_u32_yy(value, (char*)str->data+pos);
-    uint32_t gap = ending - ((char*)str->data+pos);
+    ptrdiff_t gap = ending - ((char*)str->data+pos);
+
+    if (gap < 0 || gap > UINT32_MAX) {
+        typev_api_core_panic(core, 2, "Gap value is out of range for uint32_t\n");
+        return;
+    }
 
     typev_api_return_u32(core, gap);
 }
@@ -406,7 +432,7 @@ void string_toF64(TypeV_Core* core){
     char* ptr;
     double value = yy_string_to_double((char*)str->data, &ptr);
 
-    if(ptr == str->data){
+    if (ptr == (char*)str->data) {
         typev_api_core_panic(core, 1, "Failed to convert string to float\n");
         return;
     }
@@ -418,7 +444,7 @@ void string_toF32(TypeV_Core* core){
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
     char* ptr;
     double value = yy_string_to_double((char*)str->data, &ptr);
-    if(ptr == str->data){
+    if(ptr == (char*)str->data){
         typev_api_core_panic(core, 1, "Failed to convert string to float\n");
         return;
     }
@@ -448,13 +474,20 @@ void string_toU8(TypeV_Core* core){
     typev_api_return_u8(core, (uint8_t)value);
 }
 
-void string_toI8(TypeV_Core* core){
+void string_toI8(TypeV_Core* core) {
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
 
-    int8_t value = strtol((char*)str->data, NULL, 10);
+    long value = strtol((char*)str->data, NULL, 10);
+
+    // Check if the value is within the int8_t range
+    if (value < INT8_MIN || value > INT8_MAX) {
+        typev_api_core_panic(core, 1, "Value out of range for int8_t\n");
+        return;
+    }
 
     typev_api_return_i8(core, (int8_t)value);
 }
+
 
 void string_toU16(TypeV_Core* core){
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
@@ -464,10 +497,16 @@ void string_toU16(TypeV_Core* core){
     typev_api_return_u16(core, (uint16_t)value);
 }
 
-void string_toI16(TypeV_Core* core){
+void string_toI16(TypeV_Core* core) {
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
 
-    int16_t value = strtol((char*)str->data, NULL, 10);
+    long value = strtol((char*)str->data, NULL, 10);
+
+    // Check if the value is within the int16_t range
+    if (value < INT16_MIN || value > INT16_MAX) {
+        typev_api_core_panic(core, 1, "Value out of range for int16_t\n");
+        return;
+    }
 
     typev_api_return_i16(core, (int16_t)value);
 }
@@ -476,7 +515,9 @@ void string_toU32(TypeV_Core* core){
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
 
     atoi_result res;
-    uint32_t value = atoi_u32_yy((char*)str->data, str->length, str->data+str->length-1, &res);
+    char *endPtr = (char*)(str->data+str->length-1); // Declare a pointer to store the end position
+
+    uint32_t value = atoi_u32_yy((char*)str->data, str->length, &endPtr, &res);
 
     if(res == atoi_result_fail){
         typev_api_core_panic(core, 1, "Failed to convert string to uint32_t\n");
@@ -494,7 +535,8 @@ void string_toI32(TypeV_Core* core){
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
 
     atoi_result res;
-    int32_t value = atoi_i32_yy((char*)str->data, str->length, str->data+str->length-1, &res);
+    char* endPtr = (char*)str->data+str->length-1; // Declare a pointer to store the end position
+    int32_t value = atoi_i32_yy((char*)str->data, str->length, &endPtr, &res);
 
     if(res == atoi_result_fail){
         typev_api_core_panic(core, 1, "Failed to convert string to int32_t\n");
@@ -512,7 +554,8 @@ void string_toU64(TypeV_Core* core){
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
 
     atoi_result res;
-    uint64_t value = atoi_u64_yy(str->data, str->length, str->data+str->length-1, &res);
+    char *endPtr = (char*)(str->data+str->length-1);
+    uint64_t value = atoi_u64_yy((char*)str->data, str->length, &endPtr, &res);
 
     if(res == atoi_result_fail){
         typev_api_core_panic(core, 1, "Failed to convert string to uint64_t\n");
@@ -530,7 +573,8 @@ void string_toI64(TypeV_Core* core){
     TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
 
     atoi_result res;
-    int64_t value = atoi_i64_yy((char*)str->data, str->length, str->data+str->length-1, &res);
+    char *endPtr = (char*)(str->data+str->length-1);
+    int64_t value = atoi_i64_yy((char*)str->data, str->length, &endPtr, &res);
 
     if(res == atoi_result_fail){
         typev_api_core_panic(core, 1, "Failed to convert string to int64_t\n");

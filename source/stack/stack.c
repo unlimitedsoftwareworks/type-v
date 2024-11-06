@@ -98,7 +98,7 @@ void stack_pop_32(TypeV_FuncState* fnc, uint32_t * value) {
     fnc->sp -= 4;
 }
 
-void stack_pop_64(TypeV_FuncState* fnc, uint64_t * value) {
+void stack_pop_64(TypeV_FuncState* fnc, uint64_t* value) {
     // check we don't underflow
     if (fnc->sp < 8) {
         LOG_ERROR("Stack underflow, failed to allocated 1byte, stack-size: %zu", fnc->capacity);
@@ -109,7 +109,7 @@ void stack_pop_64(TypeV_FuncState* fnc, uint64_t * value) {
     fnc->sp -= 8;
 }
 
-void stack_pop_ptr(TypeV_FuncState* fnc, size_t * value) {
+void stack_pop_ptr(TypeV_FuncState* fnc, uintptr_t* value) {
     // check we don't underflow
     if (fnc->sp < PTR_SIZE) {
         LOG_ERROR("Stack underflow, failed to allocated 1byte, stack-size: %zu", fnc->capacity);

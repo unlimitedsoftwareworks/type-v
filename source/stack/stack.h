@@ -24,7 +24,7 @@ void stack_pop_8(TypeV_FuncState* fnc, uint8_t *value);
 void stack_pop_16(TypeV_FuncState* fnc, uint16_t *value);
 void stack_pop_32(TypeV_FuncState* fnc, uint32_t *value);
 void stack_pop_64(TypeV_FuncState* fnc, uint64_t *value);
-void stack_pop_ptr(TypeV_FuncState* fnc, size_t *value);
+void stack_pop_ptr(TypeV_FuncState* fnc, uintptr_t *value);
 
 void stack_free(TypeV_FuncState* fnc);
 #endif //TYPE_V_STACK_H

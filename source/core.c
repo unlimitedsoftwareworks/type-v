@@ -21,7 +21,6 @@ TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     stack_init(state, 1024);
     state->prev = prev;
     state->next = NULL;
-    state->flags = 0;
     state->spillSlots = malloc(sizeof(TypeV_Register));
     state->spillSize = 1;
 
@@ -56,7 +55,6 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->state = CS_INITIALIZED;
 
     core->funcState = core_create_function_state(NULL);
-    core->flags = &core->funcState->flags;
     core->regs = core->funcState->regs;
 
     // Initialize GC
@@ -69,11 +67,10 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
 
     core->engineRef = engineRef;
     core->lastSignal = CSIG_NONE;
-    core->awaitingPromise = NULL;
     core->activeCoroutine = NULL;
 }
 
-void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, const uint8_t* globalPool){
+void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, uint8_t* globalPool){
     core->codePtr = program;
     core->constPtr = constantPool;
     core->globalPtr = globalPool;
@@ -82,16 +79,7 @@ void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constan
 
 
 void core_deallocate(TypeV_Core *core) {
-    stack_free(core);
-
-
-    // TODO: free mem objects
-
-
-    // free stack
-    stack_free(core);
-
-    // Note: Program deallocation depends on how programs are loaded and managed
+    // TODO
 }
 
 
@@ -194,7 +182,7 @@ void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
             break;
         }
         case OT_CLOSURE:
-        case OT_PROCESS:
+        case OT_COROUTINE:
         case OT_RAWMEM:
             break;
     }
@@ -323,7 +311,7 @@ void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* p
 }
 
 
-size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
+uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
     // [offset_pointer (size_t), data_block (totalsize)]
     LOG_INFO("CORE[%d]: Allocating struct with %d fields and %d bytes, total allocated size: %d", core->id, numfields, totalsize, sizeof(size_t)+totalsize);
 
@@ -342,11 +330,11 @@ size_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) 
     struct_ptr->numFields = numfields;
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
     struct_ptr->globalFields = calloc(numfields, sizeof(uint32_t));
-    struct_ptr->dataPointer = &struct_ptr->data;
+    struct_ptr->dataPointer = struct_ptr->data;
 
     core_gc_update_alloc(core, totalAllocationSize);
 
-    return (size_t)struct_ptr;
+    return (uintptr_t)struct_ptr;
 }
 
 uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint8_t numFields , uint32_t globalID) {
@@ -371,7 +359,7 @@ uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint
 }
 
 
-size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {
+uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {
     LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, uid: %d", core->id, num_methods, total_fields_size, classId);
 
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class) + total_fields_size;
@@ -396,10 +384,10 @@ size_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fiel
     // Track the allocation with the GC
     core_gc_update_alloc(core, totalAllocationSize);
 
-    return (size_t)class_ptr;
+    return (uintptr_t)class_ptr;
 }
 
-size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
+uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
     LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of size %d", core->id, num_elements, element_size);
 
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
@@ -420,7 +408,7 @@ size_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element
 
     core_gc_update_alloc(core, totalAllocationSize);
 
-    return (size_t)array_ptr;
+    return (uintptr_t)array_ptr;
 }
 
 uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start, uint64_t end){
@@ -448,7 +436,7 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     return (uintptr_t)array_ptr;
 }
 
-size_t core_array_extend(TypeV_Core *core, size_t array_ptr, uint64_t num_elements){
+uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_elements){
     LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated size: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
 
@@ -475,7 +463,7 @@ uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src
     uint64_t newLength = dest->length + src->length;
 
     // Extend the destination array to accommodate the new elements
-    core_array_extend(core, (size_t)dest, newLength);
+    core_array_extend(core, (uintptr_t)dest, newLength);
 
     // Shift the existing elements in the destination array to the right
     // memmove is used here to handle overlapping memory regions safely
@@ -501,26 +489,26 @@ uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src
 
 
 
-size_t core_ffi_load(TypeV_Core* core, size_t namePointer){
+uintptr_t core_ffi_load(TypeV_Core* core, uintptr_t namePointer){
     char* name = (char*)namePointer;
     LOG_INFO("CORE[%d]: Loading FFI %s", core->id, name);
     TV_LibraryHandle lib = ffi_dynlib_load(name);
     ASSERT(lib != NULL, "Failed to load library %s", ffi_find_dynlib(name));
     void* openLib = ffi_dynlib_getsym(lib, "typev_ffi_open");
     ASSERT(openLib != NULL, "Failed to open library %s", ffi_find_dynlib(name));
-    size_t (*openFunc)(TypeV_Core*) = openLib;
+    uintptr_t (*openFunc)(TypeV_Core*) = openLib;
     return openFunc(core);
 }
 
-void core_ffi_close(TypeV_Core* core, size_t libHandle){
+void core_ffi_close(TypeV_Core* core, uintptr_t libHandle){
     LOG_INFO("CORE[%d]: Closing FFI %p", core->id, (void*)libHandle);
     TV_LibraryHandle lib = (TV_LibraryHandle)libHandle;
     ffi_dynlib_unload(lib);
 }
 
-size_t core_mem_alloc(TypeV_Core* core, size_t size) {
+uintptr_t core_mem_alloc(TypeV_Core* core, uintptr_t size) {
     LOG_INFO("CORE[%d]: Allocating %d bytes", core->id, size);
-    return (size_t)core_gc_alloc(core, size);
+    return (uintptr_t)core_gc_alloc(core, size);
 }
 
 void core_resume(TypeV_Core* core) {
@@ -535,17 +523,18 @@ void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
     char message[1024];
     va_list args;
     va_start(args, fmt);
-    vsprintf(message, fmt, args);
+    vsnprintf(message, sizeof(message), fmt, args);
     va_end(args);
 
     LOG_ERROR("CORE[%d]: PANIC: ErrorID: %d, Message %s", core->id, errorId, message);
 
     TypeV_ENV env = get_env();
-    if(env_sourcemap_has(env)){
+    if (env_sourcemap_has(env)) {
         LOG_ERROR("Stack trace:");
-        // print first frame
+        // Print first frame
         TypeV_SourcePoint point = env_sourcemap_get(env, core->ip);
-        LOG_ERROR("function: %s at %s:%d:%d", point.func_name, point.file, point.line+1, point.column);
+        LOG_ERROR("function: %s at %s:%d:%d", point.func_name, point.file, point.line + 1, point.column);
+
         TypeV_FuncState* state = core->funcState->prev;
         while (state != NULL) {
             TypeV_SourcePoint point = env_sourcemap_get(env, state->ip);
@@ -554,10 +543,10 @@ void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
         }
     }
 
-
     core->state = CS_CRASHED;
     exit(-1);
 }
+
 
 void core_spill_alloc(TypeV_Core* core, uint16_t size) {
     core->funcState->spillSlots = realloc(core->funcState->spillSlots, sizeof(TypeV_Register)*(size));

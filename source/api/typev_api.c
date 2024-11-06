@@ -7,7 +7,6 @@
 #include <stdint.h>
 
 #include "typev_api.h"
-#include "../core.h"
 #include "../stack/stack.h"
 
 
@@ -34,9 +33,9 @@ uint64_t typev_api_stack_getSize(TypeV_Core* core) {
 }
 
 int8_t typev_api_stack_pop_i8(TypeV_Core* core) {
-    int8_t value;
+    uint8_t value;
     stack_pop_8(core->funcState, &value);
-    return value;
+    return (int8_t)value;
 }
 
 uint8_t typev_api_stack_pop_u8(TypeV_Core* core) {
@@ -46,9 +45,9 @@ uint8_t typev_api_stack_pop_u8(TypeV_Core* core) {
 }
 
 int16_t typev_api_stack_pop_i16(TypeV_Core* core) {
-    int16_t value;
+    uint16_t value;
     stack_pop_16(core->funcState, &value);
-    return value;
+    return (int16_t)value;
 }
 
 uint16_t typev_api_stack_pop_u16(TypeV_Core* core) {
@@ -59,9 +58,9 @@ uint16_t typev_api_stack_pop_u16(TypeV_Core* core) {
 }
 
 int32_t typev_api_stack_pop_i32(TypeV_Core* core) {
-    int32_t value;
+    uint32_t value;
     stack_pop_32(core->funcState, &value);
-    return value;
+    return (int32_t)value;
 }
 
 uint32_t typev_api_stack_pop_u32(TypeV_Core* core) {
@@ -71,9 +70,9 @@ uint32_t typev_api_stack_pop_u32(TypeV_Core* core) {
 }
 
 int64_t typev_api_stack_pop_i64(TypeV_Core* core) {
-    int64_t value;
+    uint64_t value;
     stack_pop_64(core->funcState, &value);
-    return value;
+    return (int64_t)value;
 }
 
 uint64_t typev_api_stack_pop_u64(TypeV_Core* core) {
@@ -82,7 +81,7 @@ uint64_t typev_api_stack_pop_u64(TypeV_Core* core) {
     return value;
 }
 
-size_t typev_api_stack_pop_ptr(struct TypeV_Core* core){
+uintptr_t typev_api_stack_pop_ptr(struct TypeV_Core* core){
     size_t value;
     stack_pop_ptr(core->funcState, &value);
     return value;

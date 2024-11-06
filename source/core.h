@@ -39,21 +39,6 @@ typedef struct TypeV_Array {
     uint8_t* data;            ///< Array data
 }TypeV_Array;
 
-typedef struct TypeV_Promise {
-    uint8_t resolved;       ///< resolved flag
-    size_t value;           ///< Promise value
-    uint32_t id;            ///< Promise ID, for debugging
-}TypeV_Promise;
-
-typedef struct TypeV_Lock {
-    uint8_t locked;         ///< locked flag
-    uint32_t holder;         ///< holder ID
-    uint32_t id;            ///< lock ID
-    size_t value;           ///< Lock value
-    TypeV_Promise *promise; ///< Promise that the lock is awaiting, NULL if none
-}TypeV_Lock;
-
-
 
 /**
  * @brief TypeV_Register
@@ -143,12 +128,11 @@ typedef struct TypeV_GlobalPool {
  */
 typedef enum {
     OT_CLASS = 0,
-    OT_PROCESS,
     OT_STRUCT,
     OT_ARRAY,
-    OT_RAWMEM,
     OT_CLOSURE,
     OT_COROUTINE,
+    OT_RAWMEM,
 }TypeV_ObjectType;
 
 
@@ -184,7 +168,6 @@ typedef struct TypeV_FuncState {
     uint8_t *stack;    ///< Stack
     uint64_t capacity; ///< Stack capacity
     uint64_t limit;    ///< Stack limit
-    uint64_t flags;          ///< Flags
     uint64_t sp;             ///< Stack pointer
     uint64_t ip;             ///< Instruction pointer, used only as back up
     TypeV_Register regs[MAX_REG]; ///< 256 registers.
@@ -239,7 +222,6 @@ typedef struct TypeV_Core {
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
     TypeV_CoreSignal lastSignal;              ///< Last signal received
-    TypeV_Promise* awaitingPromise;           ///< Promise that the core is awaiting, NULL if none
 
     uint32_t exitCode;                        ///< Exit code
 
@@ -247,7 +229,7 @@ typedef struct TypeV_Core {
     const uint8_t* templatePtr;               ///< Template pointer
     const uint8_t* codePtr;                   ///< Code pointer
 
-    const uint8_t* globalPtr;                 ///< Global pointer
+    uint8_t* globalPtr;                       ///< Global pointer
     uint64_t ip;                              ///< Instruction pointer
 
     TypeV_Register* regs;                     ///< Registers, pointer to current function state registers for faster access.
@@ -267,7 +249,7 @@ void core_destroy_function_state(TypeV_Core* core, TypeV_FuncState** state);
  * @param engineRef
  */
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef);
-void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, const uint8_t* globalPool);
+void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, uint8_t* globalPool);
 
 /**
  * Deallocates a core
