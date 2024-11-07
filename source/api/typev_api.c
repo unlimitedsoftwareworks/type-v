@@ -179,9 +179,9 @@ void typev_api_return_array(TypeV_Core* core, TypeV_Array* value){
 */
 TypeV_Struct *typev_api_struct_create(TypeV_Core *core, uint16_t fieldCount, size_t structSize) {
     // allocate memory for the struct
-    TypeV_Struct *structPtr = calloc(1, sizeof(TypeV_Struct) + structSize);
+    TypeV_Struct *structPtr = malloc(sizeof(TypeV_Struct) + structSize);
     // set the field count
-    structPtr->fieldOffsets = calloc(fieldCount, sizeof(uint16_t));
+    structPtr->fieldOffsets = malloc(fieldCount*sizeof(uint16_t));
 
     // not used because it's already allocated alongside the struct, contiguous memory
     //structPtr->data = (uint8_t *) calloc(1, sizeof(structSize));

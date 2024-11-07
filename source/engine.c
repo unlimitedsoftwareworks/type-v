@@ -15,8 +15,8 @@ void engine_init(TypeV_Engine *engine) {
     engine->coreCount = 0;
     engine->runningCoresCount = 0;
     engine->health = EH_OK;
-    engine->coreIterator = calloc(1, sizeof(TypeV_CoreIterator));
-    engine->coreIterator->core = calloc(1, sizeof(TypeV_Core));
+    engine->coreIterator = malloc(sizeof(TypeV_CoreIterator));
+    engine->coreIterator->core = malloc(sizeof(TypeV_Core));
     engine->coreIterator->next = NULL;
 
     engine->ffi = malloc(sizeof(TypeV_FFI*));
@@ -950,7 +950,7 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
                parentCore->globalPtr);
 
     // add iterator and attack to engine
-    TypeV_CoreIterator* newCoreIterator = calloc(1, sizeof(TypeV_CoreIterator));
+    TypeV_CoreIterator* newCoreIterator = malloc(sizeof(TypeV_CoreIterator));
     newCoreIterator->next = NULL;
     newCoreIterator->currentInstructions = 0;
     newCoreIterator->maxInstructions = 0;

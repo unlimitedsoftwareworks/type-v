@@ -107,13 +107,13 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     header->type = OT_STRUCT;
     header->size = totalAllocationSize;
     header->ptrsCount = numfields;
-    header->ptrs = calloc(numfields, sizeof(void*));
+    header->ptrs = malloc(numfields*sizeof(void*));
 
     // Get a pointer to the actual struct, which comes after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
     struct_ptr->numFields = numfields;
-    struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
-    struct_ptr->globalFields = calloc(numfields, sizeof(uint32_t));
+    struct_ptr->fieldOffsets = malloc(numfields*sizeof(uint16_t));
+    struct_ptr->globalFields = malloc(numfields*sizeof(uint32_t));
     struct_ptr->dataPointer = struct_ptr->data;
     struct_ptr->uid = uid++;
     core_gc_update_alloc(core, totalAllocationSize);
@@ -153,14 +153,14 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_f
     header->type = OT_CLASS;
     header->size = totalAllocationSize;
     header->ptrsCount = total_fields_size; // assume worse case, 1 pointer per byte
-    header->ptrs = calloc(total_fields_size, sizeof(void*));
+    header->ptrs = malloc(total_fields_size* sizeof(void*));
 
     // Get a pointer to the actual class, which comes after the header
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
     class_ptr->numMethods = num_methods;
     class_ptr->uid = classId;
-    class_ptr->methods = calloc(num_methods, sizeof(size_t));
-    class_ptr->globalMethods = calloc(num_methods, sizeof(uint32_t));
+    class_ptr->methods = malloc(num_methods*sizeof(size_t));
+    class_ptr->globalMethods = malloc(num_methods*sizeof(uint32_t));
 
     // Initialize other class fields here if needed
 
@@ -181,12 +181,12 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t elem
     header->size = totalAllocationSize;
     // we could extend bytecode to separate pointer arrays from data arrays
     header->ptrsCount = num_elements;
-    header->ptrs = calloc(num_elements, sizeof(void*));
+    header->ptrs = malloc(num_elements*sizeof(void*));
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
-    array_ptr->data = calloc(num_elements, element_size);
+    array_ptr->data = malloc(num_elements* element_size);
     array_ptr->uid = uid++;
 
     core_gc_update_alloc(core, totalAllocationSize);
@@ -209,12 +209,12 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = array->elementSize;
     array_ptr->length = slice_length;
-    array_ptr->data = calloc(slice_length, array->elementSize);
+    array_ptr->data = malloc(slice_length* array->elementSize);
     array_ptr->uid = 1000000-array->uid;
 
     TypeV_ObjectHeader* originalHeader = get_header_from_pointer(array);
     if(originalHeader->ptrsCount > 0) {
-        header->ptrs = calloc(slice_length, sizeof(void*));
+        header->ptrs = malloc(slice_length* sizeof(void*));
         for(size_t i = 0; i < slice_length; i++) {
             header->ptrs[i] = originalHeader->ptrs[start + i];
         }
@@ -399,7 +399,7 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
     closure_ptr->fnAddress = fnPtr;
     closure_ptr->envSize = envSize;
 
-    closure_ptr->upvalues = calloc(envSize, sizeof(TypeV_Register ));
+    closure_ptr->upvalues = malloc(envSize* sizeof(TypeV_Register ));
 
     core_gc_update_alloc(core, totalAllocationSize);
     return closure_ptr;

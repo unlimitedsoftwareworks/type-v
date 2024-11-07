@@ -49,7 +49,7 @@ void typev_env_init(char* sourceMapFile){
         env.cwd = strdup(cwd);
     }
 
-    env.searchPaths = calloc(3, sizeof(char*));
+    env.searchPaths = malloc(3* sizeof(char*));
     printf("current dir: %s\n", env.cwd);
 
     /*

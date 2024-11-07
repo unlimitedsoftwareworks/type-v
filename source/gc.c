@@ -6,9 +6,9 @@
 
 
 void* core_gc_alloc(TypeV_Core* core, size_t size) {
-    // trigger after 2MB of allocations
-    if (core->gc.allocsSincePastGC > 2097152) {
-        printf("[GC]: Allocated %llu bytes since last GC\n", core->gc.allocsSincePastGC);
+    // trigger after 50MB of allocations
+    if (core->gc.allocsSincePastGC > 50000000) {
+        //printf("[GC]: Allocated %llu bytes since last GC\n", core->gc.allocsSincePastGC);
         core_gc_collect(core);
         core->gc.allocsSincePastGC = 0;
     }
@@ -365,26 +365,26 @@ void core_coroutine_free(TypeV_Core* core, TypeV_ObjectHeader* header) {
 void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
     switch(header->type) {
         case OT_STRUCT: {
-            printf("freeing struct\n");
+            //printf("freeing struct\n");
             core_struct_free(core, header);
             break;
         }
         case OT_CLASS: {
-            printf("freeing class\n");
+            //printf("freeing class\n");
             core_class_free(core, header);
             break;
         }
         case OT_ARRAY: {
-            printf("freeing array\n");
+            //printf("freeing array\n");
             core_array_free(core, header);
             break;
         }
         case OT_CLOSURE:
-            printf("freeing closure\n");
+            //printf("freeing closure\n");
             core_closure_free(core, header);
             break;
         case OT_COROUTINE:
-            printf("freeing coroutine\n");
+            //printf("freeing coroutine\n");
             core_coroutine_free(core, header);
             break;
         case OT_RAWMEM:
