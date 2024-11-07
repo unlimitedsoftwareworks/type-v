@@ -23,9 +23,15 @@ void core_gc_mark_object(TypeV_Core* core, TypeV_ObjectHeader * ptr);
 void core_gc_sweep(TypeV_Core* core);
 void core_gc_collect(TypeV_Core* core);
 void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state);
+// similar to core_gc_collect_state, but only collects a single state
+// and does not sweep
+void core_gc_collect_single_state(TypeV_Core* core, TypeV_FuncState* state);
+
 void core_gc_update_struct_field(TypeV_Core* core, TypeV_Struct* structPtr, void* ptr, uint16_t fieldIndex);
 void core_gc_update_class_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex);
 void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* ptr, uint64_t fieldIndex);
+void core_gc_update_closure_env(TypeV_Core* core, TypeV_Closure* closurePtr, void* ptr);
+
 TypeV_ObjectHeader* get_header_from_pointer(void* ptr);
 
 void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header);

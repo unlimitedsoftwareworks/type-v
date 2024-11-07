@@ -26,7 +26,7 @@ static inline void log_internal(const char *color, const char *format, ...) {
 
 // Public API Macros
 #define LOG_INFO(fmt, ...)    /*log_internal(LOG_COLOR_CYAN,    "[INFO] " fmt, ##__VA_ARGS__)*/
-#define LOG_WARN(fmt, ...)    log_internal(LOG_COLOR_YELLOW,  "[WARN] " fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...)    /*log_internal(LOG_COLOR_YELLOW,  "[WARN] " fmt, ##__VA_ARGS__)*/
 #define LOG_ERROR(fmt, ...)   log_internal(LOG_COLOR_RED,     "[ERROR] " fmt, ##__VA_ARGS__)
 #define LOG_DEBUG(fmt, ...)   log_internal(LOG_COLOR_GREEN,   "[DEBUG] " fmt, ##__VA_ARGS__)
 

@@ -201,7 +201,7 @@ typedef enum TypeV_OpCode {
      * index of array dest
      */
     OP_A_STOREF_REG,
-    OP_A_,
+    OP_A_STOREF_REG_PTR,
 
     /**
      * OP_A_STOREF_CONST_[size] dest: R, index: R, offset: I (8 bytes), byteSize: S
@@ -215,7 +215,7 @@ typedef enum TypeV_OpCode {
      * OP_A_LOADF dest: R, index: R, src: R, byteSize: S
      * Loads [size] bytes from field value stored in register index
      * of array stored at src to register dest
-STOREF_REG_PTR     */
+     */
     OP_A_LOADF,
     OP_A_LOADF_PTR,
 

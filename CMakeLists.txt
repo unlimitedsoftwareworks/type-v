@@ -11,17 +11,17 @@ add_subdirectory(stdcore)
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 
 # disable inlining for easier debugging
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
 
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined")
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=leak")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-compare")
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-subtract")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-overflow")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=bounds")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined")
+##set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=leak")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-compare")
+##set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-subtract")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-overflow")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=bounds")
 
 add_executable(type_v
         source/main.c

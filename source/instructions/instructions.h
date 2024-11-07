@@ -1721,7 +1721,9 @@ static inline void closure_push_env_ptr(TypeV_Core* core) {
     uint8_t closureReg = core->codePtr[core->ip++];
     uint8_t regId = core->codePtr[core->ip++];
     TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
-    cl->upvalues[cl->envCounter++].ptr = core->regs[regId].ptr;
+    uintptr_t ptr = core->regs[regId].ptr;
+    cl->upvalues[cl->envCounter++].ptr = ptr;
+    core_gc_update_closure_env(core, cl, (void*)ptr);
 }
 
 static inline void closure_call(TypeV_Core* core) {
@@ -1833,6 +1835,7 @@ static inline void coroutine_yield(TypeV_Core* core) {
     core->regs = core->funcState->regs;
 
     coroutine->state = core_duplicate_function_state(coroutine->state);
+    core->activeCoroutine = NULL;
 }
 
 static inline void coroutine_ret(TypeV_Core* core) {
@@ -1844,6 +1847,7 @@ static inline void coroutine_ret(TypeV_Core* core) {
     core->regs = core->funcState->regs;
 
     coroutine->state = core_duplicate_function_state(coroutine->state);
+    core->activeCoroutine = NULL;
 }
 
 static inline void throw_rt(TypeV_Core* core) {

@@ -6,7 +6,8 @@
 
 
 void* core_gc_alloc(TypeV_Core* core, size_t size) {
-    if (core->gc.allocsSincePastGC > 1*1024*1024) {
+    // trigger after 2MB of allocations
+    if (core->gc.allocsSincePastGC > 2097152) {
         printf("[GC]: Allocated %llu bytes since last GC\n", core->gc.allocsSincePastGC);
         core_gc_collect(core);
         core->gc.allocsSincePastGC = 0;
@@ -68,6 +69,12 @@ void core_gc_mark_object(TypeV_Core* core, TypeV_ObjectHeader* header) {
     // Mark this object
     header->marked = 1;
 
+    if(header->type == OT_COROUTINE) {
+        // coroutine function state needs to be marked
+        TypeV_Coroutine* co = (TypeV_Coroutine*)(header + 1);
+        core_gc_collect_single_state(core, co->state);
+    }
+
 
     // Now mark the objects this one points to
     for (size_t i = 0; i < header->ptrsCount; i++) {
@@ -101,7 +108,32 @@ void core_gc_sweep(TypeV_Core* core) {
 void core_gc_collect(TypeV_Core* core) {
     //LOG_WARN("Collecting state for core %d", core->id);
     // TODO: uncomment and identify bugs
-    core_gc_collect_state(core, core->funcState);
+    if(core->funcState->next != NULL) {
+        core_gc_collect_state(core, core->funcState->next);
+    }
+    else {
+        core_gc_collect_state(core, core->funcState);
+    }
+}
+
+
+void core_gc_collect_single_state(TypeV_Core* core, TypeV_FuncState* state) {
+    // iterate through the registers
+    for (size_t i = 0; i < MAX_REG; i++) {
+        uintptr_t ptr = state->regs[i].ptr;
+        if(core_gc_is_valid_ptr(core, ptr)) {
+            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
+            core_gc_mark_object(core, header);
+        }
+    }
+
+    for(size_t i = 0; i < state->spillSize; i++) {
+        uintptr_t ptr = state->spillSlots[i].ptr;
+        if(core_gc_is_valid_ptr(core, ptr)) {
+            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
+            core_gc_mark_object(core, header);
+        }
+    }
 }
 
 void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
@@ -180,6 +212,15 @@ void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* p
     }
 
     header->ptrs[fieldIndex] = ptr;
+}
+
+void core_gc_update_closure_env(TypeV_Core* core, TypeV_Closure* closurePtr, void* ptr) {
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)((char*)closurePtr - sizeof(TypeV_ObjectHeader));
+
+    // increase the ptrsCount
+    header->ptrsCount++;
+    header->ptrs = realloc(header->ptrs, header->ptrsCount*sizeof(void*));
+    header->ptrs[header->ptrsCount-1] = ptr;
 }
 
 void core_struct_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
@@ -324,14 +365,17 @@ void core_coroutine_free(TypeV_Core* core, TypeV_ObjectHeader* header) {
 void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
     switch(header->type) {
         case OT_STRUCT: {
+            printf("freeing struct\n");
             core_struct_free(core, header);
             break;
         }
         case OT_CLASS: {
+            printf("freeing class\n");
             core_class_free(core, header);
             break;
         }
         case OT_ARRAY: {
+            printf("freeing array\n");
             core_array_free(core, header);
             break;
         }
