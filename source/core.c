@@ -7,10 +7,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "stack/stack.h"
+#include "gc.h"
 #include "engine.h"
 #include "core.h"
 #include "utils/log.h"
-#include "stack/stack.h"
 #include "dynlib/dynlib.h"
 #include "utils/utils.h"
 
@@ -82,242 +83,14 @@ void core_deallocate(TypeV_Core *core) {
     // TODO
 }
 
-
-void* core_gc_alloc(TypeV_Core* core, size_t size) {
-    if (core->gc.allocsSincePastGC > 2) {
-        core_gc_collect(core);
-        core->gc.allocsSincePastGC = 0;
-    }
-
-    if(core->gc.memObjectCount >= core->gc.memObjectCapacity) {
-        core->gc.memObjectCapacity *= 2;
-        core->gc.memObjects = realloc(core->gc.memObjects, sizeof(size_t)*(core->gc.memObjectCapacity));
-    }
-    void* mem = malloc(size);
-    core->gc.memObjects[core->gc.memObjectCount++] = mem;
-
-    return mem;
-}
-
-void core_gc_update_alloc(TypeV_Core* core, size_t mem) {
-    core->gc.allocsSincePastGC += mem;
-    core->gc.totalAllocs += mem;
-
-}
-
-TypeV_ObjectHeader* get_header_from_pointer(void* objectPtr) {
-    if (objectPtr == NULL) {
-        return NULL;
-    }
-
-    // The header is just before the object memory in the allocation.
-
-    return (TypeV_ObjectHeader*)((char*)objectPtr - sizeof(TypeV_ObjectHeader));
-}
-
-
-uint64_t core_gc_is_valid_ptr(TypeV_Core* core, uintptr_t ptr) {
-    uintptr_t headerPtr = (uintptr_t) get_header_from_pointer((void*)ptr);
-    if (!ptr) {
-        return 0; // Null pointer
-    }
-    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
-        uintptr_t objPtr = (uintptr_t)(core->gc.memObjects[i]);
-
-        if (objPtr == headerPtr) {
-            return i+1; // Found a matching pointer
-        }
-    }
-    return 0; // No matching pointer found
-}
-
-
-
-void core_gc_mark_object(TypeV_Core* core, TypeV_ObjectHeader* header) {
-    if (header == NULL){ // || (header->marked == 1)) { causes fault
-        return;  // Already marked, or null
-    }
-
-    // Mark this object
-    header->marked = 1;
-
-    // Now mark the objects this one points to
-    for (size_t i = 0; i < header->ptrsCount; i++) {
-        void* pointedObject = header->ptrs[i];
-        uint64_t idx = core_gc_is_valid_ptr(core, (uintptr_t)pointedObject);
-        if (idx) {
-            TypeV_ObjectHeader* pointedHeader = get_header_from_pointer(pointedObject);
-            core_gc_mark_object(core, pointedHeader);
-        }
-    }
-}
-
-void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
-    for(size_t i = 0; i < header->ptrsCount; i++) {
-        void* ptr = header->ptrs[i];
-        uint64_t idx = core_gc_is_valid_ptr(core, (uintptr_t)ptr);
-        if(idx) {
-            TypeV_ObjectHeader* pointedHeader = get_header_from_pointer(ptr);
-            core_gc_free_header(core, pointedHeader);
-            core->gc.memObjects[idx-1] = NULL;
-            header->ptrs[i] = NULL;
-        }
-    }
-
-    switch(header->type) {
-        case OT_STRUCT: {
-            TypeV_Struct* s = (TypeV_Struct*)(header + 1);
-            //free(s->fieldOffsets);
-
-            break;
-        }
-        case OT_CLASS: {
-            TypeV_Class* c = (TypeV_Class *)(header + 1);
-            //free(c->methods);
-            break;
-        }
-        case OT_ARRAY: {
-            TypeV_Array* a = (TypeV_Array*)(header + 1);
-            //free(a->data);
-            break;
-        }
-        case OT_CLOSURE:
-        case OT_COROUTINE:
-        case OT_RAWMEM:
-            break;
-    }
-
-    // Free the object
-    //free(header);
-}
-
-void core_gc_sweep(TypeV_Core* core) {
-    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
-        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
-        if (header && !header->marked) {
-            core_gc_free_header(core, header);
-            header = NULL;
-            core->gc.memObjects[i] = NULL;  // Clear the tracker entry
-        }
-    }
-
-    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
-        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
-        if (header) {
-            header->marked = 0;
-        }
-    }
-}
-
-void core_gc_collect(TypeV_Core* core) {
-    LOG_INFO("Collecting state for core %d", core->id);
-    // TODO: uncomment and identify bugs
-    //core_gc_collect_state(core, core->funcState);
-}
-
-void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
-    // iterate through the registers
-    for (size_t i = 0; i < MAX_REG; i++) {
-        uintptr_t ptr = state->regs[i].ptr;
-        if(core_gc_is_valid_ptr(core, ptr)) {
-            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
-            //if(header->marked == 0) {
-            core_gc_mark_object(core, header);
-
-            // Mark original struct if shadow struct
-            /*
-            if(header->type == OT_STRUCT_SHADOW) {
-                TypeV_Struct* structPtr = (TypeV_Struct*)(header + 1);
-                if(structPtr->originalStruct != NULL) {
-                    TypeV_ObjectHeader* originalHeader = get_header_from_pointer(structPtr->originalStruct);
-                    core_gc_mark_object(core, originalHeader);
-                }
-            }
-             */
-        }
-    }
-
-    for(size_t i = 0; i < state->spillSize; i++) {
-        uintptr_t ptr = state->spillSlots[i].ptr;
-        if(core_gc_is_valid_ptr(core, ptr)) {
-            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
-            //if(header->marked == 0) {
-                core_gc_mark_object(core, header);
-            //}
-        }
-    }
-
-    // if previous state exists, collect it
-    if(state->prev != NULL) {
-        core_gc_collect_state(core, state->prev);
-    }
-    else {
-        core_gc_sweep(core);
-    }
-}
-
-void core_gc_sweep_all(TypeV_Core* core){
-    for(size_t i = 0; i < core->gc.memObjectCount; i++) {
-        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
-        if(header) {
-            core_gc_free_header(core, header);
-            core->gc.memObjects[i] = NULL;
-        }
-    }
-    core->gc.memObjectCount = 0;
-}
-
-
-void core_gc_update_struct_field(TypeV_Core* core, TypeV_Struct* structPtr, void* ptr, uint16_t fieldIndex) {
-    if (fieldIndex >= 255) {
-        // Handle error: fieldIndex is out of bounds
-        return;
-    }
-
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)((char*)structPtr - sizeof(TypeV_ObjectHeader));
-    header->ptrs[fieldIndex] = ptr;
-}
-
-void core_gc_update_class_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex) {
-    if (fieldIndex >= 255) {
-        // Handle error: fieldIndex is out of bounds
-        return;
-    }
-
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)((char*)classPtr - sizeof(TypeV_ObjectHeader));
-    header->ptrs[fieldIndex] = ptr;
-}
-
-void core_gc_update_process_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex) {
-    // TODO: Implement
-    // throw an error
-    fprintf(stderr, "Not implemented yet\n");
-    exit(-1);
-}
-
-void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* ptr, uint64_t fieldIndex) {
-    if (fieldIndex >= arrayPtr->length) {
-        // Handle error: fieldIndex is out of bounds
-        return;
-    }
-
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)((char*)arrayPtr - sizeof(TypeV_ObjectHeader));
-    if (fieldIndex >= header->ptrsCount) {
-        // Handle dynamic resizing of ptrs array if needed
-        return;
-    }
-
-    header->ptrs[fieldIndex] = ptr;
-}
-
-
 uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
     // [offset_pointer (size_t), data_block (totalsize)]
     LOG_INFO("CORE[%d]: Allocating struct with %d fields and %d bytes, total allocated size: %d", core->id, numfields, totalsize, sizeof(size_t)+totalsize);
 
+
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize;
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
-
+    static uint32_t uid = 0;
     // Set header information
     header->marked = 0;
     header->type = OT_STRUCT;
@@ -331,7 +104,7 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     struct_ptr->fieldOffsets = calloc(numfields, sizeof(uint16_t));
     struct_ptr->globalFields = calloc(numfields, sizeof(uint32_t));
     struct_ptr->dataPointer = struct_ptr->data;
-
+    struct_ptr->uid = uid++;
     core_gc_update_alloc(core, totalAllocationSize);
 
     return (uintptr_t)struct_ptr;
@@ -357,7 +130,6 @@ uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint
     core_panic(core, -1, "Global ID %d not found in field array", globalID);
     exit(-1);
 }
-
 
 uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {
     LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, uid: %d", core->id, num_methods, total_fields_size, classId);
@@ -390,6 +162,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_f
 uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
     LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of size %d", core->id, num_elements, element_size);
 
+    static uint32_t uid = 0;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
     header->marked = 0;
@@ -402,9 +175,8 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t elem
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
-    array_ptr->data = (uint8_t*)(array_ptr + 1); // Data starts right after the array structure
-
     array_ptr->data = calloc(num_elements, element_size);
+    array_ptr->uid = uid++;
 
     core_gc_update_alloc(core, totalAllocationSize);
 
@@ -427,10 +199,18 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = array->elementSize;
     array_ptr->length = slice_length;
-    array_ptr->data = (uint8_t*)(array_ptr + 1);
+    array_ptr->data = calloc(slice_length, array->elementSize);
+    array_ptr->uid = 1000000-array->uid;
+
+    TypeV_ObjectHeader* originalHeader = get_header_from_pointer(array);
+    if(originalHeader->ptrsCount > 0) {
+        header->ptrs = calloc(slice_length, sizeof(void*));
+        for(size_t i = 0; i < slice_length; i++) {
+            header->ptrs[i] = originalHeader->ptrs[start + i];
+        }
+    }
 
     memcpy(array_ptr->data, array->data + start * array->elementSize, slice_length * array->elementSize);
-
     core_gc_update_alloc(core, totalAllocationSize);
 
     return (uintptr_t)array_ptr;
@@ -439,6 +219,10 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
 uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_elements){
     LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated size: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
+
+    if(array == NULL) {
+        core_panic(core, -1, "Null array");
+    }
 
     TypeV_ObjectHeader* header = get_header_from_pointer(array);
     header->size += num_elements * array->elementSize;
@@ -451,7 +235,6 @@ uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_
 
     return array_ptr;
 }
-
 uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src, uint64_t position) {
     // If the source array has no elements, return the original position
     if (src->length == 0) {
@@ -466,7 +249,6 @@ uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src
     core_array_extend(core, (uintptr_t)dest, newLength);
 
     // Shift the existing elements in the destination array to the right
-    // memmove is used here to handle overlapping memory regions safely
     memmove(
             dest->data + (position + src->length) * dest->elementSize,  // Move from this position (shifted by src's length)
             dest->data + position * dest->elementSize,                  // Move the data starting from 'position'
@@ -483,9 +265,43 @@ uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src
     // Update the length of the destination array
     dest->length = newLength;
 
+    // Get the headers for both destination and source arrays
+    TypeV_ObjectHeader* header = get_header_from_pointer((void*)dest);
+    TypeV_ObjectHeader* addedHeader = get_header_from_pointer((void*)src);
+
+    // Check if there are pointers in the source array
+    if (addedHeader->ptrsCount > 0) {
+        // Reallocate the destination's ptrs array to accommodate the new pointers from src
+        header->ptrs = realloc(header->ptrs, newLength * sizeof(void*));
+
+        // Shift the existing pointers in the destination's `ptrs` array to the right
+        memmove(
+                header->ptrs + position + src->length,  // New location for shifted pointers
+                header->ptrs + position,                // Current pointers from 'position' onward
+                (prevLength - position) * sizeof(void*) // Number of pointers to shift
+        );
+
+        // Insert pointers from `src` and pad the rest with NULLs
+        for (size_t i = 0; i < src->length; i++) {
+            header->ptrs[position + i] = addedHeader->ptrs[i];
+        }
+
+        // Pad any remaining gaps with NULLs
+        for (size_t i = prevLength; i < newLength; i++) {
+            if (header->ptrs[i] == NULL) {
+                header->ptrs[i] = NULL;
+            }
+        }
+
+        // Update the pointer count accurately
+        header->ptrsCount = newLength;
+    }
+
     // Return the new position pointing at the end of the inserted elements
     return position + src->length;
 }
+
+
 
 
 

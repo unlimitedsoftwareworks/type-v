@@ -20,43 +20,7 @@ char* read_file(char* src){
     fclose(file);
     return buffer;
 }
-/*
-int main() {
-    typev_env_init();
-    typev_env_log();
 
-    TypeV_Engine engine;
-    engine_init(&engine);
-
-    char* source = read_file("../samples/sample2.tv");
-    TypeV_ASM_Lexer lexer;
-    lexer_init(&lexer, source);
-    TypeV_ASM_Parser parser;
-    parser_init(&parser, &lexer);
-    parse(&lexer, &parser);
-    TypeV_ASM_Program* program = assemble(&parser);
-    free(source);
-    lexer_free(&lexer);
-    parser_free(&parser);
-
-    LOG_INFO("Program assembled successfully, running.");
-
-
-    debug_program(program);
-
-    engine_setmain(&engine, program->codePool, program->codePoolSize,
-                   program->constPool, program->constPoolSize,
-                   program->globalPool, program->globalPoolSize, 1024, 1024);
-
-    engine_run(&engine);
-
-    engine_deallocate(&engine);
-    free_program(program);
-    //free(program);
-}
-*/
-
-// Function prototypes
 uint8_t *readSegment(FILE *file, uint64_t offset, size_t size);
 
 int main(int argc, char **argv) {
@@ -131,8 +95,6 @@ int main(int argc, char **argv) {
     //free(constantSegment);
     //free(globalSegment);
     //free(codeSegment);
-
-    printf("done\n");
 
     return exitCode;
 }

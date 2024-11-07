@@ -26,6 +26,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=bounds")
 add_executable(type_v
         source/main.c
         source/core.c
+        source/core.h
+        source/gc.c
+        source/gc.h
         source/engine.c
         source/engine.h
         source/instructions/instructions.c

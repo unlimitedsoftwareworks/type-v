@@ -8,18 +8,20 @@
 #ifndef TYPE_V_INSTRUCTIONS_H
 #define TYPE_V_INSTRUCTIONS_H
 
-#include "../core.h"
-#include "./opcodes.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "../core.h"
+#include "./opcodes.h"
+
+#include "../stack/stack.h"
+#include "../gc.h"
 #include "instructions.h"
 #include "../core.h"
 #include "../utils/utils.h"
 #include "../utils/log.h"
 #include "../vendor/libtable/table.h"
-#include "../stack/stack.h"
 #include "../engine.h"
 
 

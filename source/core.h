@@ -16,6 +16,7 @@
 
 
 typedef struct TypeV_Struct {
+    uint32_t uid;
     uint8_t numFields;                      //< Number of fields in the struct, needed for search
     uint16_t* fieldOffsets;                 //< Field offsets table
     uint32_t* globalFields;                 //< Global fields table, contains ids of global fields, sorted
@@ -32,13 +33,12 @@ typedef struct TypeV_Class{
     uint8_t data[];           //< Fields start from here, direct access
 }TypeV_Class;
 
-
 typedef struct TypeV_Array {
+    uint32_t uid;
     uint8_t elementSize;      ///< Size of each element
     uint64_t length;          ///< Array length
     uint8_t* data;            ///< Array data
 }TypeV_Array;
-
 
 /**
  * @brief TypeV_Register
@@ -134,7 +134,6 @@ typedef enum {
     OT_COROUTINE,
     OT_RAWMEM,
 }TypeV_ObjectType;
-
 
 typedef struct {
     TypeV_ObjectType type;
@@ -233,7 +232,6 @@ typedef struct TypeV_Core {
     uint64_t ip;                              ///< Instruction pointer
 
     TypeV_Register* regs;                     ///< Registers, pointer to current function state registers for faster access.
-    uint16_t* flags;                          ///< Flags, pointer to current function state flags for faster access.
     TypeV_FuncState* funcState;               ///< Function state
     TypeV_Coroutine* activeCoroutine;         ///< Active Coroutine
 }TypeV_Core;
@@ -395,32 +393,7 @@ typedef struct TypeV_FFI {
 }TypeV_FFI;
 
 TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t offset, uint8_t envSize);
-void core_closure_free(TypeV_Core* core, TypeV_Closure* closure);
-
 TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure);
-
-
-void* core_gc_alloc(TypeV_Core* core, size_t size);
-
-/**
- * @brief Updates the amount of allocations count of the GC tracker,
- * this is used to trigger a GC
- * @param core
- * @param mem
- */
-void core_gc_update_alloc(TypeV_Core* core, size_t mem);
-void core_gc_mark_object(TypeV_Core* core, TypeV_ObjectHeader * ptr);
-void core_gc_sweep(TypeV_Core* core);
-void core_gc_collect(TypeV_Core* core);
-void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state);
-
-void core_gc_update_struct_field(TypeV_Core* core, TypeV_Struct* structPtr, void* ptr, uint16_t fieldIndex);
-void core_gc_update_class_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex);
-void core_gc_update_process_field(TypeV_Core* core, TypeV_Class* classPtr, void* ptr, uint16_t fieldIndex);
-void core_gc_update_array_field(TypeV_Core* core, TypeV_Array* arrayPtr, void* ptr, uint64_t fieldIndex);
-TypeV_ObjectHeader* get_header_from_pointer(void* ptr);
-void core_gc_sweep_all(TypeV_Core* core);
-
 
 typedef enum TypeV_RTError {
     /**
