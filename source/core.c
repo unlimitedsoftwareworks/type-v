@@ -31,7 +31,6 @@ TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
 TypeV_FuncState* core_duplicate_function_state(TypeV_FuncState* original) {
     TypeV_FuncState* state = core_create_function_state(original->prev);
 
-    /*
     state->capacity = original->capacity;
     for(size_t i = 0; i < 256; i++) {
         state->regs[i] = original->regs[i];
@@ -43,10 +42,6 @@ TypeV_FuncState* core_duplicate_function_state(TypeV_FuncState* original) {
     }
 
     state->next = original->next;
-    state->flags = original->flags;
-    */
-
-    memcpy(state, original, sizeof(TypeV_FuncState));
 
     return state;
 }
@@ -80,7 +75,23 @@ void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constan
 
 
 void core_deallocate(TypeV_Core *core) {
-    // TODO
+    // first free all the function states
+    TypeV_FuncState* state = core->funcState;
+    while(state != NULL) {
+        TypeV_FuncState* next = state->next;
+        core_free_function_state(core, state);
+        state = next;
+    }
+
+    core_gc_sweep_all(core);
+    free(core->gc.memObjects);
+    free(core);
+}
+
+void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state) {
+    stack_free(state);
+    free(state->spillSlots);
+    free(state);
 }
 
 uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
@@ -194,7 +205,6 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     header->size = totalAllocationSize;
 
     header->ptrsCount = slice_length;
-    header->ptrs = calloc(slice_length, sizeof(void*));
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = array->elementSize;
@@ -404,8 +414,10 @@ TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) 
     header->marked = 0;
     header->type = OT_COROUTINE;
     header->size = totalAllocationSize;
-    header->ptrsCount = 0;
-    //header->ptrs = calloc(envSize, sizeof(void*));
+    // add the closure to the coroutine
+    header->ptrsCount = 1;
+    header->ptrs = malloc(1*sizeof(void*));
+    header->ptrs[0] = (void*)closure;
 
     TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
     // create a new function state
@@ -417,6 +429,7 @@ TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) 
 
     // initially, the pointer points to the function address
     coroutine_ptr->ip = closure->fnAddress;
+    core_gc_update_alloc(core, totalAllocationSize);
 
     return coroutine_ptr;
 }

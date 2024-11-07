@@ -4,6 +4,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "dynlib.h"
 
 #include "dynlib.h"
@@ -25,10 +26,12 @@ char* ffi_find_dynlib(const char* dynlib_name) {
 TV_LibraryHandle ffi_dynlib_load(const char* name) {
     char* path = ffi_find_dynlib(name);
 #ifdef _WIN32
-    return (TV_LibraryHandle)LoadLibraryA(path);
+    TV_LibraryHandle res =  (TV_LibraryHandle)LoadLibraryA(path);
 #else
-    return (TV_LibraryHandle)dlopen(path, RTLD_LAZY);
+    TV_LibraryHandle res = (TV_LibraryHandle)dlopen(path, RTLD_LAZY);
 #endif
+    free(path);
+    return res;
 }
 
 // Unload a dynamic library

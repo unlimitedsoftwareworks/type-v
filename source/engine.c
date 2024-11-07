@@ -36,12 +36,17 @@ void engine_deallocate(TypeV_Engine *engine) {
     while(iterator != NULL) {
         TypeV_CoreIterator* next = iterator->next;
         core_deallocate(iterator->core);
-        free(iterator->core);
         free(iterator);
         iterator = next;
     }
     engine->coreIterator = NULL;
     engine->coreCount = 0;
+
+    // free ffi
+    for(uint16_t i = 0; i < engine->ffiCount; i++) {
+        free(engine->ffi[i]);
+    }
+    free(engine->ffi);
 }
 
 void engine_run(TypeV_Engine *engine) {

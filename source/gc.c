@@ -133,6 +133,10 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
 
 void core_gc_sweep_all(TypeV_Core* core){
     for(size_t i = 0; i < core->gc.memObjectCount; i++) {
+        if(core->gc.memObjects[i] == NULL) {
+            continue;
+        }
+
         TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
         if(header) {
             core_gc_free_header(core, header);
@@ -141,7 +145,6 @@ void core_gc_sweep_all(TypeV_Core* core){
     }
     core->gc.memObjectCount = 0;
 }
-
 
 void core_gc_update_struct_field(TypeV_Core* core, TypeV_Struct* structPtr, void* ptr, uint16_t fieldIndex) {
     if (fieldIndex >= 255) {
@@ -279,6 +282,12 @@ void core_closure_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
         return;
     }
 
+    // Free the ptrs array in the header
+    if (header->ptrs) {
+        free(header->ptrs);
+        header->ptrs = NULL;
+    }
+
     // Access the closure structure
     TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
 
@@ -289,6 +298,26 @@ void core_closure_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
     }
 
     // Free the entire header (which includes the TypeV_Closure structure)
+    free(header);
+}
+
+void core_coroutine_free(TypeV_Core* core, TypeV_ObjectHeader* header) {
+    if (!header || header->type != OT_COROUTINE) {
+        LOG_ERROR("Invalid header or type for coroutine deallocation");
+        return;
+    }
+
+    // Free the ptrs array in the header
+    if (header->ptrs) {
+        free(header->ptrs);
+        header->ptrs = NULL;
+    }
+
+    TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
+    
+    core_closure_free(core, coroutine_ptr->closure);
+    core_free_function_state(core, coroutine_ptr->state);
+
     free(header);
 }
 
@@ -307,11 +336,12 @@ void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {
             break;
         }
         case OT_CLOSURE:
-            //printf("freeing closure\n");
+            printf("freeing closure\n");
             core_closure_free(core, header);
             break;
         case OT_COROUTINE:
-            //printf("freeing coroutine\n");
+            printf("freeing coroutine\n");
+            core_coroutine_free(core, header);
             break;
         case OT_RAWMEM:
             //printf("freeing rawmem\n");

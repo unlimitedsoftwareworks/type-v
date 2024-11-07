@@ -238,7 +238,7 @@ typedef struct TypeV_Core {
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev);
 TypeV_FuncState* core_duplicate_function_state(TypeV_FuncState* prev);
-void core_destroy_function_state(TypeV_Core* core, TypeV_FuncState** state);
+void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state);
 
 /**
  * Initializes a core
