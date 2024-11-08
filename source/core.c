@@ -59,6 +59,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->gc.memObjects = malloc(sizeof(void*)*core->gc.memObjectCapacity);
     core->gc.allocsSincePastGC = 0;
     core->gc.totalAllocs = 0;
+    core->gc.arenaList = create_arena();
 
 
     core->engineRef = engineRef;

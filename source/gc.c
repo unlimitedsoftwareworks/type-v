@@ -1,12 +1,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "core.h"
+#include "allocator/allocator.h"
 #include "gc.h"
 #include "utils/log.h"
 
-
 void* core_gc_alloc(TypeV_Core* core, size_t size) {
     // trigger after 50MB of allocations
+    /*
     if (core->gc.allocsSincePastGC > 50000000) {
         //printf("[GC]: Allocated %llu bytes since last GC\n", core->gc.allocsSincePastGC);
         core_gc_collect(core);
@@ -21,8 +22,9 @@ void* core_gc_alloc(TypeV_Core* core, size_t size) {
             core_panic(core, -1, "Failed to reallocate memory for GC");
         }
     }
-    void* mem = malloc(size);
-    core->gc.memObjects[core->gc.memObjectCount++] = mem;
+    */
+    void* mem = allocate_from_arenas(&core->gc.arenaList, size);
+    //core->gc.memObjects[core->gc.memObjectCount++] = mem;
 
     return mem;
 }

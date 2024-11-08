@@ -10,6 +10,7 @@
 #define TYPE_V_CORE_H
 
 #include <stdint.h>
+#include "allocator/allocator.h"
 
 #define PTR_SIZE 8
 #define MAX_REG 256
@@ -154,6 +155,7 @@ typedef struct TypeV_GC {
 
     uint64_t totalAllocs;
     uint64_t allocsSincePastGC;
+    Arena* arenaList;
 }TypeV_GC;
 
 /**

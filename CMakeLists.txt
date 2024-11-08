@@ -34,6 +34,8 @@ add_executable(type_v
         source/gc.h
         source/engine.c
         source/engine.h
+        source/allocator/allocator.c
+        source/allocator/allocator.h
         source/instructions/instructions.c
         source/instructions/instructions.h
         source/stack/stack.c

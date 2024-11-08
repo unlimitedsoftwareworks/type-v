@@ -13,6 +13,7 @@ set(typev_files
         ../source/core.c
         ../source/gc.c
         ../source/stack/stack.c
+        ../source/allocator/allocator.c
         ../source/dynlib/dynlib.c
         ../source/env/env.c
         ../source/api/typev_api.c
