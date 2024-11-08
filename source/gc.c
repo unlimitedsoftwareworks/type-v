@@ -237,19 +237,19 @@ void core_struct_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
 
     // Free the ptrs array in the header
     if (header->ptrs) {
-        free(header->ptrs);
+        mi_free(header->ptrs);
         header->ptrs = NULL;
     }
 
     // Free the fieldOffsets array in the struct
     if (struct_ptr->fieldOffsets) {
-        free(struct_ptr->fieldOffsets);
+        mi_free(struct_ptr->fieldOffsets);
         struct_ptr->fieldOffsets = NULL;
     }
 
     // Free the globalFields array in the struct
     if (struct_ptr->globalFields) {
-        free(struct_ptr->globalFields);
+        mi_free(struct_ptr->globalFields);
         struct_ptr->globalFields = NULL;
     }
 
@@ -257,7 +257,7 @@ void core_struct_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
     // since it was allocated in the same contiguous block.
 
     // Free the entire object header (and struct within it)
-    free(header);
+    mi_free(header);
 }
 
 void core_class_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
@@ -272,26 +272,26 @@ void core_class_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
 
     // Free the ptrs array in the header
     if (header->ptrs) {
-        free(header->ptrs);
+        mi_free(header->ptrs);
         header->ptrs = NULL;
     }
 
     // Free the methods array in the class
     if (class_ptr->methods) {
-        free(class_ptr->methods);
+        mi_free(class_ptr->methods);
         class_ptr->methods = NULL;
     }
 
     // Free the globalMethods array in the class
     if (class_ptr->globalMethods) {
-        free(class_ptr->globalMethods);
+        mi_free(class_ptr->globalMethods);
         class_ptr->globalMethods = NULL;
     }
 
     // `data[]` does not need to be freed separately, as it is part of the contiguous allocation
 
     // Free the entire object, including header and class
-    free(header);
+    mi_free(header);
 }
 
 void core_array_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
@@ -305,18 +305,18 @@ void core_array_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
 
     // Free ptrs array if allocated
     if (header->ptrs) {
-        free(header->ptrs);
+        mi_free(header->ptrs);
         header->ptrs = NULL;
     }
 
     // Free the data array in TypeV_Array
     if (array_ptr->data && (array_ptr->length > 0)) {
-        free(array_ptr->data);
+        mi_free(array_ptr->data);
         array_ptr->data = NULL;
     }
 
     // Free the entire header (which includes the TypeV_Array structure)
-    free(header);
+    mi_free(header);
 }
 
 void core_closure_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
@@ -327,7 +327,7 @@ void core_closure_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
 
     // Free the ptrs array in the header
     if (header->ptrs) {
-        free(header->ptrs);
+        mi_free(header->ptrs);
         header->ptrs = NULL;
     }
 
@@ -336,12 +336,12 @@ void core_closure_free(TypeV_Core *core, TypeV_ObjectHeader* header) {
 
     // Free the upvalues array in the closure
     if (closure_ptr->upvalues) {
-        free(closure_ptr->upvalues);
+        mi_free(closure_ptr->upvalues);
         closure_ptr->upvalues = NULL;
     }
 
     // Free the entire header (which includes the TypeV_Closure structure)
-    free(header);
+    mi_free(header);
 }
 
 void core_coroutine_free(TypeV_Core* core, TypeV_ObjectHeader* header) {
@@ -352,7 +352,7 @@ void core_coroutine_free(TypeV_Core* core, TypeV_ObjectHeader* header) {
 
     // Free the ptrs array in the header
     if (header->ptrs) {
-        free(header->ptrs);
+        mi_free(header->ptrs);
         header->ptrs = NULL;
     }
 
@@ -361,7 +361,7 @@ void core_coroutine_free(TypeV_Core* core, TypeV_ObjectHeader* header) {
     core_closure_free(core, coroutine_ptr->closure);
     core_free_function_state(core, coroutine_ptr->state);
 
-    free(header);
+    mi_free(header);
 }
 
 void core_gc_free_header(TypeV_Core* core, TypeV_ObjectHeader* header) {

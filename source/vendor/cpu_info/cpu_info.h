@@ -318,7 +318,7 @@ cpui_error_t cpui_get_info(cpui_result* result)
 			if ( buf )
 				free(buf);
 
-			buf = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(ret_len);
+			buf = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)mi_malloc(ret_len);
 			if (buf == NULL) {
 				return CPUI_ERROR_INVALID_MEMORY_ALLOCATION;
 			}

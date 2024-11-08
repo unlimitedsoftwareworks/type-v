@@ -1767,7 +1767,7 @@ static inline void coroutine_fn_alloc(TypeV_Core* core) {
     // creates a new function context, if needed, else reuse the old one
     TypeV_FuncState* newState = coroutine->state;
 
-    // we will have to free the .next state of the current function state
+    // we will have to mi_free the .next state of the current function state
     // to avoid memory leaks, because coroutine duplicates the function state
     // when it yields
 

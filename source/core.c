@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <mimalloc.h>
 
 #include "stack/stack.h"
 #include "gc.h"
@@ -16,13 +17,13 @@
 #include "utils/utils.h"
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
-    TypeV_FuncState* state = malloc(sizeof(TypeV_FuncState));
+    TypeV_FuncState* state = mi_malloc(sizeof(TypeV_FuncState));
 
     state->sp = 0;
     stack_init(state, 1024);
     state->prev = prev;
     state->next = NULL;
-    state->spillSlots = malloc(sizeof(TypeV_Register));
+    state->spillSlots = mi_malloc(sizeof(TypeV_Register));
     state->spillSize = 1;
 
     return state;
@@ -56,7 +57,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     // Initialize GC
     core->gc.memObjectCapacity = 2000;
     core->gc.memObjectCount = 0;
-    core->gc.memObjects = malloc(sizeof(void*)*core->gc.memObjectCapacity);
+    core->gc.memObjects = mi_malloc(sizeof(void*)*core->gc.memObjectCapacity);
     core->gc.allocsSincePastGC = 0;
     core->gc.totalAllocs = 0;
     core->gc.arenaList = create_arena();
@@ -78,7 +79,7 @@ void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constan
 
 
 void core_deallocate(TypeV_Core *core) {
-    // first free all the function states
+    // first mi_free all the function states
     TypeV_FuncState* state = core->funcState;
     while(state != NULL) {
         TypeV_FuncState* next = state->next;
@@ -87,14 +88,14 @@ void core_deallocate(TypeV_Core *core) {
     }
 
     core_gc_sweep_all(core);
-    free(core->gc.memObjects);
-    free(core);
+    mi_free(core->gc.memObjects);
+    mi_free(core);
 }
 
 void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state) {
     stack_free(state);
-    free(state->spillSlots);
-    free(state);
+    mi_free(state->spillSlots);
+    mi_free(state);
 }
 
 uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
@@ -110,13 +111,13 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     header->type = OT_STRUCT;
     header->size = totalAllocationSize;
     header->ptrsCount = numfields;
-    header->ptrs = malloc(numfields*sizeof(void*));
+    header->ptrs = mi_malloc(numfields*sizeof(void*));
 
     // Get a pointer to the actual struct, which comes after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
     struct_ptr->numFields = numfields;
-    struct_ptr->fieldOffsets = malloc(numfields*sizeof(uint16_t));
-    struct_ptr->globalFields = malloc(numfields*sizeof(uint32_t));
+    struct_ptr->fieldOffsets = mi_malloc(numfields*sizeof(uint16_t));
+    struct_ptr->globalFields = mi_malloc(numfields*sizeof(uint32_t));
     struct_ptr->dataPointer = struct_ptr->data;
     struct_ptr->uid = uid++;
     core_gc_update_alloc(core, totalAllocationSize);
@@ -156,14 +157,14 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_f
     header->type = OT_CLASS;
     header->size = totalAllocationSize;
     header->ptrsCount = total_fields_size; // assume worse case, 1 pointer per byte
-    header->ptrs = malloc(total_fields_size* sizeof(void*));
+    header->ptrs = mi_malloc(total_fields_size* sizeof(void*));
 
     // Get a pointer to the actual class, which comes after the header
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
     class_ptr->numMethods = num_methods;
     class_ptr->uid = classId;
-    class_ptr->methods = malloc(num_methods*sizeof(size_t));
-    class_ptr->globalMethods = malloc(num_methods*sizeof(uint32_t));
+    class_ptr->methods = mi_malloc(num_methods*sizeof(size_t));
+    class_ptr->globalMethods = mi_malloc(num_methods*sizeof(uint32_t));
 
     // Initialize other class fields here if needed
 
@@ -184,12 +185,12 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t elem
     header->size = totalAllocationSize;
     // we could extend bytecode to separate pointer arrays from data arrays
     header->ptrsCount = num_elements;
-    header->ptrs = malloc(num_elements*sizeof(void*));
+    header->ptrs = mi_malloc(num_elements*sizeof(void*));
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
-    array_ptr->data = malloc(num_elements* element_size);
+    array_ptr->data = mi_malloc(num_elements* element_size);
     array_ptr->uid = uid++;
 
     core_gc_update_alloc(core, totalAllocationSize);
@@ -212,12 +213,12 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = array->elementSize;
     array_ptr->length = slice_length;
-    array_ptr->data = malloc(slice_length* array->elementSize);
+    array_ptr->data = mi_malloc(slice_length* array->elementSize);
     array_ptr->uid = 1000000-array->uid;
 
     TypeV_ObjectHeader* originalHeader = get_header_from_pointer(array);
     if(originalHeader->ptrsCount > 0) {
-        header->ptrs = malloc(slice_length* sizeof(void*));
+        header->ptrs = mi_malloc(slice_length* sizeof(void*));
         for(size_t i = 0; i < slice_length; i++) {
             header->ptrs[i] = originalHeader->ptrs[start + i];
         }
@@ -402,7 +403,7 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
     closure_ptr->fnAddress = fnPtr;
     closure_ptr->envSize = envSize;
 
-    closure_ptr->upvalues = malloc(envSize* sizeof(TypeV_Register ));
+    closure_ptr->upvalues = mi_malloc(envSize* sizeof(TypeV_Register ));
 
     core_gc_update_alloc(core, totalAllocationSize);
     return closure_ptr;
@@ -419,7 +420,7 @@ TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) 
     header->size = totalAllocationSize;
     // add the closure to the coroutine
     header->ptrsCount = 1;
-    header->ptrs = malloc(1*sizeof(void*));
+    header->ptrs = mi_malloc(1*sizeof(void*));
     header->ptrs[0] = (void*)closure;
 
     TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);

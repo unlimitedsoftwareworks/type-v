@@ -24,10 +24,10 @@ Arena* create_arena();
 // Function to allocate memory from the arena
 void* arena_alloc(Arena* arena, size_t size);
 
-// Function to free memory back to the arena
+// Function to mi_free memory back to the arena
 void arena_free(Arena* arena, void* ptr, size_t size);
 
-// Function to destroy the arena and free all memory
+// Function to destroy the arena and mi_free all memory
 void destroy_arena(Arena* arena);
 
 // Function to manage multiple arenas for more flexible allocation

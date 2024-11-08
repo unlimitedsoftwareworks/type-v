@@ -201,7 +201,7 @@ bool table_init(struct table *t, ...)
 
     va_end(ap);
 
-    t->max = malloc(t->cols * sizeof *t->max);
+    t->max = mi_malloc(t->cols * sizeof *t->max);
     if (t->max == NULL) {
         free(t->headers);
         free(t->fmt);
@@ -231,7 +231,7 @@ bool table_add(struct table *t, ...)
         t->data = tmp;
     }
 
-    row = (t->data[t->rows++] = malloc(t->cols * sizeof (char *)));
+    row = (t->data[t->rows++] = mi_malloc(t->cols * sizeof (char *)));
 
     if (row == NULL) {
         t->rows -= 1;
@@ -248,7 +248,7 @@ bool table_add(struct table *t, ...)
 
     for (i = 0; field != NULL; ++i, field = strtok(NULL, DELIM)) {
         assert(&row[i] == &t->data[t->rows - 1][i]);
-        row[i] = malloc(strlen(field) + 1);
+        row[i] = mi_malloc(strlen(field) + 1);
         if (row[i] == NULL) {
             goto err;
         }
@@ -278,12 +278,12 @@ bool table_print(struct table const *t, size_t n, FILE *f)
 
     n -= 2;
 
-    max = malloc(t->cols * sizeof *max);
+    max = mi_malloc(t->cols * sizeof *max);
     if (max == NULL) {
         return false;
     }
 
-    remaining = malloc(t-> cols * sizeof *remaining);
+    remaining = mi_malloc(t-> cols * sizeof *remaining);
     if (remaining == NULL) {
         free(max);
         return false;

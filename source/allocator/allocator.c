@@ -15,7 +15,7 @@ Arena* create_arena() {
 
     // Initialize the arena
     for (size_t i = 0; i < NUM_CELLS; i++) {
-        arena->cell_allocated[i] = false; // All cells are initially free
+        arena->cell_allocated[i] = false; // All cells are initially mi_free
     }
     arena->used_cells = 0;
     arena->next = NULL;
@@ -33,7 +33,7 @@ void* arena_alloc(Arena* arena, size_t size) {
     // Calculate the number of cells required to fulfill the request
     size_t num_cells_needed = (size + CELL_SIZE - 1) / CELL_SIZE; // Round up to nearest multiple of CELL_SIZE
 
-    // Find a contiguous block of free cells
+    // Find a contiguous block of mi_free cells
     for (size_t i = 0; i <= NUM_CELLS - num_cells_needed; i++) {
         bool found = true;
         for (size_t j = 0; j < num_cells_needed; j++) {
@@ -58,31 +58,31 @@ void* arena_alloc(Arena* arena, size_t size) {
     return NULL;
 }
 
-// Function to free memory back to the arena
+// Function to mi_free memory back to the arena
 void arena_free(Arena* arena, void* ptr, size_t size) {
     if (ptr == NULL || size == 0 || size > ARENA_SIZE) {
-        fprintf(stderr, "Invalid pointer or size for free\n");
+        fprintf(stderr, "Invalid pointer or size for mi_free\n");
         return;
     }
 
     // Calculate the starting cell index from the pointer
     uintptr_t offset = (uintptr_t)ptr - (uintptr_t)arena->data;
     if (offset % CELL_SIZE != 0 || offset >= ARENA_SIZE) {
-        fprintf(stderr, "Invalid pointer for free\n");
+        fprintf(stderr, "Invalid pointer for mi_free\n");
         return;
     }
 
     size_t start_cell = offset / CELL_SIZE;
     size_t num_cells_to_free = (size + CELL_SIZE - 1) / CELL_SIZE; // Round up to nearest multiple of CELL_SIZE
 
-    // Mark the cells as free
+    // Mark the cells as mi_free
     for (size_t i = start_cell; i < start_cell + num_cells_to_free; i++) {
         arena->cell_allocated[i] = false;
     }
     arena->used_cells -= num_cells_to_free;
 }
 
-// Function to destroy the arena and free all memory
+// Function to destroy the arena and mi_free all memory
 void destroy_arena(Arena* arena) {
     free(arena);
 }

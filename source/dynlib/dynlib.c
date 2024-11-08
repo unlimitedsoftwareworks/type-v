@@ -15,6 +15,8 @@
 #include <dlfcn.h>
 #endif
 
+#include <mimalloc.h>
+
 char* ffi_find_dynlib(const char* dynlib_name) {
     char buffer[1024];
     TypeV_ENV env = get_env();
@@ -30,7 +32,7 @@ TV_LibraryHandle ffi_dynlib_load(const char* name) {
 #else
     TV_LibraryHandle res = (TV_LibraryHandle)dlopen(path, RTLD_LAZY);
 #endif
-    free(path);
+    mi_free(path);
     return res;
 }
 

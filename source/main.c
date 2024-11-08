@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <mimalloc.h>
 
 #include "utils/log.h"
 #include "env/env.h"
@@ -14,7 +15,7 @@ char* read_file(char* src){
     fseek(file, 0, SEEK_END);
     long size = ftell(file);
     fseek(file, 0, SEEK_SET);
-    char* buffer = malloc(size + 1);
+    char* buffer = mi_malloc(size + 1);
     fread(buffer, 1, size, file);
     buffer[size] = 0;
     fclose(file);
@@ -91,16 +92,16 @@ int main(int argc, char **argv) {
 
 
     // Use the segment pointers...
-    // Remember to free them after use
-    //free(constantSegment);
-    //free(globalSegment);
-    //free(codeSegment);
+    // Remember to mi_free them after use
+    //mi_free(constantSegment);
+    //mi_free(globalSegment);
+    //mi_free(codeSegment);
 
     return exitCode;
 }
 
 uint8_t *readSegment(FILE *file, uint64_t offset, size_t size) {
-    uint8_t *buffer = (uint8_t *)malloc(size);
+    uint8_t *buffer = (uint8_t *)mi_malloc(size);
     if (buffer == NULL) {
         perror("Memory allocation failed");
         exit(1);
