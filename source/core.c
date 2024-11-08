@@ -64,6 +64,8 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->engineRef = engineRef;
     core->lastSignal = CSIG_NONE;
     core->activeCoroutine = NULL;
+
+    core->ip = 0;
 }
 
 void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, uint8_t* globalPool){
