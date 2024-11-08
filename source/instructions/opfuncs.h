@@ -42,6 +42,7 @@ static op_func op_funcs[] = {
         &s_storef_reg_ptr,
 
         &c_alloc,
+        &c_reg_field,
         &c_storem,
         &c_loadm,
 

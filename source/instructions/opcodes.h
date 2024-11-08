@@ -71,11 +71,12 @@ typedef enum TypeV_OpCode {
     OP_MV_REG_GLOBAL_PTR,
 
     /**
-     * OP_S_ALLOC dest: R, fields-count: I, struct-size: I (2bytes)
+     * OP_S_ALLOC dest: R, fields-count: I, ptr_field_bitmask, struct-size: I (2bytes)
      * Creates new struct of given total ﬁelds count (arg1) and total memory
      * (arg2 and arg3), stores the address of the new struct into dest.
      */
     OP_S_ALLOC,
+    //OP_S_ALLOC_T,
 
 
     /**
@@ -109,11 +110,20 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG_PTR,
 
     /**
-     * OP_C_ALLOC dest: R num-methods: I, class-fields-size: I (2 bytes), numMethods: I(1b) classId-size: Z, classId: I
+     * OP_C_ALLOC dest: R num-methods: I, num-fields: I(1b), class-fields-size: I (2 bytes), classId-size: Z, classId: I
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into dest.
      */
     OP_C_ALLOC,
+
+    //OP_C_ALLOC_T,
+
+    /**
+     * OP_C_REG_FIELD dest: R, local_field_index: I(1byte), field offset: I (2 bytes)
+     * Registers a new field in the class stored in dest, with the given global field ID
+     * and field offset (local), must not exceed the total fields count of the class
+     */
+    OP_C_REG_FIELD,
 
     /**
      * OP_C_STOREM destReg: R, localMethodIndex: I (1b), globalMethodIndex: I(4bytes), methodAddress: I(8 bytes)
@@ -165,7 +175,7 @@ typedef enum TypeV_OpCode {
 
 
     /**
-     * OP_A_ALLOC dest: R, num_elements: I (8 bytes), element_size: Z
+     * OP_A_ALLOC dest: R, I: isPtr, num_elements: I (8 bytes), element_size: Z
      * allocate array of num_elements of size element_size
      * stores the address of the array in dest
      */

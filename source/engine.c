@@ -100,7 +100,8 @@ static void* dispatch_table[] = { \
     &&DO_S_STOREF_CONST_PTR, \
     &&DO_S_STOREF_REG, \
     &&DO_S_STOREF_REG_PTR, \
-    &&DO_C_ALLOC, \
+    &&DO_C_ALLOC,      \
+    &&DO_C_REG_FIELD, \
     &&DO_C_STOREM, \
     &&DO_C_LOADM, \
     &&DO_C_STOREF_REG, \
@@ -364,6 +365,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_C_ALLOC:
             c_alloc(core);
+            DISPATCH();
+        DO_C_REG_FIELD:
+            c_reg_field(core);
             DISPATCH();
         DO_C_STOREM:
             c_storem(core);
@@ -1013,7 +1017,7 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
 void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlibID) {
     if(dynlibID >= engine->ffiCount) {
         engine->ffiCount = dynlibID+1;
-        engine->ffi = realloc(engine->ffi, sizeof(TypeV_EngineFFI)*engine->ffiCount);
+        engine->ffi = mi_realloc(engine->ffi, sizeof(TypeV_EngineFFI)*engine->ffiCount);
     }
 
     engine->ffi[dynlibID] = mi_malloc(sizeof(TypeV_EngineFFI));

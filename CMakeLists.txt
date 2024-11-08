@@ -3,29 +3,20 @@ project(type_v C)
 
 set(CMAKE_C_STANDARD 11)
 
+# Your other subdirectories
 add_subdirectory(stdio)
 add_subdirectory(string)
 add_subdirectory(stdcore)
 
-
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
-
-# disable inlining for easier debugging
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
-
+# Compiler flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 
+# disable inlining
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
 
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined")
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=leak")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-compare")
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-subtract")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-overflow")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=bounds")
-
+# Your executable target
 add_executable(type_v
         source/main.c
         source/core.c
@@ -59,5 +50,42 @@ add_executable(type_v
         source/vendor/cpu_info/cpu_info.h
 )
 
-add_dependencies(type_v stdio string stdcore)
-target_link_libraries(type_v stdio string stdcore)
+#add_dependencies(type_v stdio string stdcore)
+
+
+# Add the mimalloc include path explicitly
+find_path(MIMALLOC_INCLUDE_DIR mimalloc.h
+        PATHS
+        /usr/local/include
+        /usr/local/include/mimalloc-1.8
+)
+
+# Locate the mimalloc library
+find_library(MIMALLOC_LIBRARY mimalloc
+        PATHS
+        /usr/local/lib
+        /usr/local/lib/mimalloc-1.8
+)
+
+# Set the include directory and link the library
+if (MIMALLOC_INCLUDE_DIR AND MIMALLOC_LIBRARY)
+    # Add the include directory for mimalloc
+    include_directories(${MIMALLOC_INCLUDE_DIR})
+
+    # Link mimalloc to each target
+    target_include_directories(type_v PRIVATE ${MIMALLOC_INCLUDE_DIR})
+    target_link_libraries(type_v stdio string stdcore ${MIMALLOC_LIBRARY})
+
+    # Link mimalloc for all dependent targets
+    target_include_directories(stdio PRIVATE ${MIMALLOC_INCLUDE_DIR})
+    target_link_libraries(stdio PRIVATE ${MIMALLOC_LIBRARY})
+
+    target_include_directories(string PRIVATE ${MIMALLOC_INCLUDE_DIR})
+    target_link_libraries(string PRIVATE ${MIMALLOC_LIBRARY})
+
+    target_include_directories(stdcore PRIVATE ${MIMALLOC_INCLUDE_DIR})
+    target_link_libraries(stdcore PRIVATE ${MIMALLOC_LIBRARY})
+
+else()
+    message(FATAL_ERROR "mimalloc library not found.")
+endif()

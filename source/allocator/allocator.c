@@ -3,7 +3,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "allocator.h"
+#define ARENA_SIZE (2 * 1024 * 1024) // 2 MB arena size
+
+// Arena structure to manage the entire memory pool
+typedef struct Arena {
+    uint8_t data[ARENA_SIZE];   // Data section for allocations
+    size_t offset;              // Offset to the first free slot
+    struct Arena* next;         // Pointer to the next arena in the list (for managing multiple arenas)
+} Arena;
 
 // Function to create a new arena
 Arena* create_arena() {
@@ -14,10 +21,7 @@ Arena* create_arena() {
     }
 
     // Initialize the arena
-    for (size_t i = 0; i < NUM_CELLS; i++) {
-        arena->cell_allocated[i] = false; // All cells are initially mi_free
-    }
-    arena->used_cells = 0;
+    arena->offset = 0;
     arena->next = NULL;
 
     return arena;
@@ -30,63 +34,33 @@ void* arena_alloc(Arena* arena, size_t size) {
         return NULL;
     }
 
-    // Calculate the number of cells required to fulfill the request
-    size_t num_cells_needed = (size + CELL_SIZE - 1) / CELL_SIZE; // Round up to nearest multiple of CELL_SIZE
-
-    // Find a contiguous block of mi_free cells
-    for (size_t i = 0; i <= NUM_CELLS - num_cells_needed; i++) {
-        bool found = true;
-        for (size_t j = 0; j < num_cells_needed; j++) {
-            if (arena->cell_allocated[i + j]) {
-                found = false;
-                break;
-            }
-        }
-
-        // If a suitable block is found, mark cells as allocated and return a pointer
-        if (found) {
-            for (size_t j = 0; j < num_cells_needed; j++) {
-                arena->cell_allocated[i + j] = true;
-            }
-            arena->used_cells += num_cells_needed;
-            return (void*)&arena->data[i * CELL_SIZE];
-        }
+    // Check if there is enough space in the current arena
+    if (arena->offset + size > ARENA_SIZE) {
+        fprintf(stderr, "Failed to allocate memory from arena\n");
+        return NULL;
     }
 
-    // No suitable block found
-    //fprintf(stderr, "Failed to allocate memory from arena\n");
-    return NULL;
+    // Allocate memory by bumping the offset
+    void* ptr = &arena->data[arena->offset];
+    arena->offset += size;
+
+    return ptr;
 }
 
-// Function to mi_free memory back to the arena
+// Function to free memory back to the arena (simplified)
 void arena_free(Arena* arena, void* ptr, size_t size) {
-    if (ptr == NULL || size == 0 || size > ARENA_SIZE) {
-        fprintf(stderr, "Invalid pointer or size for mi_free\n");
-        return;
-    }
-
-    // Calculate the starting cell index from the pointer
-    uintptr_t offset = (uintptr_t)ptr - (uintptr_t)arena->data;
-    if (offset % CELL_SIZE != 0 || offset >= ARENA_SIZE) {
-        fprintf(stderr, "Invalid pointer for mi_free\n");
-        return;
-    }
-
-    size_t start_cell = offset / CELL_SIZE;
-    size_t num_cells_to_free = (size + CELL_SIZE - 1) / CELL_SIZE; // Round up to nearest multiple of CELL_SIZE
-
-    // Mark the cells as mi_free
-    for (size_t i = start_cell; i < start_cell + num_cells_to_free; i++) {
-        arena->cell_allocated[i] = false;
-    }
-    arena->used_cells -= num_cells_to_free;
+    // This allocator does not support freeing individual allocations.
+    // Memory is reclaimed when the entire arena is destroyed.
+    (void)arena; // Suppress unused parameter warning
+    (void)ptr;
+    (void)size;
+    //fprintf(stderr, "Freeing individual allocations is not supported.\n");
 }
 
-// Function to destroy the arena and mi_free all memory
+// Function to destroy the arena and free all memory
 void destroy_arena(Arena* arena) {
     free(arena);
 }
-
 
 // Function to manage multiple arenas for more flexible allocation
 void* allocate_from_arenas(Arena** arena_list, size_t size) {

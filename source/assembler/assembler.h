@@ -61,6 +61,7 @@ static char* instructions[] = {
         "s_storef_reg_ptr",
 
         "c_alloc",
+        "c_reg_field",
         "c_storem",
         "c_loadm",
 

@@ -6,8 +6,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define ARENA_SIZE (64 * 1024) // 64 KB arena size
-#define CELL_SIZE 16           // Each cell is 16 bytes
+#define ARENA_SIZE (200 * 1024 * 1024) // 2 MB arena size
+#define CELL_SIZE 256           // Each cell is 16 bytes
 #define NUM_CELLS (ARENA_SIZE / CELL_SIZE) // Number of cells in an arena
 
 // Arena structure to manage the entire memory pool

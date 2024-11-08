@@ -235,12 +235,13 @@ static inline void s_alloc(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
     const uint8_t fields_count = core->codePtr[core->ip++];
+    const uint8_t bitmask = core->codePtr[core->ip++];
     uint16_t struct_size = 0;
     typev_memcpy_u64_ptr_2(&struct_size, &core->codePtr[core->ip]);
     core->ip += 2;
 
     // allocate memory for struct
-    uintptr_t mem = core_struct_alloc(core, fields_count, struct_size);
+    uintptr_t mem = core_struct_alloc(core, fields_count, struct_size, bitmask);
     // move the pointer to R16
     core->regs[dest_reg].ptr = mem;
 }
@@ -284,7 +285,7 @@ static inline void s_loadf(TypeV_Core* core){
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
 
 
-    typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], byteSize);
+    typev_memcpy_u64_ptr(&core->regs[target], ((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index], byteSize);
 }
 
 static inline void s_loadf_ptr(TypeV_Core* core){
@@ -298,7 +299,7 @@ static inline void s_loadf_ptr(TypeV_Core* core){
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr_8(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[index]);
+    typev_memcpy_u64_ptr_8(&core->regs[target], ((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index]);
 }
 
 static inline void s_storef_const(TypeV_Core* core){
@@ -314,7 +315,7 @@ static inline void s_storef_const(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], &core->constPtr[offset], byteSize);
+    typev_memcpy_u64_ptr(((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index], &core->constPtr[offset], byteSize);
 }
 
 static inline void s_storef_const_ptr(TypeV_Core* core){
@@ -329,7 +330,7 @@ static inline void s_storef_const_ptr(TypeV_Core* core){
     core->ip += 8;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr_8(struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], &core->constPtr[offset]);
+    typev_memcpy_u64_ptr_8(((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index], &core->constPtr[offset]);
 }
 
 static inline void s_storef_reg(TypeV_Core* core){
@@ -346,7 +347,7 @@ static inline void s_storef_reg(TypeV_Core* core){
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[index], &core->regs[source], byteSize);
+    typev_memcpy_u64_ptr(((char*)struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->regs[source], byteSize);
 }
 
 static inline void s_storef_reg_ptr(TypeV_Core* core){
@@ -361,14 +362,16 @@ static inline void s_storef_reg_ptr(TypeV_Core* core){
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr_8(struct_ptr->dataPointer + struct_ptr->fieldOffsets[index], &core->regs[source]);
-    core_gc_update_struct_field(core, struct_ptr, (void*)core->regs[source].ptr, index);
+    typev_memcpy_u64_ptr_8(((char*)struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->regs[source]);
 }
 
 static inline void c_alloc(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
     const uint8_t methods_count = core->codePtr[core->ip++];
+    const uint8_t attrs_count = core->codePtr[core->ip++];
+    const uint8_t attr_ptr_mask = core->codePtr[core->ip++];
+
     size_t fields_size = 0;
     typev_memcpy_u64_ptr_2(&fields_size, &core->codePtr[core->ip]);
     core->ip += 2;
@@ -380,9 +383,23 @@ static inline void c_alloc(TypeV_Core* core){
 
 
     // allocate memory for class
-    size_t mem = core_class_alloc(core, methods_count, fields_size, classId);
+    size_t mem = core_class_alloc(core, methods_count, attrs_count, attr_ptr_mask, fields_size, classId);
     // move the pointer to R17
     core->regs[dest_reg].ptr = mem;
+}
+
+static inline void c_reg_field(TypeV_Core* core){
+    const uint8_t src_reg = core->codePtr[core->ip++];
+    ASSERT(src_reg < MAX_REG, "Invalid register index");
+
+    uint8_t field_index = core->codePtr[core->ip++];
+
+    uint16_t offset = 0;
+    typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
+    core->ip += 2;
+
+    TypeV_Class* c = (TypeV_Class*)core->regs[src_reg].ptr;
+    c->fieldOffsets[field_index] = offset;
 }
 
 static inline void c_storem(TypeV_Core* core){
@@ -445,8 +462,6 @@ static inline void c_storef_reg_ptr(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
     typev_memcpy_u64_ptr_8(c->data+field_offset, &core->regs[source].ptr);
-
-    core_gc_update_class_field(core, c, (void*)core->regs[source].ptr, field_offset);
 }
 
 static inline void c_storef_const(TypeV_Core* core) {
@@ -546,7 +561,7 @@ static inline void i_has_m(TypeV_Core* core){
 
 static inline void a_alloc(TypeV_Core* core){
     const uint8_t dest = core->codePtr[core->ip++];
-
+    const uint8_t is_ptr = core->codePtr[core->ip++];
     size_t num_elements = 0;
     typev_memcpy_u64_ptr_8(&num_elements, &core->codePtr[core->ip]);
     core->ip += 8;
@@ -557,7 +572,7 @@ static inline void a_alloc(TypeV_Core* core){
     }
 
     // allocate memory for struct
-    size_t mem = core_array_alloc(core, num_elements, element_size);
+    size_t mem = core_array_alloc(core, is_ptr, num_elements, element_size);
     // move the pointer to R19
     core->regs[dest].ptr = mem;
 }
@@ -629,7 +644,6 @@ static inline void a_storef_reg_ptr(TypeV_Core* core){
         core_panic(core, 1, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
     }
     typev_memcpy_u64_ptr_8(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source]);
-    core_gc_update_array_field(core, array, (void*)core->regs[source].ptr, core->regs[index].u64);
 }
 
 static inline void a_storef_const(TypeV_Core* core){
@@ -1719,7 +1733,6 @@ static inline void closure_push_env_ptr(TypeV_Core* core) {
     TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
     uintptr_t ptr = core->regs[regId].ptr;
     cl->upvalues[cl->envCounter++].ptr = ptr;
-    core_gc_update_closure_env(core, cl, (void*)ptr);
 }
 
 static inline void closure_call(TypeV_Core* core) {

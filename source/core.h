@@ -21,15 +21,15 @@ typedef struct TypeV_Struct {
     uint8_t numFields;                      //< Number of fields in the struct, needed for search
     uint16_t* fieldOffsets;                 //< Field offsets table
     uint32_t* globalFields;                 //< Global fields table, contains ids of global fields, sorted
-    uint8_t* dataPointer;                   //< Pointer to the data
     uint8_t data[];                         //< Data block, if this is a shadow struct,
 }TypeV_Struct;
 
 typedef struct TypeV_Class{
     uint64_t uid;             //< Unique ID
-    uint8_t numMethods;      //< number of methods
+    uint8_t numMethods;       //< number of methods
     uint32_t* globalMethods;  //< Global fields table, contains ids of global fields, sorted
     size_t* methods;          //< A pointer to the method table
+    uint16_t* fieldOffsets;   //< Field offsets table
     /** data */
     uint8_t data[];           //< Fields start from here, direct access
 }TypeV_Class;
@@ -138,10 +138,8 @@ typedef enum {
 
 typedef struct {
     TypeV_ObjectType type;
-    size_t size;
+    uint8_t ptrFields;
     uint8_t marked;
-    uint64_t ptrsCount;
-    void** ptrs;
 }TypeV_ObjectHeader;
 
 /**
@@ -282,9 +280,10 @@ void core_halt(TypeV_Core *core);
  * @param core
  * @param numfields Number of struct fieldOffsets
  * @param totalsize Total size of the struct
+ * @param ptr_bitmask Bitmask of pointers
  * @return Pointer to the allocated struct
  */
-uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
+uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize, uint8_t ptr_bitmask);
 
 /**
  * @brief Find the index of the global ID in the globalFields of a class/struct/variant
@@ -304,7 +303,7 @@ uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint
  * @param total_fields_size  total size of fields in bytes
  * @return new Class object initialized.
  */
-uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId);
+uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_attributes, uint8_t attr_ptr_mask, size_t total_fields_size, uint64_t classId);
 
 /**
  * Allocates an array object
@@ -313,7 +312,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_f
  * @param element_size
  * @return
  */
-uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size);
+uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size);
 
 /**
  * Extends the size of an array

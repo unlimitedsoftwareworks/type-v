@@ -24,7 +24,7 @@ void double_to_str(TypeV_Core *core) {
 
     long int length = ending - buffer + 1;
 
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, length, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, length, 1);
     memcpy(str->data, buffer, length);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -40,7 +40,7 @@ void float_to_str(TypeV_Core *core) {
 
     long int size = ending - buffer + 1;
 
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -52,7 +52,7 @@ void bool_to_str(TypeV_Core *core) {
     uint8_t value = typev_api_stack_pop_u8(core);
 
     int size = snprintf(buffer, MAX_NUM_STR_SIZE, "%s", value?"true":"false");
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -63,7 +63,7 @@ void uint8_to_str(TypeV_Core *core) {
     uint8_t value = typev_api_stack_pop_u8(core);
 
     int size = snprintf(buffer, MAX_NUM_STR_SIZE, "%" PRIu8, value);
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -75,7 +75,7 @@ void int8_to_str(TypeV_Core *core) {
     int8_t value = typev_api_stack_pop_i8(core);
 
     int size = snprintf(buffer, MAX_NUM_STR_SIZE, "%" PRId8, value);
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -87,7 +87,7 @@ void uint16_to_str(TypeV_Core *core) {
     uint16_t value = typev_api_stack_pop_u16(core);
 
     int size = snprintf(buffer, MAX_NUM_STR_SIZE, "%" PRIu16, value);
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -99,7 +99,7 @@ void int16_to_str(TypeV_Core *core) {
     int16_t value = typev_api_stack_pop_i16(core);
 
     int size = snprintf(buffer, MAX_NUM_STR_SIZE, "%" PRId16, value);
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -113,7 +113,7 @@ void uint32_to_str(TypeV_Core *core) {
     char* end = itoa_u32_yy(value, buffer);
     long int size = end - buffer + 1;
 
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -127,7 +127,7 @@ void int32_to_str(TypeV_Core *core) {
     char* end = itoa_i32_yy(value, buffer);
     long int size = end - buffer + 1;
 
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -141,7 +141,7 @@ void uint64_to_str(TypeV_Core *core) {
     char* end = itoa_u64_yy(value, buffer);
     long int size = end - buffer + 1;
 
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
@@ -154,7 +154,7 @@ void int64_to_str(TypeV_Core *core) {
     char* end = itoa_i64_yy(value, buffer);
     long int size = end - buffer + 1;
 
-    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, size, 1);
+    TypeV_Array* str = (TypeV_Array*)core_array_alloc(core, 0, size, 1);
     memcpy(str->data, buffer, size);
 
     typev_api_return_ptr(core, (size_t)str);
