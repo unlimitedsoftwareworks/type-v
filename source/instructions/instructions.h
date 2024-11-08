@@ -441,35 +441,30 @@ static inline void c_loadm(TypeV_Core* core){
 
 static inline void c_storef_reg(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
-    size_t field_offset = 0;
-    typev_memcpy_u64_ptr_2(&field_offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
     const uint8_t source = core->codePtr[core->ip++];
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
+    size_t field_offset = c->fieldOffsets[fieldIndex];
     typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source], byteSize);
 }
 
 static inline void c_storef_reg_ptr(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
-    ASSERT(class_reg < MAX_REG, "Invalid register index");
-    size_t field_offset = 0;
-    typev_memcpy_u64_ptr_2(&field_offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
+    size_t field_offset = c->fieldOffsets[fieldIndex];
     typev_memcpy_u64_ptr_8(c->data+field_offset, &core->regs[source].ptr);
 }
 
 static inline void c_storef_const(TypeV_Core* core) {
     const uint8_t class_reg = core->codePtr[core->ip++];
-    ASSERT(class_reg < MAX_REG, "Invalid register index");
-    size_t field_offset = 0;
-    typev_memcpy_u64_ptr_2(&field_offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
+
     size_t offset = 0;
     typev_memcpy_u64_ptr_8(&offset, &core->codePtr[core->ip]);
     core->ip += 8;
@@ -477,43 +472,42 @@ static inline void c_storef_const(TypeV_Core* core) {
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Class *c = (TypeV_Class *) core->regs[class_reg].ptr;
+    size_t field_offset = c->fieldOffsets[fieldIndex];
+
     typev_memcpy_u64_ptr(c->data + field_offset, &core->constPtr[offset], byteSize);
 }
 
 static inline void c_storef_const_ptr(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
-    ASSERT(class_reg < MAX_REG, "Invalid register index");
-    size_t field_offset = 0;
-    typev_memcpy_u64_ptr_2(&field_offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
     size_t offset = 0;
     typev_memcpy_u64_ptr_8(&offset, &core->codePtr[core->ip]);
     core->ip += 8;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
+    size_t field_offset = c->fieldOffsets[fieldIndex];
     typev_memcpy_u64_ptr_8(c->data+field_offset, &core->constPtr[offset]);
 }
 
 static inline void c_loadf(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
-    size_t offset = 0;
-    typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, byteSize);
+    size_t field_offset = c->fieldOffsets[fieldIndex];
+    typev_memcpy_u64_ptr(&core->regs[target], c->data+field_offset, byteSize);
 }
 
 static inline void c_loadf_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
-    size_t offset = 0;
-    typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
+
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy_u64_ptr_8(&core->regs[target], c->data+offset);
+    size_t field_offset = c->fieldOffsets[fieldIndex];
+    typev_memcpy_u64_ptr_8(&core->regs[target], c->data+field_offset);
 }
 
 static inline void i_is_c(TypeV_Core* core){

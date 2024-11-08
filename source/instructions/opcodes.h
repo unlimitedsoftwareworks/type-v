@@ -138,21 +138,20 @@ typedef enum TypeV_OpCode {
     OP_C_LOADM,
 
     /**
-     * OP_CSTOREF_REG_[size] classReg: R, fieldOffset: I (2 bytes), R: source register, byteSize: S
+     * OP_CSTOREF_REG_[size] classReg: R, fieldIndex: I (1b), R: source register, byteSize: S
      * Stores [size] bytes from register R to field I of class stored at classReg
      */
     OP_C_STOREF_REG,
     OP_C_STOREF_REG_PTR,
 
     /**
-     * OP_C_STOREF_CONST_[size] classReg: R, fieldOffset: I (2 bytes), offset: I (8 bytes), byteSize: S
+     * OP_C_STOREF_CONST_[size] classReg: R, fieldIndex: I (1b), offset: I (8 bytes), byteSize: S
      */
     OP_C_STOREF_CONST,
     OP_C_STOREF_CONST_PTR,
 
-
     /**
-     * OP_C_LOADF_[size] dest: R, classReg: R, fieldOffset: I (2 bytes), byteSize: S
+     * OP_C_LOADF_[size] dest: R, classReg: R, fieldIndex: I (1b), byteSize: S
      * Loads [size] bytes from field I of class stored at classReg to register R
      */
     OP_C_LOADF,
