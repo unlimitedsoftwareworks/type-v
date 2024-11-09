@@ -147,13 +147,7 @@ typedef struct {
  * references of the objects given.
  */
 typedef struct TypeV_GC {
-    void** memObjects;
-    uint64_t memObjectCount;
-    uint64_t memObjectCapacity;
-
-    uint64_t totalAllocs;
-    uint64_t allocsSincePastGC;
-    Arena* arenaList;
+    TypeV_Colosseum* colosseum;
 }TypeV_GC;
 
 /**

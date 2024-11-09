@@ -55,12 +55,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->regs = core->funcState->regs;
 
     // Initialize GC
-    core->gc.memObjectCapacity = 2000;
-    core->gc.memObjectCount = 0;
-    core->gc.memObjects = mi_malloc(sizeof(void*)*core->gc.memObjectCapacity);
-    core->gc.allocsSincePastGC = 0;
-    core->gc.totalAllocs = 0;
-    core->gc.arenaList = create_arena();
+    core->gc.colosseum = tv_colosseum_init();
 
 
     core->engineRef = engineRef;
@@ -88,7 +83,7 @@ void core_deallocate(TypeV_Core *core) {
     }
 
     core_gc_sweep_all(core);
-    mi_free(core->gc.memObjects);
+    //mi_free(core->gc.memObjects);
     mi_free(core);
 }
 

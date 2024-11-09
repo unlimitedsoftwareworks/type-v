@@ -6,32 +6,34 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define ARENA_SIZE (200 * 1024 * 1024) // 2 MB arena size
-#define CELL_SIZE 16          // Each cell is 16 bytes
-#define NUM_CELLS (ARENA_SIZE / CELL_SIZE) // Number of cells in an arena
+#define COLESSEUM_ARENA_SIZE (20 * 1024 * 1024) // 2 MB arena size
+#define COLESSEUM_CELL_SIZE 64                // 16 bytes per cell
+#define COLESSEUM_NUM_CELLS (COLESSEUM_ARENA_SIZE / COLESSEUM_CELL_SIZE)
+#define COLESSEUM_BITMAP_SIZE (COLESSEUM_NUM_CELLS / 8) // Size in bytes for 16K cells (2 KB per bitmap)
+#define ARENA_SKIP_THRESHOLD 3       // Number of times an arena can be skipped before being marked unusable
+
 
 // Arena structure to manage the entire memory pool
-typedef struct Arena {
-    uint8_t data[ARENA_SIZE];   // Data section for allocations
-    size_t offset;              // Offset to the first free slot
-    struct Arena* next;         // Pointer to the next arena in the list (for managing multiple arenas)
-    int skip_count;             // Number of times the arena has been skipped
-    bool usable;                // Flag indicating if the arena is usable for allocation
-} Arena;
-// Function to create a new arena
-Arena* create_arena();
+typedef struct TypeV_GCArena {
+    uint8_t block_bitmap[COLESSEUM_BITMAP_SIZE]; // Bitmap to track block allocation status
+    uint8_t mark_bitmap[COLESSEUM_BITMAP_SIZE];  // Bitmap to track mark status for GC
+    uint8_t *top;                      // Pointer to the first free slot
+    struct TypeV_GCArena *prev;
+    uint8_t data[COLESSEUM_ARENA_SIZE];          // Data section for allocations
+} TypeV_GCArena;
 
-// Function to allocate memory from the arena
-void* arena_alloc(Arena* arena, size_t size);
+typedef struct TypeV_Colosseum {
+    TypeV_GCArena *head;
+    TypeV_GCArena *busyHead;
+} TypeV_Colosseum;
 
-// Function to mi_free memory back to the arena
-void arena_free(Arena* arena, void* ptr, size_t size);
+TypeV_Colosseum* tv_colosseum_init();
+void tv_colosseum_free(TypeV_Colosseum* colosseum);
 
-// Function to destroy the arena and mi_free all memory
-void destroy_arena(Arena* arena);
+TypeV_GCArena* tv_arena_init(TypeV_Colosseum* colosseum);
+void tv_arena_free(TypeV_GCArena* arena, TypeV_Colosseum* colosseum);
 
-// Function to manage multiple arenas for more flexible allocation
-void* allocate_from_arenas(Arena** arena_list, size_t size);
+uintptr_t tv_gc_alloc(TypeV_Colosseum* colosseum, size_t size);
 
 #endif
 

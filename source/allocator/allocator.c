@@ -2,108 +2,104 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <mimalloc.h>
+
 #include "allocator.h"
 // Function to create a new arena
-Arena* create_arena() {
-    Arena* arena = (Arena*)mi_malloc_aligned(sizeof(Arena), 16);
-    if (arena == NULL) {
-        //fprintf(stderr, "Failed to allocate memory for arena\n");
-        return NULL;
-    }
 
-    // Initialize the arena
-    arena->offset = 0;
-    arena->next = NULL;
-    arena->skip_count = 0;
-    arena->usable = true;
+static inline uint8_t is_size_large(size_t size) {
+    // returns true if size > 128 bytes
+    return size > 128;
+}
 
+// Function to set a bit in a bitmap
+static inline void set_bitmap_bit(uint8_t* bitmap, size_t index) {
+    bitmap[index / 8] |= (1 << (index % 8));
+}
+
+// Function to clear a bit in a bitmap
+static inline void clear_bitmap_bit(uint8_t* bitmap, size_t index) {
+    bitmap[index / 8] &= ~(1 << (index % 8));
+}
+
+// Function to check if a bit is set in a bitmap
+static inline bool is_bitmap_bit_set(const uint8_t* bitmap, size_t index) {
+    return (bitmap[index / 8] & (1 << (index % 8))) != 0;
+}
+
+
+TypeV_Colosseum* tv_colosseum_init() {
+    TypeV_Colosseum* colosseum = (TypeV_Colosseum*)mi_malloc(sizeof(TypeV_Colosseum));
+    colosseum->head = tv_arena_init(colosseum);
+    colosseum->busyHead = NULL;
+    return colosseum;
+}
+
+void tv_colosseum_free(TypeV_Colosseum* colosseum) {
+    mi_free(colosseum);
+}
+
+TypeV_GCArena* tv_arena_init(TypeV_Colosseum* colosseum) {
+    TypeV_GCArena* arena = (TypeV_GCArena*)mi_malloc(sizeof(TypeV_GCArena));
+
+    // set the flags to 0
+    memset(arena->block_bitmap, 0, COLESSEUM_BITMAP_SIZE);
+    memset(arena->mark_bitmap, 0, COLESSEUM_BITMAP_SIZE);
+
+    arena->top = arena->data;
     return arena;
 }
 
-// Function to allocate memory from the arena
-
-// Function to allocate memory from the arena
-void* arena_alloc(Arena* arena, size_t size) {
-    if (__builtin_expect(size == 0 || size > ARENA_SIZE, 0)) {
-        //fprintf(stderr, "Invalid allocation size\n");
-        return NULL;
-    }
-
-    // Check if there is enough space in the current arena
-    if (__builtin_expect(arena->offset + size > ARENA_SIZE, 0)) {
-        //fprintf(stderr, "Failed to allocate memory from arena\n");
-        return NULL;
-    }
-
-    // Allocate memory by bumping the offset
-    void* ptr = &arena->data[arena->offset];
-    arena->offset += size;
-
-    return ptr;
-}
-
-
-// Function to free memory back to the arena (simplified)
-void arena_free(Arena* arena, void* ptr, size_t size) {
-    // This allocator does not support freeing individual allocations.
-    // Memory is reclaimed when the entire arena is destroyed.
-    (void)arena; // Suppress unused parameter warning
-    (void)ptr;
-    (void)size;
-    //fprintf(stderr, "Freeing individual allocations is not supported.\n");
-}
-
-// Function to destroy the arena and free all memory
-void destroy_arena(Arena* arena) {
+void tv_arena_free(TypeV_GCArena* arena, TypeV_Colosseum* colosseum) {
     mi_free(arena);
 }
 
-// Function to manage multiple arenas for more flexible allocation
-void* allocate_from_arenas(Arena** arena_list, size_t size) {
-    Arena* current = *arena_list;
-    Arena* prev = NULL;
-
-    // Try to allocate from an existing arena
-    while (current != NULL) {
-        void* ptr = arena_alloc(current, size);
-        if (ptr != NULL) {
-            return ptr; // Allocation successful
+TypeV_GCArena* tv_arena_find_usable(TypeV_Colosseum* colosseum, size_t size) {
+    TypeV_GCArena* arena = colosseum->head;
+    TypeV_GCArena* parent = NULL;
+    while (arena != NULL) {
+        if (__builtin_expect(arena->top + size <= arena->data + COLESSEUM_ARENA_SIZE, 1)) {
+            return arena;
         }
-
-        // Increment skip count if the arena is skipped
-        if (current->usable) {
-            current->skip_count++;
-            if (current->skip_count >= 3) {
-                current->usable = false; // Mark the arena as unusable after being skipped too many times
-
-                // Remove the arena from the usable list
-                if (prev == NULL) {
-                    *arena_list = current->next;
-                } else {
-                    prev->next = current->next;
-                }
-
-
-                current = (prev == NULL) ? *arena_list : prev->next;
-                continue;
-            }
+        if (__builtin_expect(is_size_large(size), 0)) {
+            parent->prev = arena->prev;
+            arena->prev = colosseum->busyHead;
+            colosseum->busyHead = arena;
         }
+        parent = arena;
+        arena = arena->prev;
+    }
+    return NULL;
+}
 
-        prev = current;
-        current = current->next;
+uintptr_t tv_gc_alloc(TypeV_Colosseum* colosseum, size_t size) {
+    /**
+     * 1. Start from the head of the colosseum
+     * 2. Find an arena that has enough space for the allocation
+     * 3. When searching, if an arena has no space and size is small, we consider
+     *    the arena unusable and we add into busyHead
+     * 4. Update the arena pointer to the next arena
+     * 5. Return the pointer to the allocated memory
+     */
+    TypeV_GCArena* arena = tv_arena_find_usable(colosseum, size);
+    if (__builtin_expect(arena == NULL, 0)) {
+        arena = tv_arena_init(colosseum);
+        arena->prev = colosseum->head;
+        colosseum->head = arena;
     }
 
-    // If no existing arena has space, create a new arena
-    Arena* new_arena = create_arena();
-    if (new_arena == NULL) {
-        return NULL; // Failed to create a new arena
+    uintptr_t ptr = (uintptr_t)arena->top;
+    arena->top += size;
+
+    // Calculate the start and end indices of the allocated block
+    size_t start_index = (ptr - (uintptr_t)arena->data) / COLESSEUM_CELL_SIZE;
+    size_t num_cells = (size + COLESSEUM_CELL_SIZE - 1) / COLESSEUM_CELL_SIZE; // Number of cells to allocate
+
+    // Update the block bitmap for all allocated cells
+    for (size_t i = 0; i < num_cells; i++) {
+        set_bitmap_bit(arena->block_bitmap, start_index + i);
     }
 
-    // Add the new arena to the list
-    new_arena->next = *arena_list;
-    *arena_list = new_arena;
-
-    // Allocate from the new arena
-    return arena_alloc(new_arena, size);
+    return ptr;
 }

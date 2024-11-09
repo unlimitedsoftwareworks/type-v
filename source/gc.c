@@ -8,15 +8,14 @@
 
 void* core_gc_alloc(TypeV_Core* core, size_t size) {
    
-    void* mem = allocate_from_arenas(&core->gc.arenaList, size);
+    void* mem = (void*)tv_gc_alloc(core->gc.colosseum, size);
     //core->gc.memObjects[core->gc.memObjectCount++] = mem;
 
     return mem;
 }
 
 void core_gc_update_alloc(TypeV_Core* core, size_t mem) {
-    core->gc.allocsSincePastGC += mem;
-    core->gc.totalAllocs += mem;
+
 }
 
 TypeV_ObjectHeader* get_header_from_pointer(void* objectPtr) {
@@ -36,6 +35,8 @@ uint64_t core_gc_is_valid_ptr(TypeV_Core* core, uintptr_t ptr) {
     if (!ptr) {
         return 0; // Null pointer
     }
+
+    /*
     for (size_t i = 0; i < core->gc.memObjectCount; i++) {
         uintptr_t objPtr = (uintptr_t)(core->gc.memObjects[i]);
 
@@ -43,6 +44,7 @@ uint64_t core_gc_is_valid_ptr(TypeV_Core* core, uintptr_t ptr) {
             return i+1; // Found a matching pointer
         }
     }
+     */
     return 0; // No matching pointer found
 }
 
@@ -77,6 +79,7 @@ void core_gc_mark_object(TypeV_Core* core, TypeV_ObjectHeader* header) {
 }
 
 void core_gc_sweep(TypeV_Core* core) {
+    /*
     for (size_t i = 0; i < core->gc.memObjectCount; i++) {
         TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
         if (header && !header->marked) {
@@ -92,6 +95,7 @@ void core_gc_sweep(TypeV_Core* core) {
             header->marked = 0;
         }
     }
+     */
 }
 
 void core_gc_collect(TypeV_Core* core) {
@@ -153,6 +157,7 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
 }
 
 void core_gc_sweep_all(TypeV_Core* core){
+    /*
     for(size_t i = 0; i < core->gc.memObjectCount; i++) {
         if(core->gc.memObjects[i] == NULL) {
             continue;
@@ -165,6 +170,7 @@ void core_gc_sweep_all(TypeV_Core* core){
         }
     }
     core->gc.memObjectCount = 0;
+     */
 }
 
 void core_gc_update_closure_env(TypeV_Core* core, TypeV_Closure* closurePtr, void* ptr) {
