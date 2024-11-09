@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <mimalloc.h>
+#include <string.h>
 #include "core.h"
 #include "allocator/allocator.h"
 #include "gc.h"
@@ -43,11 +44,38 @@ void core_gc_mark_object(TypeV_Core* core, TypeV_GCArena* arena, TypeV_ObjectHea
     switch (header->type) {
         case OT_STRUCT: {
             TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
-            for (size_t i = 0; i < sizeof(header->ptrFields)*8; i++) {
-                // Check if the field is a pointer using the bitmask
-                if ((header->ptrFields*8 >> i) & 1) {
-                    // Get the field's pointer value
+
+            for (size_t i = 0; i < struct_ptr->numFields; i++) {
+                // Determine which byte and which bit correspond to the current field index `i`
+                size_t byteIndex = i / 8;       // Which byte contains the bit for the field at index `i`
+                uint8_t bitOffset = i % 8;      // Which bit within that byte corresponds to field `i`
+
+                // Check if the bit corresponding to field `i` is set
+                if (struct_ptr->pointerBitmask[byteIndex] & (1 << bitOffset)) {
                     uintptr_t fieldPtr = (uintptr_t)(struct_ptr->data + struct_ptr->fieldOffsets[i]);
+                    TypeV_ObjectHeader* fieldHeader = get_header_from_pointer((void*)fieldPtr);
+
+                    // Find the arena that contains this field and mark it
+                    TypeV_GCArena* fieldArena = tv_arena_find_pointerArena(core->gc.colosseum, (uintptr_t)fieldHeader);
+                    if (fieldArena) {
+                        core_gc_mark_object(core, fieldArena, fieldHeader);
+                    }
+                }
+            }
+
+            break;
+        }
+
+        case OT_CLASS: {
+            TypeV_Class *class_ptr = (TypeV_Class *) (header + 1);
+            for (size_t i = 0; i < class_ptr->numFields; i++) {
+                // Determine which byte and which bit correspond to the current field index `i`
+                size_t byteIndex = i / 8;       // Which byte contains the bit for the field at index `i`
+                uint8_t bitOffset = i % 8;      // Which bit within that byte corresponds to field `i`
+
+                // Check if the bit corresponding to field `i` is set
+                if (class_ptr->pointerBitmask[byteIndex] & (1 << bitOffset)) {
+                    uintptr_t fieldPtr = (uintptr_t)(class_ptr->data + class_ptr->fieldOffsets[i]);
                     TypeV_ObjectHeader* fieldHeader = get_header_from_pointer((void*)fieldPtr);
 
                     // Find the arena that contains this field and mark it
@@ -59,55 +87,76 @@ void core_gc_mark_object(TypeV_Core* core, TypeV_GCArena* arena, TypeV_ObjectHea
             }
             break;
         }
+        case OT_ARRAY: {
+            TypeV_Array *array_ptr = (TypeV_Array *) (header + 1);
+            if (array_ptr->isPointerContainer) {
+                for (size_t i = 0; i < array_ptr->length; i++) {
+                    uintptr_t fieldPtr = (uintptr_t)(array_ptr->data + i * array_ptr->elementSize);
+                    TypeV_ObjectHeader* fieldHeader = get_header_from_pointer((void*)fieldPtr);
 
-        case OT_CLASS: {
-            TypeV_Class *class_ptr = (TypeV_Class *) (header + 1);
-            for (size_t i = 0; i < header->ptrFields; i++) {
-                // Check if the method is a pointer using the bitmask
-                if (header->ptrFields & (1 << i)) {
-                    // Get the method's pointer value
-                    uintptr_t methodPtr = (uintptr_t) (class_ptr->methods[i]);
-                    TypeV_ObjectHeader *methodHeader = get_header_from_pointer((void *) methodPtr);
-
-                    // Find the arena that contains this method and mark it
-                    TypeV_GCArena *methodArena = tv_arena_find_pointerArena(core->gc.colosseum, (uintptr_t) methodHeader);
-                    if (methodArena) {
-                        core_gc_mark_object(core, methodArena, methodHeader);
+                    // Find the arena that contains this field and mark it
+                    TypeV_GCArena* fieldArena = tv_arena_find_pointerArena(core->gc.colosseum, (uintptr_t)fieldHeader);
+                    if (fieldArena) {
+                        core_gc_mark_object(core, fieldArena, fieldHeader);
                     }
                 }
             }
             break;
         }
-        case OT_ARRAY:
+        case OT_CLOSURE: {
             break;
-        case OT_CLOSURE:
+        }
+        case OT_COROUTINE: {
             break;
-        case OT_COROUTINE:
+        }
+        case OT_RAWMEM: {
             break;
-        case OT_RAWMEM:
-            break;
+        }
     }
+}
+// Function to set a bit in a bitmap
+static inline void set_bitmap_bit(uint8_t* bitmap, size_t index) {
+    bitmap[index / 8] |= (1 << (index % 8));
+}
+
+// Function to clear a bit in a bitmap
+static inline void clear_bitmap_bit(uint8_t* bitmap, size_t index) {
+    bitmap[index / 8] &= ~(1 << (index % 8));
+}
+
+// Function to check if a bit is set in a bitmap
+static inline bool is_bitmap_bit_set(const uint8_t* bitmap, size_t index) {
+    return (bitmap[index / 8] & (1 << (index % 8))) != 0;
 }
 
 
 void core_gc_sweep(TypeV_Core* core) {
-    /*
-    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
-        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
-        if (header && !header->marked) {
-            core_gc_free_header(core, header);
-            header = NULL;
-            core->gc.memObjects[i] = NULL;  // Clear the tracker entry
-        }
-    }
+    // Iterate through all full arenas and sweep them
+    TypeV_GCArena* arena = core->gc.colosseum->busyHead;
+    while (arena != NULL) {
+        // Iterate through all cells in the arena
+        for (size_t i = 0; i < COLESSEUM_NUM_CELLS; i++) {
+            // Check if the cell is marked
+            if (!is_bitmap_bit_set(arena->mark_bitmap, i) && is_bitmap_bit_set(arena->block_bitmap, i)) {
+                // The cell is not marked, so it is garbage
+                uintptr_t ptr = (uintptr_t)(arena->data + i * COLESSEUM_CELL_SIZE);
+                TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
 
-    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
-        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
-        if (header) {
-            header->marked = 0;
+                // Free the object
+                //core_gc_free_header(core, header);
+                printf("freeing object %p of type %d\n", header, header->type);
+
+                // Clear the bitmap bit for this cell
+                clear_bitmap_bit(arena->block_bitmap, i);
+            }
         }
+
+        // Reset the mark bitmap for the next GC cycle
+        memset(arena->mark_bitmap, 0, COLESSEUM_BITMAP_SIZE);
+
+        // Move to the next arena
+        arena = arena->prev;
     }
-     */
 }
 
 void core_gc_collect(TypeV_Core* core) {
@@ -150,20 +199,6 @@ void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
 }
 
 void core_gc_sweep_all(TypeV_Core* core){
-    /*
-    for(size_t i = 0; i < core->gc.memObjectCount; i++) {
-        if(core->gc.memObjects[i] == NULL) {
-            continue;
-        }
-
-        TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core->gc.memObjects[i];
-        if(header) {
-            core_gc_free_header(core, header);
-            core->gc.memObjects[i] = NULL;
-        }
-    }
-    core->gc.memObjectCount = 0;
-     */
 }
 
 void core_struct_free(TypeV_Core *core, TypeV_ObjectHeader* header) {

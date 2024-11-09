@@ -29,6 +29,7 @@ typedef struct TypeV_Struct {
 typedef struct TypeV_Class{
     size_t bitMaskSize;
     uint8_t* pointerBitmask;
+    uint8_t numFields;        //< Number of fields in the class
     uint64_t uid;             //< Unique ID
     uint8_t numMethods;       //< number of methods
     uint32_t* globalMethods;  //< Global fields table, contains ids of global fields, sorted
@@ -39,6 +40,7 @@ typedef struct TypeV_Class{
 }TypeV_Class;
 
 typedef struct TypeV_Array {
+    uint8_t isPointerContainer;
     uint32_t uid;
     uint8_t elementSize;      ///< Size of each element
     uint64_t length;          ///< Array length
@@ -142,7 +144,6 @@ typedef enum {
 
 typedef struct {
     TypeV_ObjectType type;
-    uint8_t ptrFields;
     uint8_t marked;
 }TypeV_ObjectHeader;
 

@@ -6,8 +6,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define COLESSEUM_ARENA_SIZE (20 * 1024 * 1024) // 2 MB arena size
-#define COLESSEUM_CELL_SIZE 64                // 16 bytes per cell
+#define COLESSEUM_ARENA_SIZE (2 * 1024 * 1024) // 2 MB arena size
+#define COLESSEUM_CELL_SIZE 128                // 16 bytes per cell
 #define COLESSEUM_NUM_CELLS (COLESSEUM_ARENA_SIZE / COLESSEUM_CELL_SIZE)
 #define COLESSEUM_BITMAP_SIZE (COLESSEUM_NUM_CELLS / 8) // Size in bytes for 16K cells (2 KB per bitmap)
 #define ARENA_SKIP_THRESHOLD 3       // Number of times an arena can be skipped before being marked unusable

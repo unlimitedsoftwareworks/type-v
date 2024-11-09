@@ -153,6 +153,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_at
     // Get a pointer to the actual class, which comes after the header
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
     class_ptr->numMethods = num_methods;
+    class_ptr->numFields = num_attributes;
     class_ptr->uid = classId;
     class_ptr->methods = (size_t*)(class_ptr->data + total_fields_size);
     class_ptr->globalMethods = (uint32_t*)(class_ptr->methods + num_methods);
@@ -172,13 +173,13 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint6
     header->type = OT_ARRAY;
     // for arrays 0 means elements are not pointers
     // anything else means elements are pointers
-    header->ptrFields = is_pointer_container;
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
     array_ptr->data = mi_malloc(num_elements* element_size);
     array_ptr->uid = uid++;
+    array_ptr->isPointerContainer = is_pointer_container;
 
     return (uintptr_t)array_ptr;
 }
@@ -197,6 +198,7 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     array_ptr->length = slice_length;
     array_ptr->data = mi_malloc(slice_length* array->elementSize);
     array_ptr->uid = 1000000-array->uid;
+    array_ptr->isPointerContainer = array->isPointerContainer;
 
     memcpy(array_ptr->data, array->data + start * array->elementSize, slice_length * array->elementSize);
 
