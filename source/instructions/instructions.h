@@ -236,21 +236,18 @@ static inline void s_alloc(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
     const uint8_t fields_count = core->codePtr[core->ip++];
-    const uint8_t bitmask = core->codePtr[core->ip++];
     uint16_t struct_size = 0;
     typev_memcpy_u64_ptr_2(&struct_size, &core->codePtr[core->ip]);
     core->ip += 2;
 
     // allocate memory for struct
-    uintptr_t mem = core_struct_alloc(core, fields_count, struct_size, bitmask);
+    uintptr_t mem = core_struct_alloc(core, fields_count, struct_size);
     // move the pointer to R16
     core->regs[dest_reg].ptr = mem;
 }
 
 static inline void s_reg_field(TypeV_Core* core){
     const uint8_t src_reg = core->codePtr[core->ip++];
-    ASSERT(src_reg < MAX_REG, "Invalid register index");
-
     uint8_t field_index = core->codePtr[core->ip++];
 
     uint32_t globalFieldIndex = 0;
@@ -261,10 +258,17 @@ static inline void s_reg_field(TypeV_Core* core){
     typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
     core->ip += 2;
 
+    uint8_t isPtr = core->codePtr[core->ip++];
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[src_reg].ptr;
     struct_ptr->globalFields[field_index] = globalFieldIndex;
     struct_ptr->fieldOffsets[field_index] = offset;
+
+    if (isPtr) {
+        size_t byteIndex = field_index / 8;      // Determine which byte contains the bit
+        uint8_t bitOffset = field_index % 8;     // Determine the bit position within the byte
+        struct_ptr->pointerBitmask[byteIndex] |= (1 << bitOffset); // Set the bit to mark as a pointer
+    }
 }
 
 
@@ -369,7 +373,6 @@ static inline void c_alloc(TypeV_Core* core){
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
     const uint8_t methods_count = core->codePtr[core->ip++];
     const uint8_t attrs_count = core->codePtr[core->ip++];
-    const uint8_t attr_ptr_mask = core->codePtr[core->ip++];
 
     size_t fields_size = 0;
     typev_memcpy_u64_ptr_2(&fields_size, &core->codePtr[core->ip]);
@@ -382,23 +385,30 @@ static inline void c_alloc(TypeV_Core* core){
 
 
     // allocate memory for class
-    size_t mem = core_class_alloc(core, methods_count, attrs_count, attr_ptr_mask, fields_size, classId);
+    size_t mem = core_class_alloc(core, methods_count, attrs_count, fields_size, classId);
     // move the pointer to R17
     core->regs[dest_reg].ptr = mem;
 }
 
 static inline void c_reg_field(TypeV_Core* core){
     const uint8_t src_reg = core->codePtr[core->ip++];
-    ASSERT(src_reg < MAX_REG, "Invalid register index");
-
-    uint8_t field_index = core->codePtr[core->ip++];
+    const uint8_t field_index = core->codePtr[core->ip++];
 
     uint16_t offset = 0;
     typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
     core->ip += 2;
 
-    TypeV_Class* c = (TypeV_Class*)core->regs[src_reg].ptr;
-    c->fieldOffsets[field_index] = offset;
+    TypeV_Class* class_ptr = (TypeV_Class*)core->regs[src_reg].ptr;
+    class_ptr->fieldOffsets[field_index] = offset;
+
+    uint8_t isPtr = core->codePtr[core->ip++];
+
+
+    if (isPtr) {
+        size_t byteIndex = field_index / 8;      // Determine which byte contains the bit
+        uint8_t bitOffset = field_index % 8;     // Determine the bit position within the byte
+        class_ptr->pointerBitmask[byteIndex] |= (1 << bitOffset); // Set the bit to mark as a pointer
+    }
 }
 
 static inline void c_storem(TypeV_Core* core){

@@ -25,6 +25,7 @@ typedef struct TypeV_GCArena {
 typedef struct TypeV_Colosseum {
     TypeV_GCArena *head;
     TypeV_GCArena *busyHead;
+    uint32_t busyCount;
 } TypeV_Colosseum;
 
 TypeV_Colosseum* tv_colosseum_init();
@@ -35,5 +36,7 @@ void tv_arena_free(TypeV_GCArena* arena, TypeV_Colosseum* colosseum);
 
 uintptr_t tv_gc_alloc(TypeV_Colosseum* colosseum, size_t size);
 
+TypeV_GCArena* tv_arena_find_pointerArena(TypeV_Colosseum* col, uintptr_t ptr);
+void tv_arena_mark_ptr(TypeV_GCArena* arena, uintptr_t ptr);
 #endif
 

@@ -10,7 +10,7 @@
 
 static inline uint8_t is_size_large(size_t size) {
     // returns true if size > 128 bytes
-    return size > 128;
+    return size > 256;
 }
 
 // Function to set a bit in a bitmap
@@ -30,9 +30,10 @@ static inline bool is_bitmap_bit_set(const uint8_t* bitmap, size_t index) {
 
 
 TypeV_Colosseum* tv_colosseum_init() {
-    TypeV_Colosseum* colosseum = (TypeV_Colosseum*)mi_malloc(sizeof(TypeV_Colosseum));
+    TypeV_Colosseum* colosseum = (TypeV_Colosseum*)mi_malloc_aligned(sizeof(TypeV_Colosseum), 16);
     colosseum->head = tv_arena_init(colosseum);
     colosseum->busyHead = NULL;
+    colosseum->busyCount = 0;
     return colosseum;
 }
 
@@ -41,11 +42,17 @@ void tv_colosseum_free(TypeV_Colosseum* colosseum) {
 }
 
 TypeV_GCArena* tv_arena_init(TypeV_Colosseum* colosseum) {
-    TypeV_GCArena* arena = (TypeV_GCArena*)mi_malloc(sizeof(TypeV_GCArena));
+    TypeV_GCArena* arena = (TypeV_GCArena*)mi_malloc_aligned(sizeof(TypeV_GCArena), 16);
 
     // set the flags to 0
     memset(arena->block_bitmap, 0, COLESSEUM_BITMAP_SIZE);
     memset(arena->mark_bitmap, 0, COLESSEUM_BITMAP_SIZE);
+
+    uint8_t fill_percentage = 0;
+    if(colosseum->head) {
+        fill_percentage = (colosseum->head->top - colosseum->head->data) * 100 / COLESSEUM_ARENA_SIZE;
+    }
+    printf("[GC] Allocating new arena, prevArena fill percentage = %d\n",fill_percentage);
 
     arena->top = arena->data;
     return arena;
@@ -58,18 +65,45 @@ void tv_arena_free(TypeV_GCArena* arena, TypeV_Colosseum* colosseum) {
 TypeV_GCArena* tv_arena_find_usable(TypeV_Colosseum* colosseum, size_t size) {
     TypeV_GCArena* arena = colosseum->head;
     TypeV_GCArena* parent = NULL;
+
     while (arena != NULL) {
+        // Check if this arena has enough space to accommodate the requested size.
         if (__builtin_expect(arena->top + size <= arena->data + COLESSEUM_ARENA_SIZE, 1)) {
             return arena;
         }
-        if (__builtin_expect(is_size_large(size), 0)) {
-            parent->prev = arena->prev;
+
+        // Use a threshold bit mask to check if the arena is at least 90% full.
+        size_t used_size = arena->top - arena->data;
+
+        // Calculate threshold of 90% capacity using a bit mask.
+        if (__builtin_expect(1, 1)) {
+            // Move arena to the busy list as it is almost full.
+            if (parent != NULL) {
+                // If the arena is not the head, link the previous arena to the next.
+                parent->prev = arena->prev;
+            } else {
+                // If the arena is the head, update the head to the next arena.
+                colosseum->head = arena->prev;
+            }
+
+            // Add the arena to the busy list.
             arena->prev = colosseum->busyHead;
             colosseum->busyHead = arena;
+
+            // Move to the next arena in the usable list.
+            // Note: We cannot use `arena->prev` directly here since `arena` has been moved.
+            arena = (parent != NULL) ? parent->prev : colosseum->head;
+            colosseum->busyCount++;
+
+            continue; // Continue to the next iteration after moving the arena.
         }
+
+        // Move to the next arena.
         parent = arena;
         arena = arena->prev;
     }
+
+    // If no usable arena was found, return NULL.
     return NULL;
 }
 
@@ -87,6 +121,12 @@ uintptr_t tv_gc_alloc(TypeV_Colosseum* colosseum, size_t size) {
         arena = tv_arena_init(colosseum);
         arena->prev = colosseum->head;
         colosseum->head = arena;
+
+        if(colosseum->busyCount > 100) {
+            printf("[GC] Freeing busy arenas\n");
+            colosseum->busyCount = 0;
+        }
+
     }
 
     uintptr_t ptr = (uintptr_t)arena->top;
@@ -102,4 +142,41 @@ uintptr_t tv_gc_alloc(TypeV_Colosseum* colosseum, size_t size) {
     }
 
     return ptr;
+}
+
+TypeV_GCArena* tv_arena_find_pointerArena_Clean(TypeV_GCArena* arena, uintptr_t ptr) {
+    if(ptr >= ((uintptr_t)arena->data) && (ptr <= (uintptr_t)arena->top)) {
+        return arena;
+    }
+    if (arena->prev != NULL) {
+        return tv_arena_find_pointerArena_Clean(arena->prev, ptr);
+    }
+    return NULL;
+}
+
+TypeV_GCArena* tv_arena_find_pointerArena_Full(TypeV_GCArena* arena, uintptr_t ptr) {
+    if(ptr >= ((uintptr_t)arena->data) && (ptr <= (uintptr_t)arena->top)) {
+        return arena;
+    }
+    if (arena->prev != NULL) {
+        return tv_arena_find_pointerArena_Full(arena->prev, ptr);
+    }
+    return NULL;
+}
+
+
+TypeV_GCArena* tv_arena_find_pointerArena(TypeV_Colosseum* col, uintptr_t ptr) {
+    TypeV_GCArena* arena = tv_arena_find_pointerArena_Full(col->head, ptr);
+    if(arena) {
+        return arena;
+    }
+    return tv_arena_find_pointerArena_Clean(col->busyHead, ptr);
+}
+
+void tv_arena_mark_ptr(TypeV_GCArena* arena, uintptr_t ptr) {
+    // Calculate the index of the cell that this pointer points to
+    size_t start_index = (ptr - (uintptr_t)arena->data) / COLESSEUM_CELL_SIZE;
+
+    // Set the bit in the mark bitmap to indicate that this cell is live
+    set_bitmap_bit(arena->mark_bitmap, start_index);
 }

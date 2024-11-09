@@ -9,13 +9,14 @@
 void* core_gc_alloc(TypeV_Core* core, size_t size) {
    
     void* mem = (void*)tv_gc_alloc(core->gc.colosseum, size);
-    //core->gc.memObjects[core->gc.memObjectCount++] = mem;
+
+    if(core->gc.colosseum->busyCount > 10){
+        printf("Collecting garbage\n");
+        core_gc_collect(core);
+        core->gc.colosseum->busyCount = 0;
+    }
 
     return mem;
-}
-
-void core_gc_update_alloc(TypeV_Core* core, size_t mem) {
-
 }
 
 TypeV_ObjectHeader* get_header_from_pointer(void* objectPtr) {
@@ -29,54 +30,65 @@ TypeV_ObjectHeader* get_header_from_pointer(void* objectPtr) {
     return (TypeV_ObjectHeader*)((char*)objectPtr - HEADER_SIZE);
 }
 
-
-uint64_t core_gc_is_valid_ptr(TypeV_Core* core, uintptr_t ptr) {
-    uintptr_t headerPtr = (uintptr_t) get_header_from_pointer((void*)ptr);
-    if (!ptr) {
-        return 0; // Null pointer
-    }
-
-    /*
-    for (size_t i = 0; i < core->gc.memObjectCount; i++) {
-        uintptr_t objPtr = (uintptr_t)(core->gc.memObjects[i]);
-
-        if (objPtr == headerPtr) {
-            return i+1; // Found a matching pointer
-        }
-    }
-     */
-    return 0; // No matching pointer found
-}
-
-
-
-void core_gc_mark_object(TypeV_Core* core, TypeV_ObjectHeader* header) {
+void core_gc_mark_object(TypeV_Core* core, TypeV_GCArena* arena, TypeV_ObjectHeader* header) {
+    printf("Marking object %p\n");
     if (header == NULL) {
         return;  // Already marked, or null
     }
 
-    // Mark this object
-    header->marked = 1;
+    // Mark the current object in its arena
+    tv_arena_mark_ptr(arena, (uintptr_t)header);
 
-    if(header->type == OT_COROUTINE) {
-        // coroutine function state needs to be marked
-        TypeV_Coroutine* co = (TypeV_Coroutine*)(header + 1);
-        core_gc_collect_single_state(core, co->state);
-    }
+    // If the object is a struct, mark its fields
+    switch (header->type) {
+        case OT_STRUCT: {
+            TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
+            for (size_t i = 0; i < sizeof(header->ptrFields)*8; i++) {
+                // Check if the field is a pointer using the bitmask
+                if ((header->ptrFields*8 >> i) & 1) {
+                    // Get the field's pointer value
+                    uintptr_t fieldPtr = (uintptr_t)(struct_ptr->data + struct_ptr->fieldOffsets[i]);
+                    TypeV_ObjectHeader* fieldHeader = get_header_from_pointer((void*)fieldPtr);
 
-
-    // Now mark the objects this one points to
-    /*
-    for (size_t i = 0; i < header->ptrsCount; i++) {
-        void* pointedObject = header->ptrs[i];
-        uint64_t idx = core_gc_is_valid_ptr(core, (uintptr_t)pointedObject);
-        if (idx) {
-            TypeV_ObjectHeader* pointedHeader = get_header_from_pointer(pointedObject);
-            core_gc_mark_object(core, pointedHeader);
+                    // Find the arena that contains this field and mark it
+                    TypeV_GCArena* fieldArena = tv_arena_find_pointerArena(core->gc.colosseum, (uintptr_t)fieldHeader);
+                    if (fieldArena) {
+                        core_gc_mark_object(core, fieldArena, fieldHeader);
+                    }
+                }
+            }
+            break;
         }
+
+        case OT_CLASS: {
+            TypeV_Class *class_ptr = (TypeV_Class *) (header + 1);
+            for (size_t i = 0; i < header->ptrFields; i++) {
+                // Check if the method is a pointer using the bitmask
+                if (header->ptrFields & (1 << i)) {
+                    // Get the method's pointer value
+                    uintptr_t methodPtr = (uintptr_t) (class_ptr->methods[i]);
+                    TypeV_ObjectHeader *methodHeader = get_header_from_pointer((void *) methodPtr);
+
+                    // Find the arena that contains this method and mark it
+                    TypeV_GCArena *methodArena = tv_arena_find_pointerArena(core->gc.colosseum, (uintptr_t) methodHeader);
+                    if (methodArena) {
+                        core_gc_mark_object(core, methodArena, methodHeader);
+                    }
+                }
+            }
+            break;
+        }
+        case OT_ARRAY:
+            break;
+        case OT_CLOSURE:
+            break;
+        case OT_COROUTINE:
+            break;
+        case OT_RAWMEM:
+            break;
     }
-     */
 }
+
 
 void core_gc_sweep(TypeV_Core* core) {
     /*
@@ -110,42 +122,23 @@ void core_gc_collect(TypeV_Core* core) {
 }
 
 
-void core_gc_collect_single_state(TypeV_Core* core, TypeV_FuncState* state) {
-    // iterate through the registers
-    for (size_t i = 0; i < MAX_REG; i++) {
-        uintptr_t ptr = state->regs[i].ptr;
-        if(core_gc_is_valid_ptr(core, ptr)) {
-            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
-            core_gc_mark_object(core, header);
-        }
-    }
-
-    for(size_t i = 0; i < state->spillSize; i++) {
-        uintptr_t ptr = state->spillSlots[i].ptr;
-        if(core_gc_is_valid_ptr(core, ptr)) {
-            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
-            core_gc_mark_object(core, header);
-        }
-    }
-}
-
 void core_gc_collect_state(TypeV_Core* core, TypeV_FuncState* state) {
-    // iterate through the registers
-    for (size_t i = 0; i < MAX_REG; i++) {
+    uint32_t busyCount = core->gc.colosseum->busyCount;
+    for(uint32_t i = 0; i < MAX_REG; i++) {
         uintptr_t ptr = state->regs[i].ptr;
-        if(core_gc_is_valid_ptr(core, ptr)) {
-            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
-            core_gc_mark_object(core, header);
+        // get the header
+        TypeV_ObjectHeader *header = get_header_from_pointer((void*)ptr);
+
+        if(header == NULL) {
+            continue;
+        }
+
+        TypeV_GCArena* arena = tv_arena_find_pointerArena(core->gc.colosseum, (uintptr_t)header);
+        if(arena) {
+            core_gc_mark_object(core, arena, header);
         }
     }
 
-    for(size_t i = 0; i < state->spillSize; i++) {
-        uintptr_t ptr = state->spillSlots[i].ptr;
-        if(core_gc_is_valid_ptr(core, ptr)) {
-            TypeV_ObjectHeader* header = get_header_from_pointer((void*)ptr);
-            core_gc_mark_object(core, header);
-        }
-    }
 
     // if previous state exists, collect it
     if(state->prev != NULL) {
@@ -170,17 +163,6 @@ void core_gc_sweep_all(TypeV_Core* core){
         }
     }
     core->gc.memObjectCount = 0;
-     */
-}
-
-void core_gc_update_closure_env(TypeV_Core* core, TypeV_Closure* closurePtr, void* ptr) {
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)((char*)closurePtr - sizeof(TypeV_ObjectHeader));
-
-    // increase the ptrsCount
-    /*
-    header->ptrsCount++;
-    header->ptrs = mi_realloc(header->ptrs, header->ptrsCount*sizeof(void*));
-    header->ptrs[header->ptrsCount-1] = ptr;
      */
 }
 
