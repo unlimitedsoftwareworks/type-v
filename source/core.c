@@ -106,7 +106,7 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize;
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
     
-    static uint32_t uid = 0;
+    //static uint32_t uid = 0;
     // Set header information
     header->ptrFields = ptr_bitmask;
     header->marked = 0;
@@ -115,23 +115,58 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     // Get a pointer to the actual struct, which comes after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
     struct_ptr->numFields = numfields;
-    struct_ptr->fieldOffsets = mi_malloc(numfields*sizeof(uint16_t));
-    struct_ptr->globalFields = mi_malloc(numfields*sizeof(uint32_t));
-    struct_ptr->uid = uid++;
-    core_gc_update_alloc(core, totalAllocationSize);
+    struct_ptr->fieldOffsets = core_gc_alloc(core, numfields*sizeof(uint16_t));
+    struct_ptr->globalFields = core_gc_alloc(core, numfields*sizeof(uint32_t));
+    //struct_ptr->uid = uid++;
+    //core_gc_update_alloc(core, totalAllocationSize);
 
     return (uintptr_t)struct_ptr;
 }
 
-uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint8_t numFields , uint32_t globalID) {
+
+#define CACHE_SIZE 4
+
+typedef struct {
+    uint32_t globalID;
+    uint8_t index;
+} CacheEntry;
+
+static CacheEntry cache[CACHE_SIZE] = { {0, -1} };  // Initialize cache entries with invalid index
+
+uint8_t find_in_cache(uint32_t globalID) {
+    for (int i = 0; i < CACHE_SIZE; ++i) {
+        if (__builtin_expect(cache[i].globalID == globalID, 1)) {
+            return cache[i].index;  // Cache hit
+        }
+    }
+    return (uint8_t)-1;  // Cache miss
+}
+
+void update_cache(uint32_t globalID, uint8_t index) {
+    // Shift entries to make room at the front (simple LRU policy)
+    for (int i = CACHE_SIZE - 1; i > 0; --i) {
+        cache[i] = cache[i - 1];
+    }
+    cache[0].globalID = globalID;
+    cache[0].index = index;
+}
+
+inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *globalFields, uint8_t numFields, uint32_t globalID) {
+    // First, try to find the index in the cache
+    int cache_index = find_in_cache(globalID);
+    if (__builtin_expect(cache_index != (uint8_t)-1, 1)) {
+        return cache_index;  // Cache hit
+    }
+
+    // Perform binary search if cache miss
     int left = 0;
     int right = numFields - 1;
+    while (__builtin_expect(left <= right, 1)) {  // Loop is likely to continue
+        int mid = left + (right - left) / 2;
 
-    while (left <= right) {
-       int mid = left + (right - left) / 2;
-
-        if (globalFields[mid] == globalID) {
-            return (uint8_t)mid;  // Return the index where the global ID is found
+        if (__builtin_expect(globalFields[mid] == globalID, 1)) {  // Likely to find ID in the array
+            update_cache(globalID, (uint8_t)mid);  // Update cache with the result
+            return (uint8_t)mid;
         } else if (globalFields[mid] < globalID) {
             left = mid + 1;
         } else {
@@ -139,9 +174,14 @@ uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint
         }
     }
 
-    // unreachable, in theory
-    core_panic(core, -1, "Global ID %d not found in field array", globalID);
-    exit(-1);
+    // If we reach here, it means the ID was not found
+    // This is an unlikely case, so mark it as such
+    if (__builtin_expect(0, 0)) {
+        core_panic(core, -1, "Global ID %d not found in field array", globalID);
+        exit(-1);
+    }
+
+    return -1;  // Return an invalid index (in theory, should not be reached)
 }
 
 uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t attr_ptr_mask, uint8_t num_attributes, size_t total_fields_size, uint64_t classId) {

@@ -2,41 +2,37 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-
-#define ARENA_SIZE (2 * 1024 * 1024) // 2 MB arena size
-
-// Arena structure to manage the entire memory pool
-typedef struct Arena {
-    uint8_t data[ARENA_SIZE];   // Data section for allocations
-    size_t offset;              // Offset to the first free slot
-    struct Arena* next;         // Pointer to the next arena in the list (for managing multiple arenas)
-} Arena;
-
+#include <mimalloc.h>
+#include "allocator.h"
 // Function to create a new arena
 Arena* create_arena() {
-    Arena* arena = (Arena*)malloc(sizeof(Arena));
+    Arena* arena = (Arena*)mi_malloc_aligned(sizeof(Arena), 16);
     if (arena == NULL) {
-        fprintf(stderr, "Failed to allocate memory for arena\n");
+        //fprintf(stderr, "Failed to allocate memory for arena\n");
         return NULL;
     }
 
     // Initialize the arena
     arena->offset = 0;
     arena->next = NULL;
+    arena->skip_count = 0;
+    arena->usable = true;
 
     return arena;
 }
 
 // Function to allocate memory from the arena
+
+// Function to allocate memory from the arena
 void* arena_alloc(Arena* arena, size_t size) {
-    if (size == 0 || size > ARENA_SIZE) {
-        fprintf(stderr, "Invalid allocation size\n");
+    if (__builtin_expect(size == 0 || size > ARENA_SIZE, 0)) {
+        //fprintf(stderr, "Invalid allocation size\n");
         return NULL;
     }
 
     // Check if there is enough space in the current arena
-    if (arena->offset + size > ARENA_SIZE) {
-        fprintf(stderr, "Failed to allocate memory from arena\n");
+    if (__builtin_expect(arena->offset + size > ARENA_SIZE, 0)) {
+        //fprintf(stderr, "Failed to allocate memory from arena\n");
         return NULL;
     }
 
@@ -46,6 +42,7 @@ void* arena_alloc(Arena* arena, size_t size) {
 
     return ptr;
 }
+
 
 // Function to free memory back to the arena (simplified)
 void arena_free(Arena* arena, void* ptr, size_t size) {
@@ -59,12 +56,13 @@ void arena_free(Arena* arena, void* ptr, size_t size) {
 
 // Function to destroy the arena and free all memory
 void destroy_arena(Arena* arena) {
-    free(arena);
+    mi_free(arena);
 }
 
 // Function to manage multiple arenas for more flexible allocation
 void* allocate_from_arenas(Arena** arena_list, size_t size) {
     Arena* current = *arena_list;
+    Arena* prev = NULL;
 
     // Try to allocate from an existing arena
     while (current != NULL) {
@@ -72,6 +70,27 @@ void* allocate_from_arenas(Arena** arena_list, size_t size) {
         if (ptr != NULL) {
             return ptr; // Allocation successful
         }
+
+        // Increment skip count if the arena is skipped
+        if (current->usable) {
+            current->skip_count++;
+            if (current->skip_count >= 3) {
+                current->usable = false; // Mark the arena as unusable after being skipped too many times
+
+                // Remove the arena from the usable list
+                if (prev == NULL) {
+                    *arena_list = current->next;
+                } else {
+                    prev->next = current->next;
+                }
+
+
+                current = (prev == NULL) ? *arena_list : prev->next;
+                continue;
+            }
+        }
+
+        prev = current;
         current = current->next;
     }
 

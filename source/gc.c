@@ -7,24 +7,8 @@
 #include "utils/log.h"
 
 void* core_gc_alloc(TypeV_Core* core, size_t size) {
-    // 2mb
-    /*
-    if (core->gc.allocsSincePastGC > 2000000) {
-        printf("[GC]: Allocated %llu bytes since last GC\n", core->gc.allocsSincePastGC);
-        core_gc_collect(core);
-        core->gc.allocsSincePastGC = 0;
-    }
-
-    if(core->gc.memObjectCount >= core->gc.memObjectCapacity) {
-        core->gc.memObjectCapacity *= 2;
-        core->gc.memObjects = mi_realloc(core->gc.memObjects, sizeof(size_t)*(core->gc.memObjectCapacity));
-
-        if(core->gc.memObjects == NULL) {
-            core_panic(core, -1, "Failed to reallocate memory for GC");
-        }
-    }
-    */
-    void* mem = mi_malloc(size); //allocate_from_arenas(core->gc.arenaList, size);//mi_malloc(size);
+   
+    void* mem = allocate_from_arenas(&core->gc.arenaList, size);
     //core->gc.memObjects[core->gc.memObjectCount++] = mem;
 
     return mem;
