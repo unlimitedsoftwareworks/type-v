@@ -55,7 +55,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->regs = core->funcState->regs;
 
     // Initialize GC
-    core->gc.colosseum = tv_colosseum_init();
+    core->gc = gc_init();
 
 
     core->engineRef = engineRef;
@@ -82,7 +82,7 @@ void core_deallocate(TypeV_Core *core) {
         state = next;
     }
 
-    core_gc_sweep_all(core);
+    //core_gc_sweep_all(core);
     //mi_free(core->gc.memObjects);
     mi_free(core);
 }
@@ -107,7 +107,7 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
                                  + numfields * sizeof(uint32_t); // globalFields array
 
     // Allocate the entire memory block
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Initialize the object header
     header->marked = 1;
@@ -144,7 +144,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_at
                                 + num_methods * sizeof(uint32_t)
                                 + num_attributes * sizeof(uint16_t);
 
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
     header->marked = 1;
@@ -168,7 +168,7 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint6
 
     static uint32_t uid = 0;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
     header->marked = 1;
     header->type = OT_ARRAY;
     // for arrays 0 means elements are not pointers
@@ -189,7 +189,7 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
 
     size_t slice_length = end - start;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array) + slice_length * array->elementSize;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
     header->marked = 1;
     header->type = OT_ARRAY;
 
@@ -309,7 +309,7 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *globalFields
 
     // If we reach here, it means the ID was not found
     // This is an unlikely case, so mark it as such
-    if (__builtin_expect(0, 0)) {
+    if (__builtin_expect(1, 1)) {
         core_panic(core, -1, "Global ID %d not found in field array", globalID);
         exit(-1);
     }
@@ -338,7 +338,7 @@ void core_ffi_close(TypeV_Core* core, uintptr_t libHandle){
 
 uintptr_t core_mem_alloc(TypeV_Core* core, uintptr_t size) {
     LOG_INFO("CORE[%d]: Allocating %d bytes", core->id, size);
-    return (uintptr_t)core_gc_alloc(core, size);
+    return (uintptr_t)gc_alloc(core, size);
 }
 
 void core_resume(TypeV_Core* core) {
@@ -386,7 +386,7 @@ void core_spill_alloc(TypeV_Core* core, uint16_t size) {
 TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t argsOffset, uint8_t envSize) {
     LOG_WARN("CORE[%d]: Allocating closure with %d bytes", core->id, envSize);
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Closure);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
     header->marked = 1;
@@ -409,7 +409,7 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
 TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) {
     LOG_INFO("CORE[%d]: Allocating coroutine", core->id);
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Coroutine);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
     header->marked = 1;

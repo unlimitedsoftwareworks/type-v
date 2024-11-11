@@ -8,9 +8,7 @@
 
 #ifndef TYPE_V_CORE_H
 #define TYPE_V_CORE_H
-
 #include <stdint.h>
-#include "allocator/allocator.h"
 
 #define PTR_SIZE 8
 #define MAX_REG 256
@@ -145,17 +143,8 @@ typedef enum {
 typedef struct {
     TypeV_ObjectType type;
     uint8_t marked;
+    size_t totalSize;
 }TypeV_ObjectHeader;
-
-/**
- * @brief Future GC, right now it only holds
- * references of the objects given.
- */
-typedef struct TypeV_GC {
-    TypeV_Colosseum* colosseum;
-    uint32_t countLastGCArenas; // number of full arenas visited since last GC.
-    uint32_t countLastGCStateDepth;
-}TypeV_GC;
 
 /**
  * @brief A function state is an object that holds the state of a function. Since function arguments are passed
@@ -219,7 +208,7 @@ typedef struct TypeV_Core {
     uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
 
-    TypeV_GC gc;                              ///< Future Garbage collector
+    struct GCContext* gc;                              ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
     TypeV_CoreSignal lastSignal;              ///< Last signal received
