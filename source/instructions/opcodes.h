@@ -581,6 +581,8 @@ typedef enum TypeV_OpCode {
      */
     OP_COROUTINE_RET,
 
+    OP_THROW_RT,
+
 }TypeV_OpCode;
 
 #endif //TYPE_V_OPCODES_H

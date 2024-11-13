@@ -128,7 +128,7 @@ TypeV_ObjectHeader *gc_alloc(TypeV_Core* core, size_t size) {
 }
 
 void gc_minor_gc(TypeV_Core* core) {
-    //printf("Performing minor GC\n");
+    printf("Performing minor GC\n");
     TypeV_GC *gc = core->gc;
     TypeV_NurseryRegion *nursery = gc->nurseryRegion;
     TypeV_OldGenerationRegion *old = gc->oldRegion;

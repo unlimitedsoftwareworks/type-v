@@ -153,10 +153,20 @@ void core_gc_mark_nursery_object(TypeV_Core* core, uintptr_t ptr) {
 }
 
 void gc_mark_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery) {
-    if(inNursery) {
-        for(uint32_t i = 0; i < MAX_REG; i++) {
-            if(IS_REG_PTR(state, i)) {
-                uintptr_t ptr = state->regs[i].ptr;
+    if (inNursery) {
+        for (uint32_t bitmap_index = 0; bitmap_index < 4; bitmap_index++) {
+            uint64_t bitmap = state->regsPtrBitmap[bitmap_index];
+            
+            while (bitmap) {
+                // Find the index of the lowest set bit
+                uint32_t bit_position = __builtin_ctzll(bitmap); // Count trailing zeros to find first set bit
+                uint32_t reg_index = (bitmap_index * 64) + bit_position;
+
+                // Clear the bit in bitmap to continue with the next set bit
+                bitmap &= ~(1ULL << bit_position);
+
+                // Now, we know reg_index holds a pointer
+                uintptr_t ptr = state->regs[reg_index].ptr;
                 core_gc_mark_nursery_object(core, ptr);
             }
         }
@@ -164,11 +174,13 @@ void gc_mark_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery) 
     else {
         core_panic(core, -1, "Not implemented");
     }
-    // if previous state exists, collect it
-    if(state->prev != NULL) {
+
+    // Recursively mark previous state if it exists
+    if (state->prev != NULL) {
         gc_mark_state(core, state->prev, inNursery);
     }
 }
+
 
 void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHeader* old_header) {
     // printf("Checking for object updates %p\n", header);
@@ -280,24 +292,33 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
 }
 
 void gc_update_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery) {
-    if(inNursery) {
-        for(uint32_t i = 0; i < MAX_REG; i++) {
-            if(IS_REG_PTR(state, i)) {
-                uintptr_t ptr = state->regs[i].ptr;
+    if (inNursery) {
+        for (uint32_t bitmap_index = 0; bitmap_index < 4; bitmap_index++) {
+            uint64_t bitmap = state->regsPtrBitmap[bitmap_index];
+            
+            while (bitmap) {
+                // Find the index of the lowest set bit
+                uint32_t bit_position = __builtin_ctzll(bitmap); // Count trailing zeros (GCC/Clang intrinsic)
+                uint32_t reg_index = (bitmap_index * 64) + bit_position;
+
+                // Clear the bit so we can find the next one
+                bitmap &= ~(1ULL << bit_position);
+
+                // Now, we know reg_index holds a pointer
+                uintptr_t ptr = state->regs[reg_index].ptr;
                 TypeV_ObjectHeader* old_header = gc_ptr_in_nursery(ptr, core->gc->nurseryRegion);
-                if(old_header) {
+                if (old_header) {
                     void *val = core_gc_update_object_reference_nursery(core, old_header);
                     if (val != NULL) {
-                        state->regs[i].ptr = (uintptr_t) val;
+                        state->regs[reg_index].ptr = (uintptr_t) val;
                     }
                 }
             }
         }
     }
 
-
-    // if previous state exists, collect it
-    if(state->prev != NULL) {
+    // If previous state exists, recursively update it
+    if (state->prev != NULL) {
         gc_update_state(core, state->prev, inNursery);
     }
 }
