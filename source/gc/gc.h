@@ -13,19 +13,19 @@
 /**
  * Size of each cell.
  */
-#define CELL_SIZE 16
+#define CELL_SIZE 64
 
 /**
  * Maximum number of cells in the nursery region.
  */
-#define NURSERY_MAX_CELLS 409600
+#define NURSERY_MAX_CELLS 131072
 
 /**
  * Initial number of cells in the old generation region.
  * The number of cells is scaled by a factor of 2 each time the old generation is extended.
  * The factor is stored in the `capacityFactor` field of the `TypeV_OldGenerationRegion` structure.
  */
-#define INITIAL_OLD_CELLS 819200
+#define INITIAL_OLD_CELLS 131072
 
 /**
  * Total cellSize of the nursery region.
