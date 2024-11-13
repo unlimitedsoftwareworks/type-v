@@ -71,11 +71,12 @@ typedef enum TypeV_OpCode {
     OP_MV_REG_GLOBAL_PTR,
 
     /**
-     * OP_S_ALLOC dest: R, fields-count: I, struct-size: I (2bytes)
+     * OP_S_ALLOC dest: R, fields-count: I, ptr_field_bitmask, struct-size: I (2bytes)
      * Creates new struct of given total ﬁelds count (arg1) and total memory
      * (arg2 and arg3), stores the address of the new struct into dest.
      */
     OP_S_ALLOC,
+    //OP_S_ALLOC_T,
 
 
     /**
@@ -109,11 +110,20 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG_PTR,
 
     /**
-     * OP_C_ALLOC dest: R num-methods: I, class-fields-size: I (2 bytes), numMethods: I(1b) classId-size: Z, classId: I
+     * OP_C_ALLOC dest: R num-methods: I, num-fields: I(1b), class-fields-size: I (2 bytes), classId-size: Z, classId: I
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into dest.
      */
     OP_C_ALLOC,
+
+    //OP_C_ALLOC_T,
+
+    /**
+     * OP_C_REG_FIELD dest: R, local_field_index: I(1byte), field offset: I (2 bytes)
+     * Registers a new field in the class stored in dest, with the given global field ID
+     * and field offset (local), must not exceed the total fields count of the class
+     */
+    OP_C_REG_FIELD,
 
     /**
      * OP_C_STOREM destReg: R, localMethodIndex: I (1b), globalMethodIndex: I(4bytes), methodAddress: I(8 bytes)
@@ -128,21 +138,20 @@ typedef enum TypeV_OpCode {
     OP_C_LOADM,
 
     /**
-     * OP_CSTOREF_REG_[size] classReg: R, fieldOffset: I (2 bytes), R: source register, byteSize: S
+     * OP_CSTOREF_REG_[size] classReg: R, fieldIndex: I (1b), R: source register, byteSize: S
      * Stores [size] bytes from register R to field I of class stored at classReg
      */
     OP_C_STOREF_REG,
     OP_C_STOREF_REG_PTR,
 
     /**
-     * OP_C_STOREF_CONST_[size] classReg: R, fieldOffset: I (2 bytes), offset: I (8 bytes), byteSize: S
+     * OP_C_STOREF_CONST_[size] classReg: R, fieldIndex: I (1b), offset: I (8 bytes), byteSize: S
      */
     OP_C_STOREF_CONST,
     OP_C_STOREF_CONST_PTR,
 
-
     /**
-     * OP_C_LOADF_[size] dest: R, classReg: R, fieldOffset: I (2 bytes), byteSize: S
+     * OP_C_LOADF_[size] dest: R, classReg: R, fieldIndex: I (1b), byteSize: S
      * Loads [size] bytes from field I of class stored at classReg to register R
      */
     OP_C_LOADF,
@@ -165,7 +174,7 @@ typedef enum TypeV_OpCode {
 
 
     /**
-     * OP_A_ALLOC dest: R, num_elements: I (8 bytes), element_size: Z
+     * OP_A_ALLOC dest: R, I: isPtr, num_elements: I (8 bytes), element_size: Z
      * allocate array of num_elements of size element_size
      * stores the address of the array in dest
      */
@@ -508,21 +517,6 @@ typedef enum TypeV_OpCode {
     OP_LOAD_STD,
 
     /**
-     * OP_SPILL_ALLOC size: I (2 bytes)
-     */
-    OP_SPILL_ALLOC,
-
-    /**
-     * OP_SPILL_REG: slot (2 bytes), source: R
-     */
-    OP_SPILL_REG,
-
-    /**
-     * OP_UNSPILL_ALLOC dest: R, slot: I (2 bytes)
-     */
-    OP_UNSPILL_REG,
-
-    /**
      * OP_CLOSURE_ALLOC, dest:R, offset_to_args: 1Byte, env_size: 1byte fn_address: I (8 bytes),
      * Allocates a closure, storing it in dest.
      * The closure will push its environment in the register starting from offset_to_args.
@@ -586,6 +580,8 @@ typedef enum TypeV_OpCode {
      * Same as yield but marks the coroutine as finished
      */
     OP_COROUTINE_RET,
+
+    OP_THROW_RT,
 
 }TypeV_OpCode;
 

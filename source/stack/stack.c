@@ -1,6 +1,7 @@
 
 #include <string.h>
 #include <assert.h>
+
 #include "stack.h"
 #include "../utils/log.h"
 

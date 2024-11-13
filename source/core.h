@@ -8,32 +8,39 @@
 
 #ifndef TYPE_V_CORE_H
 #define TYPE_V_CORE_H
-
 #include <stdint.h>
 
 #define PTR_SIZE 8
 #define MAX_REG 256
 
+#undef NANO_PREALLOCATE_BAND_VM
+
 
 typedef struct TypeV_Struct {
+    size_t bitMaskSize;
+    uint8_t* pointerBitmask;
     uint32_t uid;
     uint8_t numFields;                      //< Number of fields in the struct, needed for search
     uint16_t* fieldOffsets;                 //< Field offsets table
     uint32_t* globalFields;                 //< Global fields table, contains ids of global fields, sorted
-    uint8_t* dataPointer;                   //< Pointer to the data
     uint8_t data[];                         //< Data block, if this is a shadow struct,
 }TypeV_Struct;
 
 typedef struct TypeV_Class{
+    size_t bitMaskSize;
+    uint8_t* pointerBitmask;
+    uint8_t numFields;        //< Number of fields in the class
     uint64_t uid;             //< Unique ID
-    uint8_t numMethods;      //< number of methods
+    uint8_t numMethods;       //< number of methods
     uint32_t* globalMethods;  //< Global fields table, contains ids of global fields, sorted
     size_t* methods;          //< A pointer to the method table
+    uint16_t* fieldOffsets;   //< Field offsets table
     /** data */
     uint8_t data[];           //< Fields start from here, direct access
 }TypeV_Class;
 
 typedef struct TypeV_Array {
+    uint8_t isPointerContainer;
     uint32_t uid;
     uint8_t elementSize;      ///< Size of each element
     uint64_t length;          ///< Array length
@@ -137,24 +144,9 @@ typedef enum {
 
 typedef struct {
     TypeV_ObjectType type;
-    size_t size;
-    uint8_t marked;
-    uint64_t ptrsCount;
-    void** ptrs;
+    uint8_t survivedCount;
+    size_t totalSize;
 }TypeV_ObjectHeader;
-
-/**
- * @brief Future GC, right now it only holds
- * references of the objects given.
- */
-typedef struct TypeV_GC {
-    void** memObjects;
-    uint64_t memObjectCount;
-    uint64_t memObjectCapacity;
-
-    uint64_t totalAllocs;
-    uint64_t allocsSincePastGC;
-}TypeV_GC;
 
 /**
  * @brief A function state is an object that holds the state of a function. Since function arguments are passed
@@ -170,11 +162,26 @@ typedef struct TypeV_FuncState {
     uint64_t sp;             ///< Stack pointer
     uint64_t ip;             ///< Instruction pointer, used only as back up
     TypeV_Register regs[MAX_REG]; ///< 256 registers.
+    uint64_t regsPtrBitmap[4];   ///< 1 if the register is a pointer, 0 otherwise
+
     TypeV_Register* spillSlots; ///< Spill slots, used when registers are not enough
-    uint16_t spillSize; ///< Spill size
+    uint16_t spillSize; ///< Spill cellSize
+    uint8_t* ptrFields;  ///< Pointer fields
     struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
     struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
 }TypeV_FuncState;
+
+// Macro to set the pointer status for a given register (set to 1)
+#define SET_REG_PTR(state, reg_index) \
+    ((state)->regsPtrBitmap[(reg_index) / 64] |= (1ULL << ((reg_index) % 64)))
+
+// Macro to clear the pointer status for a given register (set to 0)
+#define CLEAR_REG_PTR(state, reg_index) \
+    ((state)->regsPtrBitmap[(reg_index) / 64] &= ~(1ULL << ((reg_index) % 64)))
+
+// Macro to check if a register holds a pointer (returns non-zero if true)
+#define IS_REG_PTR(state, reg_index) \
+    ((state)->regsPtrBitmap[(reg_index) / 64] & (1ULL << ((reg_index) % 64)))
 
 /**
  * @brief Closure, a closure is a function that has captured its environment.
@@ -182,10 +189,12 @@ typedef struct TypeV_FuncState {
 typedef struct TypeV_Closure {
     uintptr_t fnAddress;      ///< Function state
     TypeV_Register* upvalues; ///< Captured registers
-    uint8_t envSize;          ///< Environment size
-    uint8_t envCounter;       ///< Environment size
+    uint8_t envSize;          ///< Environment cellSize
+    uint8_t envCounter;       ///< Environment cellSize
     uint8_t offset;           ///< Upvalues start registers, right after the args
+    uint8_t* ptrFields;       ///< Pointer fields bitmap
 }TypeV_Closure;
+#define IS_CLOSURE_UPVALUE_POINTER(ptrFields, i) ((ptrFields[(i) / 8] >> ((i) % 8)) & 1)
 
 
 typedef enum TypeV_CoroutineExecState {
@@ -217,7 +226,7 @@ typedef struct TypeV_Core {
     uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
 
-    TypeV_GC gc;                              ///< Future Garbage collector
+    struct TypeV_GC* gc;                              ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
     TypeV_CoreSignal lastSignal;              ///< Last signal received
@@ -279,7 +288,8 @@ void core_halt(TypeV_Core *core);
  * Allocates a struct object
  * @param core
  * @param numfields Number of struct fieldOffsets
- * @param totalsize Total size of the struct
+ * @param totalsize Total cellSize of the struct
+ * @param ptr_bitmask Bitmask of pointers
  * @return Pointer to the allocated struct
  */
 uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize);
@@ -299,10 +309,10 @@ uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint
  * Allocates a class object
  * @param core
  * @param num_methods Number of methods
- * @param total_fields_size  total size of fields in bytes
+ * @param total_fields_size  total cellSize of fields in bytes
  * @return new Class object initialized.
  */
-uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId);
+uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId);
 
 /**
  * Allocates an array object
@@ -311,10 +321,10 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_f
  * @param element_size
  * @return
  */
-uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size);
+uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size);
 
 /**
- * Extends the size of an array
+ * Extends the cellSize of an array
  * @param core
  * @param array_ptr
  * @param num_elements new number of elements

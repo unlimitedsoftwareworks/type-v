@@ -3,32 +3,29 @@ project(type_v C)
 
 set(CMAKE_C_STANDARD 11)
 
+# Your other subdirectories
 add_subdirectory(stdio)
 add_subdirectory(string)
 add_subdirectory(stdcore)
 
+# Compiler flags
 
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+# Compiler flags
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 
-# disable inlining for easier debugging
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
+# disable inlining
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
 
 
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined")
-##set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=leak")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-compare")
-##set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-subtract")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=pointer-overflow")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=bounds")
-
+# Your executable target
 add_executable(type_v
         source/main.c
         source/core.c
         source/core.h
-        source/gc.c
-        source/gc.h
+        source/gc/gc.c
+        source/gc/gc.h
         source/engine.c
         source/engine.h
         source/instructions/instructions.c
@@ -52,7 +49,8 @@ add_executable(type_v
         source/env/env.h
         source/env/env.c
         source/vendor/cpu_info/cpu_info.h
+        source/gc/mark.c
+        source/gc/mark.h
 )
 
-add_dependencies(type_v stdio string stdcore)
-target_link_libraries(type_v stdio string stdcore)
+target_link_libraries(type_v stdio string stdcore )

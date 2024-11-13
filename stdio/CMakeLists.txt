@@ -5,7 +5,8 @@ set(stdio_files source/stdio.c)
 
 set(typev_files
         ../source/core.c
-        ../source/gc.c
+        ../source/gc/gc.c
+        ../source/gc/mark.c
         ../source/stack/stack.c
         ../source/dynlib/dynlib.c
         ../source/env/env.c

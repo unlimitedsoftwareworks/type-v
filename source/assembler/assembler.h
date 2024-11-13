@@ -61,6 +61,7 @@ static char* instructions[] = {
         "s_storef_reg_ptr",
 
         "c_alloc",
+        "c_reg_field",
         "c_storem",
         "c_loadm",
 
@@ -253,10 +254,6 @@ static char* instructions[] = {
         "halt",
 
         "load_std",
-
-        "spill_alloc",
-        "spill_reg",
-        "unspill_reg",
 
         "closure_alloc",
         "closure_push_env",

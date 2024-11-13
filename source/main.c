@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
 #include "utils/log.h"
 #include "env/env.h"
 
@@ -86,7 +87,7 @@ int main(int argc, char **argv) {
 
     uint32_t exitCode = engine.mainCoreExitCode;
 
-    engine_deallocate(&engine);
+    //engine_deallocate(&engine);
     //free_program(program);
 
 

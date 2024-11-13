@@ -42,6 +42,7 @@ static op_func op_funcs[] = {
         &s_storef_reg_ptr,
 
         &c_alloc,
+        &c_reg_field,
         &c_storem,
         &c_loadm,
 
@@ -235,10 +236,6 @@ static op_func op_funcs[] = {
         &halt,
 
         &load_std,
-
-        &spill_alloc,
-        &spill_reg,
-        &unspill_reg,
 
         &closure_alloc,
         &closure_push_env,

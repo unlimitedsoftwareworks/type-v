@@ -16,7 +16,7 @@
 #include "./opcodes.h"
 
 #include "../stack/stack.h"
-#include "../gc.h"
+#include "../gc/gc.h"
 #include "instructions.h"
 #include "../core.h"
 #include "../utils/utils.h"
@@ -90,23 +90,24 @@ static inline uint64_t typev_memcpy_u64_8(const unsigned char *s) {
 }
 
 // Read exactly 4 bytes from potentially unaligned memory and return as uint64_t (zero-extended)
-static inline uint64_t typev_memcpy_u64_4(const unsigned char *s) {
-    return ((uint64_t)s[0]) |
-           ((uint64_t)s[1] << 8) |
-           ((uint64_t)s[2] << 16) |
-           ((uint64_t)s[3] << 24);
+static inline uint32_t typev_memcpy_u64_4(const unsigned char *s) {
+    return ((uint32_t)s[0]) |
+           ((uint32_t)s[1] << 8) |
+           ((uint32_t)s[2] << 16) |
+           ((uint32_t)s[3] << 24);
 }
 
 // Read exactly 2 bytes from potentially unaligned memory and return as uint64_t (zero-extended)
-static inline uint64_t typev_memcpy_u64_2(const unsigned char *s) {
-    return ((uint64_t)s[0]) |
-           ((uint64_t)s[1] << 8);
+static inline uint16_t typev_memcpy_u64_2(const unsigned char *s) {
+    return ((uint16_t)s[0]) |
+           ((uint16_t)s[1] << 8);
 }
 
 // Read exactly 1 byte from potentially unaligned memory and return as uint64_t (zero-extended)
-static inline uint64_t typev_memcpy_u64_1(const unsigned char *s) {
-    return (uint64_t)s[0];
+static inline uint8_t typev_memcpy_u64_1(const unsigned char *s) {
+    return (uint8_t)s[0];
 }
+
 
 
 static inline void mv_reg_reg(TypeV_Core* core){
@@ -119,6 +120,7 @@ static inline void mv_reg_reg(TypeV_Core* core){
 
     //typev_memcpy_u64_ptr(&core->regs[target], &core->regs[source], byteSize);
     core->regs[target].ptr = core->regs[source].ptr;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void mv_reg_reg_ptr(TypeV_Core* core){
@@ -126,11 +128,13 @@ static inline void mv_reg_reg_ptr(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     typev_memcpy_u64_ptr_8((unsigned char*)&core->regs[target], (unsigned char*)&core->regs[source]);
+    SET_REG_PTR(core->funcState, target);
 }
 
 static inline void mv_reg_null(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     core->regs[target].ptr = 0;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void mv_reg_i(TypeV_Core* core){
@@ -144,6 +148,7 @@ static inline void mv_reg_i(TypeV_Core* core){
     core->regs[target].ptr =  immediate;
     //typev_memcpy_u64_ptr(&core->regs[target], &immediate, immediate_size);
     //typev_memcpy_u64_ptr(&core->regs[target], &immediate, 8);
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void mv_reg_i_ptr(TypeV_Core* core){
@@ -157,6 +162,7 @@ static inline void mv_reg_i_ptr(TypeV_Core* core){
     core->regs[target].ptr =  immediate;
     //typev_memcpy_u64_ptr(&core->regs[target], &immediate, immediate_size);
     //typev_memcpy_u64_ptr(&core->regs[target], &immediate, 8);
+    SET_REG_PTR(core->funcState, target);
 }
 
 static inline void mv_reg_const(TypeV_Core* core){
@@ -172,6 +178,7 @@ static inline void mv_reg_const(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     typev_memcpy_u64_ptr(&core->regs[target], &core->constPtr[constant_offset], byteSize);
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void mv_reg_const_ptr(TypeV_Core* core){
@@ -183,6 +190,7 @@ static inline void mv_reg_const_ptr(TypeV_Core* core){
     typev_memcpy_u64_ptr(&constant_offset, &core->codePtr[core->ip],  offset_length);
     core->ip += offset_length;
     typev_memcpy_u64_ptr_8(&core->regs[target], &core->constPtr[constant_offset]);
+    SET_REG_PTR(core->funcState, target);
 }
 
 static inline void mv_global_reg(TypeV_Core* core){
@@ -243,12 +251,11 @@ static inline void s_alloc(TypeV_Core* core){
     uintptr_t mem = core_struct_alloc(core, fields_count, struct_size);
     // move the pointer to R16
     core->regs[dest_reg].ptr = mem;
+    SET_REG_PTR(core->funcState, dest_reg);
 }
 
 static inline void s_reg_field(TypeV_Core* core){
     const uint8_t src_reg = core->codePtr[core->ip++];
-    ASSERT(src_reg < MAX_REG, "Invalid register index");
-
     uint8_t field_index = core->codePtr[core->ip++];
 
     uint32_t globalFieldIndex = 0;
@@ -259,23 +266,29 @@ static inline void s_reg_field(TypeV_Core* core){
     typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
     core->ip += 2;
 
+    uint8_t isPtr = core->codePtr[core->ip++];
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[src_reg].ptr;
     struct_ptr->globalFields[field_index] = globalFieldIndex;
     struct_ptr->fieldOffsets[field_index] = offset;
+
+    if (isPtr) {
+        size_t byteIndex = field_index / 8;      // Determine which byte contains the bit
+        uint8_t bitOffset = field_index % 8;     // Determine the bit position within the byte
+        struct_ptr->pointerBitmask[byteIndex] |= (1 << bitOffset); // Set the bit to mark as a pointer
+    }
 }
 
-
-
 static inline void s_loadf(TypeV_Core* core){
-    const uint8_t target = core->codePtr[core->ip++];
-    const uint8_t source = core->codePtr[core->ip++];
-    uint32_t field_index = 0;
-    typev_memcpy_u64_ptr_4(&field_index, &core->codePtr[core->ip]);
+    char* code = (char*)core->codePtr+core->ip;
+    const uint8_t target = *code;
+    const uint8_t source = *(code+1);
+    uint32_t field_index = typev_memcpy_u64_4(code+2);
+    //typev_memcpy_u64_ptr_4(&field_index, code+2);
 
-    core->ip += 4;
 
-    uint8_t byteSize = core->codePtr[core->ip++];
+    uint8_t byteSize = *(code + 6);
+    core->ip += 7;
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
@@ -283,8 +296,8 @@ static inline void s_loadf(TypeV_Core* core){
 
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
 
-
-    typev_memcpy_u64_ptr(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], byteSize);
+    typev_memcpy_u64_ptr(&core->regs[target], ((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index], byteSize);
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void s_loadf_ptr(TypeV_Core* core){
@@ -298,7 +311,8 @@ static inline void s_loadf_ptr(TypeV_Core* core){
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr_8(&core->regs[target], struct_ptr->dataPointer+struct_ptr->fieldOffsets[index]);
+    typev_memcpy_u64_ptr_8(&core->regs[target], ((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index]);
+    SET_REG_PTR(core->funcState, target);
 }
 
 static inline void s_storef_const(TypeV_Core* core){
@@ -311,10 +325,9 @@ static inline void s_storef_const(TypeV_Core* core){
     typev_memcpy_u64_ptr_8(&offset, &core->codePtr[core->ip]);
     core->ip += 8;
     uint8_t byteSize = core->codePtr[core->ip++];
-    CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr(struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], &core->constPtr[offset], byteSize);
+    typev_memcpy_u64_ptr(((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index], &core->constPtr[offset], byteSize);
 }
 
 static inline void s_storef_const_ptr(TypeV_Core* core){
@@ -329,14 +342,14 @@ static inline void s_storef_const_ptr(TypeV_Core* core){
     core->ip += 8;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr_8(struct_ptr->dataPointer+struct_ptr->fieldOffsets[index], &core->constPtr[offset]);
+    typev_memcpy_u64_ptr_8(((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index], &core->constPtr[offset]);
+
 }
 
 static inline void s_storef_reg(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
 
-    uint32_t field_index = 0;
-    typev_memcpy_u64_ptr_4(&field_index, &core->codePtr[core->ip]);
+    uint32_t field_index = typev_memcpy_u64_4(core->codePtr+core->ip);
     core->ip += 4;
 
     ASSERT(field_index < MAX_REG, "Invalid register index");
@@ -346,9 +359,8 @@ static inline void s_storef_reg(TypeV_Core* core){
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr(struct_ptr->dataPointer + struct_ptr->fieldOffsets[index], &core->regs[source], byteSize);
+    typev_memcpy_u64_ptr(((char*)struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->regs[source], byteSize);
 }
-
 static inline void s_storef_reg_ptr(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
 
@@ -361,14 +373,15 @@ static inline void s_storef_reg_ptr(TypeV_Core* core){
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
-    typev_memcpy_u64_ptr_8(struct_ptr->dataPointer + struct_ptr->fieldOffsets[index], &core->regs[source]);
-    core_gc_update_struct_field(core, struct_ptr, (void*)core->regs[source].ptr, index);
+    typev_memcpy_u64_ptr_8(((char*)struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->regs[source]);
 }
 
 static inline void c_alloc(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
     ASSERT(dest_reg < MAX_REG, "Invalid register index");
     const uint8_t methods_count = core->codePtr[core->ip++];
+    const uint8_t attrs_count = core->codePtr[core->ip++];
+
     size_t fields_size = 0;
     typev_memcpy_u64_ptr_2(&fields_size, &core->codePtr[core->ip]);
     core->ip += 2;
@@ -380,9 +393,31 @@ static inline void c_alloc(TypeV_Core* core){
 
 
     // allocate memory for class
-    size_t mem = core_class_alloc(core, methods_count, fields_size, classId);
+    size_t mem = core_class_alloc(core, methods_count, attrs_count, fields_size, classId);
     // move the pointer to R17
     core->regs[dest_reg].ptr = mem;
+    SET_REG_PTR(core->funcState, dest_reg);
+}
+
+static inline void c_reg_field(TypeV_Core* core){
+    const uint8_t src_reg = core->codePtr[core->ip++];
+    const uint8_t field_index = core->codePtr[core->ip++];
+
+    uint16_t offset = 0;
+    typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
+    core->ip += 2;
+
+    TypeV_Class* class_ptr = (TypeV_Class*)core->regs[src_reg].ptr;
+    class_ptr->fieldOffsets[field_index] = offset;
+
+    uint8_t isPtr = core->codePtr[core->ip++];
+
+
+    if (isPtr) {
+        size_t byteIndex = field_index / 8;      // Determine which byte contains the bit
+        uint8_t bitOffset = field_index % 8;     // Determine the bit position within the byte
+        class_ptr->pointerBitmask[byteIndex] |= (1 << bitOffset); // Set the bit to mark as a pointer
+    }
 }
 
 static inline void c_storem(TypeV_Core* core){
@@ -420,41 +455,35 @@ static inline void c_loadm(TypeV_Core* core){
 
     size_t offset = c->methods[idx];
     core->regs[target].ptr = offset;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void c_storef_reg(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
-    size_t field_offset = 0;
-    typev_memcpy_u64_ptr_2(&field_offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
     const uint8_t source = core->codePtr[core->ip++];
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
+    size_t field_offset = c->fieldOffsets[fieldIndex];
     typev_memcpy_u64_ptr(c->data+field_offset, &core->regs[source], byteSize);
 }
 
 static inline void c_storef_reg_ptr(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
-    ASSERT(class_reg < MAX_REG, "Invalid register index");
-    size_t field_offset = 0;
-    typev_memcpy_u64_ptr_2(&field_offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
+    size_t field_offset = c->fieldOffsets[fieldIndex];
     typev_memcpy_u64_ptr_8(c->data+field_offset, &core->regs[source].ptr);
-
-    core_gc_update_class_field(core, c, (void*)core->regs[source].ptr, field_offset);
 }
 
 static inline void c_storef_const(TypeV_Core* core) {
     const uint8_t class_reg = core->codePtr[core->ip++];
-    ASSERT(class_reg < MAX_REG, "Invalid register index");
-    size_t field_offset = 0;
-    typev_memcpy_u64_ptr_2(&field_offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
+
     size_t offset = 0;
     typev_memcpy_u64_ptr_8(&offset, &core->codePtr[core->ip]);
     core->ip += 8;
@@ -462,43 +491,44 @@ static inline void c_storef_const(TypeV_Core* core) {
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Class *c = (TypeV_Class *) core->regs[class_reg].ptr;
+    size_t field_offset = c->fieldOffsets[fieldIndex];
+
     typev_memcpy_u64_ptr(c->data + field_offset, &core->constPtr[offset], byteSize);
 }
 
 static inline void c_storef_const_ptr(TypeV_Core* core){
     const uint8_t class_reg = core->codePtr[core->ip++];
-    ASSERT(class_reg < MAX_REG, "Invalid register index");
-    size_t field_offset = 0;
-    typev_memcpy_u64_ptr_2(&field_offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
     size_t offset = 0;
     typev_memcpy_u64_ptr_8(&offset, &core->codePtr[core->ip]);
     core->ip += 8;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
+    size_t field_offset = c->fieldOffsets[fieldIndex];
     typev_memcpy_u64_ptr_8(c->data+field_offset, &core->constPtr[offset]);
 }
 
 static inline void c_loadf(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
-    size_t offset = 0;
-    typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy_u64_ptr(&core->regs[target], c->data+offset, byteSize);
+    size_t field_offset = c->fieldOffsets[fieldIndex];
+    typev_memcpy_u64_ptr(&core->regs[target], c->data+field_offset, byteSize);
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void c_loadf_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
-    size_t offset = 0;
-    typev_memcpy_u64_ptr_2(&offset, &core->codePtr[core->ip]);
-    core->ip += 2;
+    const uint8_t fieldIndex = core->codePtr[core->ip++];
+
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    typev_memcpy_u64_ptr_8(&core->regs[target], c->data+offset);
+    size_t field_offset = c->fieldOffsets[fieldIndex];
+    typev_memcpy_u64_ptr_8(&core->regs[target], c->data+field_offset);
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void i_is_c(TypeV_Core* core){
@@ -512,6 +542,7 @@ static inline void i_is_c(TypeV_Core* core){
     TypeV_Class* class_ = (TypeV_Class*)core->regs[interface_reg].ptr;
 
     core->regs[target].u8 = class_->uid == classId;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void i_has_m(TypeV_Core* core){
@@ -546,7 +577,7 @@ static inline void i_has_m(TypeV_Core* core){
 
 static inline void a_alloc(TypeV_Core* core){
     const uint8_t dest = core->codePtr[core->ip++];
-
+    const uint8_t is_ptr = core->codePtr[core->ip++];
     size_t num_elements = 0;
     typev_memcpy_u64_ptr_8(&num_elements, &core->codePtr[core->ip]);
     core->ip += 8;
@@ -557,9 +588,10 @@ static inline void a_alloc(TypeV_Core* core){
     }
 
     // allocate memory for struct
-    size_t mem = core_array_alloc(core, num_elements, element_size);
+    size_t mem = core_array_alloc(core, is_ptr, num_elements, element_size);
     // move the pointer to R19
     core->regs[dest].ptr = mem;
+    SET_REG_PTR(core->funcState, dest);
 }
 
 static inline void a_extend(TypeV_Core* core){
@@ -577,6 +609,7 @@ static inline void a_len(TypeV_Core* core){
     const uint8_t array_reg = core->codePtr[core->ip++];
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
     core->regs[target].u64 = array->length;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void a_slice(TypeV_Core* core){
@@ -591,6 +624,7 @@ static inline void a_slice(TypeV_Core* core){
 
     size_t mem = core_array_slice(core, array, start_, end_);
     core->regs[target].ptr = mem;
+    SET_REG_PTR(core->funcState, target);
 }
 
 static inline void a_insert_a(TypeV_Core* core){
@@ -629,7 +663,6 @@ static inline void a_storef_reg_ptr(TypeV_Core* core){
         core_panic(core, 1, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
     }
     typev_memcpy_u64_ptr_8(array->data+(core->regs[index].u64*array->elementSize), &core->regs[source]);
-    core_gc_update_array_field(core, array, (void*)core->regs[source].ptr, core->regs[index].u64);
 }
 
 static inline void a_storef_const(TypeV_Core* core){
@@ -676,6 +709,7 @@ static inline void a_loadf(TypeV_Core* core) {
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     typev_memcpy_u64_ptr(&core->regs[target], array->data + (idx * array->elementSize), byteSize);
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void a_loadf_ptr(TypeV_Core* core) {
@@ -692,6 +726,7 @@ static inline void a_loadf_ptr(TypeV_Core* core) {
     }
 
     typev_memcpy_u64_ptr_8(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize));
+    SET_REG_PTR(core->funcState, target);
 }
 
 
@@ -804,6 +839,8 @@ static inline void fn_alloc(TypeV_Core* core){
     }
     else {
         newState = core->funcState->next;
+        // clear the pointer status of the new state
+        memset(newState->regsPtrBitmap, 0, sizeof(newState->regsPtrBitmap));
     }
 
     newState->prev = core->funcState;
@@ -827,6 +864,7 @@ static inline void fn_set_reg_ptr(TypeV_Core* core){
     const uint8_t source_reg = core->codePtr[core->ip++];
 
     core->funcState->next->regs[dest_reg] = core->regs[source_reg];
+    SET_REG_PTR(core->funcState->next, dest_reg);
 }
 
 static inline void fn_call(TypeV_Core* core){
@@ -874,6 +912,7 @@ static inline void fn_get_ret_reg(TypeV_Core* core){
 
     // we grab the register from the .next into the current one
     core->regs[dest_reg] = core->funcState->next->regs[source_reg];
+    CLEAR_REG_PTR(core->funcState, dest_reg);
 }
 
 static inline void fn_get_ret_reg_ptr(TypeV_Core* core){
@@ -882,12 +921,14 @@ static inline void fn_get_ret_reg_ptr(TypeV_Core* core){
 
     // we grab the register from the .next into the current one
     core->regs[dest_reg].ptr = core->funcState->next->regs[source_reg].ptr;
+    SET_REG_PTR(core->funcState, dest_reg);
 }
 
 #define OP_CAST(d1, d2, type) \
 static inline void cast_##d1##_##d2(TypeV_Core* core){ \
     uint8_t op1 = core->codePtr[core->ip++];\
     core->regs[op1].d2 = (type) core->regs[op1].d1;\
+    CLEAR_REG_PTR(core->funcState, op1);\
 }
 
 OP_CAST(i8, u8, uint8_t)
@@ -927,6 +968,7 @@ static inline void upcast_i(TypeV_Core* core) {
 
     // Store the result back in the register
     typev_memcpy_u64_ptr(&core->regs[reg], &value, to);
+    CLEAR_REG_PTR(core->funcState, reg);
 }
 
 
@@ -958,6 +1000,7 @@ static inline void upcast_u(TypeV_Core* core) {
 
     // Store the result back in the register
     //typev_memcpy_u64_ptr(&core->regs[reg], &value, to);
+    CLEAR_REG_PTR(core->funcState, reg);
 }
 
 static inline void upcast_f(TypeV_Core* core) {
@@ -977,6 +1020,7 @@ static inline void upcast_f(TypeV_Core* core) {
 
     // Store the result back in the register
     typev_memcpy_u64_ptr(&core->regs[reg], &doubleValue, to);
+    CLEAR_REG_PTR(core->funcState, reg);
 }
 
 
@@ -994,6 +1038,7 @@ static inline void dcast_i(TypeV_Core* core) {
 
     // Store the result back in the register (overwriting only 'to' bytes)
     typev_memcpy_u64_ptr(&core->regs[reg], &value, to);
+    CLEAR_REG_PTR(core->funcState, reg);
 }
 
 static inline void dcast_u(TypeV_Core* core) {
@@ -1014,6 +1059,7 @@ static inline void dcast_u(TypeV_Core* core) {
 
     // Store the truncated value back in the register
     typev_memcpy_u64_ptr(&core->regs[reg], &truncatedValue, to);
+    CLEAR_REG_PTR(core->funcState, reg);
 }
 
 static inline void dcast_f(TypeV_Core* core) {
@@ -1033,6 +1079,7 @@ static inline void dcast_f(TypeV_Core* core) {
 
     // Store the result back in the register
     typev_memcpy_u64_ptr(&core->regs[reg], &floatValue, to);
+    CLEAR_REG_PTR(core->funcState, reg);
 }
 
 
@@ -1043,6 +1090,7 @@ static inline void name##_##type(TypeV_Core* core){\
     uint8_t op1 = core->codePtr[core->ip++];\
     uint8_t op2 = core->codePtr[core->ip++];\
     core->regs[target].type = core->regs[op1].type op core->regs[op2].type;\
+    CLEAR_REG_PTR(core->funcState, target);\
 }
 
 OP_BINARY(add, i8, +)
@@ -1058,6 +1106,7 @@ static inline void add_u32(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
     //printf("adding %d + %d\n", core->regs[op1].u32, core->regs[op2].u32);
     core->regs[target].u32 = core->regs[op1].u32 + core->regs[op2].u32;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 OP_BINARY(add, i64, +)
@@ -1069,6 +1118,7 @@ static inline void add_f32(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
     //printf("adding %d + %d\n", core->regs[op1].u32, core->regs[op2].u32);
     core->regs[target].f32 = core->regs[op1].f32 + core->regs[op2].f32;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 
@@ -1080,6 +1130,7 @@ static inline void add_u64(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].u64 = core->regs[op1].u64 + core->regs[op2].u64;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void add_ptr_u8(TypeV_Core* core){
@@ -1087,6 +1138,7 @@ static inline void add_ptr_u8(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].ptr = core->regs[op1].ptr + core->regs[op2].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void add_ptr_u16(TypeV_Core* core){
@@ -1094,6 +1146,7 @@ static inline void add_ptr_u16(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].ptr = core->regs[op1].ptr + core->regs[op2].u16;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void add_ptr_u32(TypeV_Core* core){
@@ -1101,6 +1154,7 @@ static inline void add_ptr_u32(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].ptr = core->regs[op1].ptr + core->regs[op2].u32;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void add_ptr_u64(TypeV_Core* core){
@@ -1108,6 +1162,7 @@ static inline void add_ptr_u64(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].ptr = core->regs[op1].ptr + core->regs[op2].u64;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 OP_BINARY(sub, i8, -)
@@ -1126,6 +1181,7 @@ static inline void sub_ptr_u8(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].ptr = core->regs[op1].ptr - core->regs[op2].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void sub_ptr_u16(TypeV_Core* core){
@@ -1133,6 +1189,7 @@ static inline void sub_ptr_u16(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].ptr = core->regs[op1].ptr - core->regs[op2].u16;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void sub_ptr_u32(TypeV_Core* core){
@@ -1140,6 +1197,7 @@ static inline void sub_ptr_u32(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].ptr = core->regs[op1].ptr - core->regs[op2].u32;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void sub_ptr_u64(TypeV_Core* core){
@@ -1147,6 +1205,7 @@ static inline void sub_ptr_u64(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
     uint8_t op2 = core->codePtr[core->ip++];
     core->regs[target].ptr = core->regs[op1].ptr - core->regs[op2].u64;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 OP_BINARY(mul, i8, *)
@@ -1206,6 +1265,7 @@ static inline void band_8(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u8 = core->regs[op1].u8 & core->regs[op2].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void band_16(TypeV_Core* core){
@@ -1214,6 +1274,7 @@ static inline void band_16(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u16 = core->regs[op1].u16 & core->regs[op2].u16;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void band_32(TypeV_Core* core){
@@ -1222,6 +1283,7 @@ static inline void band_32(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u32 = core->regs[op1].u32 & core->regs[op2].u32;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void band_64(TypeV_Core* core){
@@ -1230,6 +1292,7 @@ static inline void band_64(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u64 = core->regs[op1].u64 & core->regs[op2].u64;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bor_8(TypeV_Core* core){
@@ -1238,6 +1301,7 @@ static inline void bor_8(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u8 = core->regs[op1].u8 | core->regs[op2].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bor_16(TypeV_Core* core){
@@ -1246,6 +1310,7 @@ static inline void bor_16(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u16 = core->regs[op1].u16 | core->regs[op2].u16;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bor_32(TypeV_Core* core){
@@ -1254,6 +1319,7 @@ static inline void bor_32(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u32 = core->regs[op1].u32 | core->regs[op2].u32;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bor_64(TypeV_Core* core){
@@ -1262,6 +1328,7 @@ static inline void bor_64(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u64 = core->regs[op1].u64 | core->regs[op2].u64;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bxor_8(TypeV_Core* core){
@@ -1269,6 +1336,7 @@ static inline void bxor_8(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u8 = core->regs[op1].u8 ^ core->regs[target].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bxor_16(TypeV_Core* core){
@@ -1276,6 +1344,7 @@ static inline void bxor_16(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u16 = core->regs[op1].u16 ^ core->regs[target].u16;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bxor_32(TypeV_Core* core){
@@ -1283,6 +1352,7 @@ static inline void bxor_32(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u32 = core->regs[op1].u32 ^ core->regs[target].u32;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bxor_64(TypeV_Core* core){
@@ -1290,6 +1360,7 @@ static inline void bxor_64(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u64 = core->regs[op1].u64 ^ core->regs[target].u64;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bnot_8(TypeV_Core* core){
@@ -1297,6 +1368,7 @@ static inline void bnot_8(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u8 = ~core->regs[op1].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bnot_16(TypeV_Core* core){
@@ -1304,6 +1376,7 @@ static inline void bnot_16(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u16 = ~core->regs[op1].u16;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bnot_32(TypeV_Core* core){
@@ -1311,6 +1384,7 @@ static inline void bnot_32(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u32 = ~core->regs[op1].u32;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bnot_64(TypeV_Core* core){
@@ -1318,6 +1392,7 @@ static inline void bnot_64(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u64 = ~core->regs[op1].u64;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void and(TypeV_Core* core){
@@ -1326,6 +1401,7 @@ static inline void and(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u8 = core->regs[op1].u8 && core->regs[op2].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void or(TypeV_Core* core){
@@ -1334,6 +1410,7 @@ static inline void or(TypeV_Core* core){
     uint8_t op2 = core->codePtr[core->ip++];
 
     core->regs[target].u8 = core->regs[op1].u8 || core->regs[op2].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void not(TypeV_Core* core){
@@ -1341,6 +1418,7 @@ static inline void not(TypeV_Core* core){
     uint8_t op1 = core->codePtr[core->ip++];
 
     core->regs[target].u8 = !core->regs[op1].u8;
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void jmp(TypeV_Core* core){
@@ -1672,26 +1750,6 @@ static inline void vm_health(TypeV_Core* core){
     core->regs[dest].u8 = core->engineRef->health;
 }
 
-static inline void spill_alloc(TypeV_Core* core){
-    uint16_t size = (uint16_t)typev_memcpy_u64_2(&core->codePtr[core->ip]);
-    core->ip += 2;
-    core_spill_alloc(core, size);
-}
-
-static inline void spill_reg(TypeV_Core* core){
-    uint16_t slot = (uint16_t)typev_memcpy_u64_2(&core->codePtr[core->ip]);
-    core->ip += 2;
-    uint8_t reg = core->codePtr[core->ip++];
-    core->funcState->spillSlots[slot] = core->regs[reg];
-}
-
-
-static inline void unspill_reg(TypeV_Core* core){
-    uint8_t reg = core->codePtr[core->ip++];
-    uint16_t slot = (uint16_t)typev_memcpy_u64_2(&core->codePtr[core->ip]);
-    core->ip += 2;
-    core->regs[reg] = core->funcState->spillSlots[slot];
-}
 
 static inline void closure_alloc(TypeV_Core* core) {
     uint8_t dest = core->codePtr[core->ip++];
@@ -1702,6 +1760,7 @@ static inline void closure_alloc(TypeV_Core* core) {
     core->ip += 8;
 
     core->regs[dest].ptr = (uintptr_t) core_closure_alloc(core, fnAddressReg, offsetToArgs, envSize);
+    SET_REG_PTR(core->funcState, dest);
 }
 
 static inline void closure_push_env(TypeV_Core* core) {
@@ -1718,8 +1777,10 @@ static inline void closure_push_env_ptr(TypeV_Core* core) {
     uint8_t regId = core->codePtr[core->ip++];
     TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
     uintptr_t ptr = core->regs[regId].ptr;
-    cl->upvalues[cl->envCounter++].ptr = ptr;
-    core_gc_update_closure_env(core, cl, (void*)ptr);
+    cl->upvalues[cl->envCounter].ptr = ptr;
+    cl->ptrFields[cl->envCounter / 8] |= (1 << (cl->envCounter % 8));
+
+    cl->envCounter++;
 }
 
 static inline void closure_call(TypeV_Core* core) {
@@ -1738,6 +1799,9 @@ static inline void closure_call(TypeV_Core* core) {
     // copy the closure's environment to the function's environment
     for (uint8_t i = 0; i < cl->envSize; i++) {
         core->funcState->regs[i+offset] = cl->upvalues[i];
+        if(IS_CLOSURE_UPVALUE_POINTER(cl->ptrFields, i)) {
+            SET_REG_PTR(core->funcState, i+offset);
+        }
     }
 }
 
@@ -1758,6 +1822,7 @@ static inline void coroutine_alloc(TypeV_Core* core) {
 
     // allocate the coroutine
     core->regs[destReg].ptr = (uintptr_t) core_coroutine_alloc(core, closure);
+    SET_REG_PTR(core->funcState, destReg);
 }
 
 
@@ -1792,6 +1857,7 @@ static inline void coroutine_get_state(TypeV_Core* core) {
     TypeV_Coroutine* coroutine = (TypeV_Coroutine*) core->regs[coroutineReg].ptr;
 
     core->regs[destReg].u8 = coroutine->executionState;
+    CLEAR_REG_PTR(core->funcState, destReg);
 }
 
 static inline void coroutine_call(TypeV_Core* core) {

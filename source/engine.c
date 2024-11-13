@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+
 #include "engine.h"
 #include "assembler/assembler.h"
 #include "core.h"
@@ -99,7 +100,8 @@ static void* dispatch_table[] = { \
     &&DO_S_STOREF_CONST_PTR, \
     &&DO_S_STOREF_REG, \
     &&DO_S_STOREF_REG_PTR, \
-    &&DO_C_ALLOC, \
+    &&DO_C_ALLOC,      \
+    &&DO_C_REG_FIELD, \
     &&DO_C_STOREM, \
     &&DO_C_LOADM, \
     &&DO_C_STOREF_REG, \
@@ -264,9 +266,6 @@ static void* dispatch_table[] = { \
     &&DO_DEBUG_REG, \
     &&DO_HALT, \
     &&DO_LOAD_STD, \
-    &&DO_SPILL_ALLOC, \
-    &&DO_SPILL_REG, \
-    &&DO_UNSPILL_REG,   \
     &&DO_CLOSURE_ALLOC, \
     &&DO_CLOSURE_PUSH_ENV,\
     &&DO_CLOSURE_PUSH_ENV_PTR,\
@@ -363,6 +362,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_C_ALLOC:
             c_alloc(core);
+            DISPATCH();
+        DO_C_REG_FIELD:
+            c_reg_field(core);
             DISPATCH();
         DO_C_STOREM:
             c_storem(core);
@@ -857,15 +859,6 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_LOAD_STD:
             load_std(core);
-            DISPATCH();
-        DO_SPILL_ALLOC:
-            spill_alloc(core);
-            DISPATCH();
-        DO_SPILL_REG:
-            spill_reg(core);
-            DISPATCH();
-        DO_UNSPILL_REG:
-            unspill_reg(core);
             DISPATCH();
         DO_CLOSURE_ALLOC:
             closure_alloc(core);

@@ -7,8 +7,9 @@
 #include <stdio.h>
 #include <string.h>
 
+
 #include "stack/stack.h"
-#include "gc.h"
+#include "gc/gc.h"
 #include "engine.h"
 #include "core.h"
 #include "utils/log.h"
@@ -24,6 +25,7 @@ TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     state->next = NULL;
     state->spillSlots = malloc(sizeof(TypeV_Register));
     state->spillSize = 1;
+    memset(state->regsPtrBitmap, 0, sizeof(state->regsPtrBitmap));
 
     return state;
 }
@@ -43,6 +45,9 @@ TypeV_FuncState* core_duplicate_function_state(TypeV_FuncState* original) {
 
     state->next = original->next;
 
+    state->ptrFields = malloc((original->spillSize + 7) / 8);
+    memset(state->ptrFields, 0, (original->spillSize + 7) / 8);
+
     return state;
 }
 
@@ -54,16 +59,14 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->regs = core->funcState->regs;
 
     // Initialize GC
-    core->gc.memObjectCapacity = 2000;
-    core->gc.memObjectCount = 0;
-    core->gc.memObjects = malloc(sizeof(void*)*core->gc.memObjectCapacity);
-    core->gc.allocsSincePastGC = 0;
-    core->gc.totalAllocs = 0;
+    core->gc = gc_initialize();
 
 
     core->engineRef = engineRef;
     core->lastSignal = CSIG_NONE;
     core->activeCoroutine = NULL;
+
+    core->ip = 0;
 }
 
 void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, uint8_t* globalPool){
@@ -83,8 +86,8 @@ void core_deallocate(TypeV_Core *core) {
         state = next;
     }
 
-    core_gc_sweep_all(core);
-    free(core->gc.memObjects);
+    //core_gc_sweep_all(core);
+    //free(core->gc.memObjects);
     free(core);
 }
 
@@ -95,101 +98,91 @@ void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state) {
 }
 
 uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
-    // [offset_pointer (size_t), data_block (totalsize)]
-    LOG_INFO("CORE[%d]: Allocating struct with %d fields and %d bytes, total allocated size: %d", core->id, numfields, totalsize, sizeof(size_t)+totalsize);
+    LOG_INFO("CORE[%d]: Allocating struct with %d fields and %zu bytes, total allocated cellSize: %zu",
+             core->id, numfields, totalsize, sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize + numfields * sizeof(uint16_t) + numfields * sizeof(uint32_t));
 
+    size_t bitmaskSize = (numfields + 7) / 8;
 
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    // Calculate the total allocation cellSize for the struct
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct)
+                                 + bitmaskSize  // Pointer bitmask
+                                 + totalsize // Data block cellSize
+                                 + numfields * sizeof(uint16_t)  // fieldOffsets array
+                                 + numfields * sizeof(uint32_t); // globalFields array
+
+    // Allocate the entire memory block
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
+
     static uint32_t uid = 0;
-    // Set header information
-    header->marked = 0;
+    // Initialize the object header
     header->type = OT_STRUCT;
-    header->size = totalAllocationSize;
-    header->ptrsCount = numfields;
-    header->ptrs = malloc(numfields*sizeof(void*));
 
-    // Get a pointer to the actual struct, which comes after the header
+    // Place the `TypeV_Struct` directly after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
-    struct_ptr->numFields = numfields;
-    struct_ptr->fieldOffsets = malloc(numfields*sizeof(uint16_t));
-    struct_ptr->globalFields = malloc(numfields*sizeof(uint32_t));
-    struct_ptr->dataPointer = struct_ptr->data;
-    struct_ptr->uid = uid++;
-    core_gc_update_alloc(core, totalAllocationSize);
 
+    struct_ptr->numFields = numfields;
+
+
+    // Set `fieldOffsets` and `globalFields` pointers based on `data`
+    struct_ptr->fieldOffsets = (uint16_t*)(struct_ptr->data + totalsize);
+    struct_ptr->globalFields = (uint32_t*)(struct_ptr->fieldOffsets + numfields);
+    struct_ptr->pointerBitmask = (uint8_t*)(struct_ptr->globalFields+numfields);
+    struct_ptr->uid = uid++;
+
+    // zero out the bitmask
+    memset(struct_ptr->pointerBitmask, 0, bitmaskSize);
+
+    // Return the pointer to the struct
     return (uintptr_t)struct_ptr;
 }
 
-uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint8_t numFields , uint32_t globalID) {
-    int left = 0;
-    int right = numFields - 1;
 
-    while (left <= right) {
-       int mid = left + (right - left) / 2;
-
-        if (globalFields[mid] == globalID) {
-            return (uint8_t)mid;  // Return the index where the global ID is found
-        } else if (globalFields[mid] < globalID) {
-            left = mid + 1;
-        } else {
-            right = mid - 1;
-        }
-    }
-
-    // unreachable, in theory
-    core_panic(core, -1, "Global ID %d not found in field array", globalID);
-    exit(-1);
-}
-
-uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, size_t total_fields_size, uint64_t classId) {
+uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId) {
     LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, uid: %d", core->id, num_methods, total_fields_size, classId);
 
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class) + total_fields_size;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    size_t bitmaskSize = (num_attributes + 7) / 8;
+
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class)
+                                + bitmaskSize
+                                + total_fields_size
+                                + num_methods * sizeof(size_t)
+                                + num_methods * sizeof(uint32_t)
+                                + num_attributes * sizeof(uint16_t);
+
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
-    header->marked = 0;
     header->type = OT_CLASS;
-    header->size = totalAllocationSize;
-    header->ptrsCount = total_fields_size; // assume worse case, 1 pointer per byte
-    header->ptrs = malloc(total_fields_size* sizeof(void*));
 
     // Get a pointer to the actual class, which comes after the header
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
     class_ptr->numMethods = num_methods;
+    class_ptr->numFields = num_attributes;
     class_ptr->uid = classId;
-    class_ptr->methods = malloc(num_methods*sizeof(size_t));
-    class_ptr->globalMethods = malloc(num_methods*sizeof(uint32_t));
-
-    // Initialize other class fields here if needed
-
-    // Track the allocation with the GC
-    core_gc_update_alloc(core, totalAllocationSize);
+    class_ptr->methods = (size_t*)(class_ptr->data + total_fields_size);
+    class_ptr->globalMethods = (uint32_t*)(class_ptr->methods + num_methods);
+    class_ptr->fieldOffsets = (uint16_t*)(class_ptr->globalMethods + num_methods);
+    class_ptr->pointerBitmask = (uint8_t*)(class_ptr->fieldOffsets + num_attributes);
 
     return (uintptr_t)class_ptr;
 }
 
-uintptr_t core_array_alloc(TypeV_Core *core, uint64_t num_elements, uint8_t element_size) {
-    LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of size %d", core->id, num_elements, element_size);
+uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size) {
+    LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of cellSize %d", core->id, num_elements, element_size);
 
     static uint32_t uid = 0;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
-    header->marked = 0;
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
     header->type = OT_ARRAY;
-    header->size = totalAllocationSize;
-    // we could extend bytecode to separate pointer arrays from data arrays
-    header->ptrsCount = num_elements;
-    header->ptrs = malloc(num_elements*sizeof(void*));
+    // for arrays 0 means elements are not pointers
+    // anything else means elements are pointers
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
     array_ptr->data = malloc(num_elements* element_size);
     array_ptr->uid = uid++;
-
-    core_gc_update_alloc(core, totalAllocationSize);
+    array_ptr->isPointerContainer = is_pointer_container;
 
     return (uintptr_t)array_ptr;
 }
@@ -199,46 +192,28 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
 
     size_t slice_length = end - start;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array) + slice_length * array->elementSize;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
-    header->marked = 0;
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
     header->type = OT_ARRAY;
-    header->size = totalAllocationSize;
-
-    header->ptrsCount = slice_length;
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = array->elementSize;
     array_ptr->length = slice_length;
     array_ptr->data = malloc(slice_length* array->elementSize);
     array_ptr->uid = 1000000-array->uid;
-
-    TypeV_ObjectHeader* originalHeader = get_header_from_pointer(array);
-    if(originalHeader->ptrsCount > 0) {
-        header->ptrs = malloc(slice_length* sizeof(void*));
-        for(size_t i = 0; i < slice_length; i++) {
-            header->ptrs[i] = originalHeader->ptrs[start + i];
-        }
-    }
+    array_ptr->isPointerContainer = array->isPointerContainer;
 
     memcpy(array_ptr->data, array->data + start * array->elementSize, slice_length * array->elementSize);
-    core_gc_update_alloc(core, totalAllocationSize);
 
     return (uintptr_t)array_ptr;
 }
 
 uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_elements){
-    LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated size: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
+    LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated cellSize: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
 
     if(array == NULL) {
         core_panic(core, -1, "Null array");
     }
-
-    TypeV_ObjectHeader* header = get_header_from_pointer(array);
-    header->size += num_elements * array->elementSize;
-
-    header->ptrsCount = num_elements;
-    header->ptrs = realloc(header->ptrs, num_elements* sizeof(void*));
 
     array->data = realloc(array->data, num_elements*array->elementSize);
     array->length = num_elements;
@@ -275,43 +250,74 @@ uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src
     // Update the length of the destination array
     dest->length = newLength;
 
-    // Get the headers for both destination and source arrays
-    TypeV_ObjectHeader* header = get_header_from_pointer((void*)dest);
-    TypeV_ObjectHeader* addedHeader = get_header_from_pointer((void*)src);
-
-    // Check if there are pointers in the source array
-    if (addedHeader->ptrsCount > 0) {
-        // Reallocate the destination's ptrs array to accommodate the new pointers from src
-        header->ptrs = realloc(header->ptrs, newLength * sizeof(void*));
-
-        // Shift the existing pointers in the destination's `ptrs` array to the right
-        memmove(
-                header->ptrs + position + src->length,  // New location for shifted pointers
-                header->ptrs + position,                // Current pointers from 'position' onward
-                (prevLength - position) * sizeof(void*) // Number of pointers to shift
-        );
-
-        // Insert pointers from `src` and pad the rest with NULLs
-        for (size_t i = 0; i < src->length; i++) {
-            header->ptrs[position + i] = addedHeader->ptrs[i];
-        }
-
-        // Pad any remaining gaps with NULLs
-        for (size_t i = prevLength; i < newLength; i++) {
-            if (header->ptrs[i] == NULL) {
-                header->ptrs[i] = NULL;
-            }
-        }
-
-        // Update the pointer count accurately
-        header->ptrsCount = newLength;
-    }
-
     // Return the new position pointing at the end of the inserted elements
     return position + src->length;
 }
 
 
+
+/*
+#define CACHE_SIZE 4
+
+typedef struct {
+    uint32_t globalID;
+    uint8_t index;
+} CacheEntry;
+
+static CacheEntry cache[CACHE_SIZE] = { {0, -1} };  // Initialize cache entries with invalid index
+
+uint8_t find_in_cache(uint32_t globalID) {
+    for (int i = 0; i < CACHE_SIZE; ++i) {
+        if (__builtin_expect(cache[i].globalID == globalID, 1)) {
+            return cache[i].index;  // Cache hit
+        }
+    }
+    return (uint8_t)-1;  // Cache miss
+}
+
+void update_cache(uint32_t globalID, uint8_t index) {
+    // Shift entries to make room at the front (simple LRU policy)
+    for (int i = CACHE_SIZE - 1; i > 0; --i) {
+        cache[i] = cache[i - 1];
+    }
+    cache[0].globalID = globalID;
+    cache[0].index = index;
+}
+ */
+
+inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *globalFields, uint8_t numFields, uint32_t globalID) {
+    // First, try to find the index in the cache
+    /*int cache_index = find_in_cache(globalID);
+    if (__builtin_expect(cache_index != (uint8_t)-1, 1)) {
+        return cache_index;  // Cache hit
+    }
+     */
+
+    // Perform binary search if cache miss
+    int left = 0;
+    int right = numFields - 1;
+    while (__builtin_expect(left <= right, 1)) {  // Loop is likely to continue
+        int mid = left + (right - left) / 2;
+
+        if (__builtin_expect(globalFields[mid] == globalID, 1)) {  // Likely to find ID in the array
+            //update_cache(globalID, (uint8_t)mid);  // Update cache with the result
+            return (uint8_t)mid;
+        } else if (globalFields[mid] < globalID) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    // If we reach here, it means the ID was not found
+    // This is an unlikely case, so mark it as such
+    if (__builtin_expect(1, 1)) {
+        core_panic(core, -1, "Global ID %d not found in field array", globalID);
+        exit(-1);
+    }
+
+    return -1;  // Return an invalid index (in theory, should not be reached)
+}
 
 
 
@@ -334,7 +340,7 @@ void core_ffi_close(TypeV_Core* core, uintptr_t libHandle){
 
 uintptr_t core_mem_alloc(TypeV_Core* core, uintptr_t size) {
     LOG_INFO("CORE[%d]: Allocating %d bytes", core->id, size);
-    return (uintptr_t)core_gc_alloc(core, size);
+    return (uintptr_t)gc_alloc(core, size);
 }
 
 void core_resume(TypeV_Core* core) {
@@ -382,13 +388,10 @@ void core_spill_alloc(TypeV_Core* core, uint16_t size) {
 TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t argsOffset, uint8_t envSize) {
     LOG_WARN("CORE[%d]: Allocating closure with %d bytes", core->id, envSize);
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Closure);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
-    header->marked = 0;
     header->type = OT_CLOSURE;
-    header->size = totalAllocationSize;
-    header->ptrsCount = 0;
     //header->ptrs = calloc(envSize, sizeof(void*));
 
     // Get a pointer to the actual closure, which comes after the header
@@ -401,24 +404,20 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
 
     closure_ptr->upvalues = malloc(envSize* sizeof(TypeV_Register ));
 
-    core_gc_update_alloc(core, totalAllocationSize);
+    size_t bitmaskSize = (envSize + 7) / 8;
+    closure_ptr->ptrFields = malloc(bitmaskSize);
+    memset(closure_ptr->ptrFields, 0, bitmaskSize);
+
     return closure_ptr;
 }
 
 TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) {
     LOG_INFO("CORE[%d]: Allocating coroutine", core->id);
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Coroutine);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)core_gc_alloc(core, totalAllocationSize);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
-    header->marked = 0;
     header->type = OT_COROUTINE;
-    header->size = totalAllocationSize;
-    // add the closure to the coroutine
-    header->ptrsCount = 1;
-    header->ptrs = malloc(1*sizeof(void*));
-    header->ptrs[0] = (void*)closure;
-
     TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
     // create a new function state
     coroutine_ptr->closure = closure;
@@ -429,7 +428,6 @@ TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) 
 
     // initially, the pointer points to the function address
     coroutine_ptr->ip = closure->fnAddress;
-    core_gc_update_alloc(core, totalAllocationSize);
 
     return coroutine_ptr;
 }
