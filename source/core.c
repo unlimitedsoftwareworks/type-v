@@ -55,7 +55,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->regs = core->funcState->regs;
 
     // Initialize GC
-    core->gc = gc_init();
+    core->gc = gc_initialize();
 
 
     core->engineRef = engineRef;
@@ -109,8 +109,8 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     // Allocate the entire memory block
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
+    static uint32_t uid = 0;
     // Initialize the object header
-    header->marked = 1;
     header->type = OT_STRUCT;
 
     // Place the `TypeV_Struct` directly after the header
@@ -123,6 +123,7 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     struct_ptr->fieldOffsets = (uint16_t*)(struct_ptr->data + totalsize);
     struct_ptr->globalFields = (uint32_t*)(struct_ptr->fieldOffsets + numfields);
     struct_ptr->pointerBitmask = (uint8_t*)(struct_ptr->globalFields+numfields);
+    struct_ptr->uid = uid++;
 
     // zero out the bitmask
     memset(struct_ptr->pointerBitmask, 0, bitmaskSize);
@@ -147,7 +148,6 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_at
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
-    header->marked = 1;
     header->type = OT_CLASS;
 
     // Get a pointer to the actual class, which comes after the header
@@ -169,7 +169,6 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint6
     static uint32_t uid = 0;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
-    header->marked = 1;
     header->type = OT_ARRAY;
     // for arrays 0 means elements are not pointers
     // anything else means elements are pointers
@@ -190,7 +189,6 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     size_t slice_length = end - start;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array) + slice_length * array->elementSize;
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
-    header->marked = 1;
     header->type = OT_ARRAY;
 
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
@@ -389,7 +387,6 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
-    header->marked = 1;
     header->type = OT_CLOSURE;
     //header->ptrs = calloc(envSize, sizeof(void*));
 
@@ -412,7 +409,6 @@ TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) 
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
-    header->marked = 1;
     header->type = OT_COROUTINE;
     TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
     // create a new function state

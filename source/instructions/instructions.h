@@ -271,8 +271,6 @@ static inline void s_reg_field(TypeV_Core* core){
     }
 }
 
-
-
 static inline void s_loadf(TypeV_Core* core){
     char* code = (char*)core->codePtr+core->ip;
     const uint8_t target = *code;
@@ -317,7 +315,6 @@ static inline void s_storef_const(TypeV_Core* core){
     typev_memcpy_u64_ptr_8(&offset, &core->codePtr[core->ip]);
     core->ip += 8;
     uint8_t byteSize = core->codePtr[core->ip++];
-    CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_u64_ptr(((char*)struct_ptr->data)+struct_ptr->fieldOffsets[index], &core->constPtr[offset], byteSize);

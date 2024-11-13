@@ -1,30 +1,20 @@
-/**
- * Type-V Virtual Machine
- * Author: praisethemoon
- * gc.h: Garbage Collection
- */
+#ifndef GC_H
+#define GC_H
 
-#ifndef TYPE_V_GC_H
-#define TYPE_V_GC_H
-
-#include <stdlib.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdbool.h>
-
+#include <stddef.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include "core.h"
 
-// Constants for garbage collection
+/*** GC Configuration ***/
 #define CELL_SIZE 64
-#define MAX_CELLS 4096000
+#define MAX_CELLS 4096
 #define REGION_SIZE (CELL_SIZE * MAX_CELLS)
-#define SSB_SIZE 128
-#define MAX_UPDATE_LIST 1024  // Maximum number of pointers to update after GC
 
 // Memory Regions
-#define NURSERY_SIZE (REGION_SIZE)
-#define SURVIVOR_SIZE (REGION_SIZE*2)
-#define OLD_GEN_INITIAL_SIZE (REGION_SIZE * 2)
+#define NURSERY_SIZE (REGION_SIZE*2)
 
 // Object States
 typedef enum {
@@ -33,76 +23,65 @@ typedef enum {
     BLACK = 0b10
 } ObjectColor;
 
-// Memory Region Types
-typedef enum {
-    REGION_NURSERY,
-    REGION_SURVIVOR_FROM,
-    REGION_SURVIVOR_TO,
-    REGION_OLD
-} RegionType;
+typedef struct TypeV_NurseryRegion {
+    uint8_t color_bitmap[(MAX_CELLS * 2) / 8];   // 2 bits per cell
+    uint8_t active_bitmap[MAX_CELLS / 8];        // 1 bit per cell
+    uint8_t* from; // always storing in from, will be swapped with `to` later on
+    uint8_t* to;
+    size_t size; // in cells!
+    uint8_t* data;
+} TypeV_NurseryRegion;
 
-// Metadata for each memory region
-typedef struct {
-    uint64_t block_bitmap[MAX_CELLS / 64];
-    uint8_t color[MAX_CELLS / 4];
-    uint16_t gray_stack[MAX_CELLS];
-    uint16_t gray_stack_top;
-    uint16_t ssb[SSB_SIZE];
-    uint16_t ssb_top;
-} RegionMetadata;
 
-// Memory Region Structure
-typedef struct {
-    RegionType type;
-    RegionMetadata metadata;
-    uint8_t *data;
-    size_t size;
-} MemoryRegion;
+typedef struct TypeV_OldGenerationRegion {
+    uint8_t color_bitmap[(MAX_CELLS * 2) / 8];     // 2 bits per cell for color (same as nursery)
+    uint8_t active_bitmap[MAX_CELLS / 8];          // 1 bit per cell for active status
+    size_t size;                                   // Total size of the region
+    uint8_t* data;                                 // Data segment
+} TypeV_OldGenerationRegion;
 
-// Memory Manager Structure
-typedef struct {
-    MemoryRegion *nursery;
-    MemoryRegion *survivor_from;
-    MemoryRegion *survivor_to;
-    MemoryRegion *old_gen;
-} MemoryManager;
+typedef struct TypeV_GCUpdateList {
+    uintptr_t old_address;
+    uintptr_t new_address;
+} TypeV_GCUpdateList;
 
-// Forwarding table entry
-typedef struct {
-    void *old_ptr;
-    void *new_ptr;
-} ForwardEntry;
+typedef struct TypeV_GC {
+    TypeV_NurseryRegion* nurseryRegion;
+    TypeV_OldGenerationRegion* oldRegion;
 
-// GC Context Structure
-typedef struct GCContext {
-    MemoryManager *memory_manager;
-    ForwardEntry forwarding_table[MAX_CELLS];
-    size_t forwarding_table_size;
+    // count since last major gc
+    uint32_t minorGCCount;
 
-    // List to store pointers needing updates after GC
-    void **update_list[MAX_UPDATE_LIST];
-    size_t update_list_size;
-} GCContext;
+    TypeV_GCUpdateList nurseryUpdateList[MAX_CELLS];
+    uint64_t updateListSize;
+}TypeV_GC;
 
-// GC API
-GCContext *gc_init(void);
-void gc_finalize(GCContext *context);
-void *gc_alloc(TypeV_Core* core, size_t size);
-void gc_minor_collect(GCContext *context);
-void gc_full_collect(GCContext *context);
-void gc_register_root(GCContext *context, void *root);
-void gc_unregister_root(GCContext *context, void *root);
-void mark_ptr(GCContext *gc, void *ptr_ptr);
-void mark_all_roots(GCContext *context);
 
-// Helper functions
-TypeV_ObjectHeader* get_header_from_pointer(GCContext *ctx, void * objectPtr);
-void add_to_forwarding_table(GCContext *gc, void *old_ptr, void *new_ptr);
-void *get_forwarded_pointer(GCContext *gc, void *old_ptr);
-void add_to_update_list(GCContext *gc, void **ptr_ptr);
-void update_pointers_from_list(GCContext *gc);
-void move_live_objects(GCContext *context);
-void allocate_in_survivor(MemoryRegion *to, void *ptr);
-void mark_in_place(void *ptr);
-void core_gc_update_references_state(TypeV_Core* core, TypeV_FuncState* state);
-#endif // TYPE_V_GC_H
+// Macros for accessing color_bitmap
+#define GET_COLOR(bitmap, cell) ((bitmap[(cell * 2) / 8] >> ((cell * 2) % 8)) & 0b11)
+#define SET_COLOR(bitmap, cell, color) \
+    bitmap[(cell * 2) / 8] = (bitmap[(cell * 2) / 8] & ~(0b11 << ((cell * 2) % 8))) | ((color & 0b11) << ((cell * 2) % 8))
+
+// Macros for accessing active_bitmap
+#define GET_ACTIVE(bitmap, cell) ((bitmap[cell / 8] >> (cell % 8)) & 0b1)
+#define SET_ACTIVE(bitmap, cell, active) \
+    bitmap[cell / 8] = (bitmap[cell / 8] & ~(1 << (cell % 8))) | ((active & 0b1) << (cell % 8))
+
+
+TypeV_NurseryRegion* gc_create_nursery();
+TypeV_OldGenerationRegion* gc_create_old_generation();
+TypeV_GC* gc_initialize();
+TypeV_ObjectHeader* gc_alloc(TypeV_Core* core, size_t size);
+void gc_minor_gc(TypeV_Core* core);
+
+
+TypeV_ObjectHeader* gc_mark_nursery_ptr(uintptr_t ptr, TypeV_NurseryRegion* nursery, ObjectColor color);
+
+
+void gc_mark_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery);
+
+uintptr_t gc_get_new_ptr_location(TypeV_Core* core, uintptr_t oldPtr);
+void gc_update_object_pointers(TypeV_Core* core, uintptr_t old_address, uintptr_t new_address);
+void gc_update_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery);
+void gc_debug_nursery(TypeV_GC* gc);
+#endif // GC_H

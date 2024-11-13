@@ -142,7 +142,7 @@ typedef enum {
 
 typedef struct {
     TypeV_ObjectType type;
-    uint8_t marked;
+    uint8_t survivedCount;
     size_t totalSize;
 }TypeV_ObjectHeader;
 
@@ -208,7 +208,7 @@ typedef struct TypeV_Core {
     uint8_t isRunning;                        ///< Is the core running
     TypeV_CoreState state;                    ///< Core state
 
-    struct GCContext* gc;                              ///< Future Garbage collector
+    struct TypeV_GC* gc;                              ///< Future Garbage collector
 
     struct TypeV_Engine* engineRef;           ///< Reference to the engine. Not part of the core state, just to void adding to every function call.
     TypeV_CoreSignal lastSignal;              ///< Last signal received
