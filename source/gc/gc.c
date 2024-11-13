@@ -25,7 +25,7 @@ TypeV_NurseryRegion* gc_create_nursery() {
     if (!nursery) return NULL;
 
     // Allocate and initialize the nursery data buffer
-    nursery->data = (uint8_t*)aligned_alloc(16, NURSERY_SIZE);
+    nursery->data = (uint8_t*)aligned_alloc(NURSERY_SIZE, NURSERY_SIZE);
     if (!nursery->data) {
         free(nursery);
         return NULL;
@@ -128,7 +128,7 @@ TypeV_ObjectHeader *gc_alloc(TypeV_Core* core, size_t size) {
 }
 
 void gc_minor_gc(TypeV_Core* core) {
-    printf("Performing minor GC\n");
+    //printf("Performing minor GC\n");
     TypeV_GC *gc = core->gc;
     TypeV_NurseryRegion *nursery = gc->nurseryRegion;
     TypeV_OldGenerationRegion *old = gc->oldRegion;
