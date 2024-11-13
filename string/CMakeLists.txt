@@ -5,8 +5,8 @@ set(string_files source/string.c)
 
 set(typev_files
         ../source/core.c
-        ../source/gc.c
-        ../source/allocator/allocator.c
+        ../source/gc/gc.c
+        ../source/gc/mark.c
         ../source/stack/stack.c
         ../source/dynlib/dynlib.c
         ../source/env/env.c

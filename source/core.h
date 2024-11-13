@@ -13,6 +13,8 @@
 #define PTR_SIZE 8
 #define MAX_REG 256
 
+#undef NANO_PREALLOCATE_BAND_VM
+
 
 typedef struct TypeV_Struct {
     size_t bitMaskSize;
@@ -161,7 +163,7 @@ typedef struct TypeV_FuncState {
     uint64_t ip;             ///< Instruction pointer, used only as back up
     TypeV_Register regs[MAX_REG]; ///< 256 registers.
     TypeV_Register* spillSlots; ///< Spill slots, used when registers are not enough
-    uint16_t spillSize; ///< Spill size
+    uint16_t spillSize; ///< Spill cellSize
     uint8_t ptrFields;  ///< Pointer fields
     struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
     struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
@@ -173,8 +175,8 @@ typedef struct TypeV_FuncState {
 typedef struct TypeV_Closure {
     uintptr_t fnAddress;      ///< Function state
     TypeV_Register* upvalues; ///< Captured registers
-    uint8_t envSize;          ///< Environment size
-    uint8_t envCounter;       ///< Environment size
+    uint8_t envSize;          ///< Environment cellSize
+    uint8_t envCounter;       ///< Environment cellSize
     uint8_t offset;           ///< Upvalues start registers, right after the args
 }TypeV_Closure;
 
@@ -270,7 +272,7 @@ void core_halt(TypeV_Core *core);
  * Allocates a struct object
  * @param core
  * @param numfields Number of struct fieldOffsets
- * @param totalsize Total size of the struct
+ * @param totalsize Total cellSize of the struct
  * @param ptr_bitmask Bitmask of pointers
  * @return Pointer to the allocated struct
  */
@@ -291,7 +293,7 @@ uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint
  * Allocates a class object
  * @param core
  * @param num_methods Number of methods
- * @param total_fields_size  total size of fields in bytes
+ * @param total_fields_size  total cellSize of fields in bytes
  * @return new Class object initialized.
  */
 uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId);
@@ -306,7 +308,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_at
 uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size);
 
 /**
- * Extends the size of an array
+ * Extends the cellSize of an array
  * @param core
  * @param array_ptr
  * @param num_elements new number of elements

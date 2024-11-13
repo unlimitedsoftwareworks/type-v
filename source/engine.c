@@ -2,7 +2,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
-#include <mimalloc.h>
+
 
 #include "engine.h"
 #include "assembler/assembler.h"
@@ -16,11 +16,11 @@ void engine_init(TypeV_Engine *engine) {
     engine->coreCount = 0;
     engine->runningCoresCount = 0;
     engine->health = EH_OK;
-    engine->coreIterator = mi_malloc(sizeof(TypeV_CoreIterator));
-    engine->coreIterator->core = mi_malloc(sizeof(TypeV_Core));
+    engine->coreIterator = malloc(sizeof(TypeV_CoreIterator));
+    engine->coreIterator->core = malloc(sizeof(TypeV_Core));
     engine->coreIterator->next = NULL;
 
-    engine->ffi = mi_malloc(sizeof(TypeV_FFI*));
+    engine->ffi = malloc(sizeof(TypeV_FFI*));
     engine->ffiCount = 0;
 
     core_init(engine->coreIterator->core, engine_generateNewCoreID(engine), engine);
@@ -32,22 +32,22 @@ void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLeng
 }
 
 void engine_deallocate(TypeV_Engine *engine) {
-    // mi_free cores
+    // free cores
     TypeV_CoreIterator* iterator = engine->coreIterator;
     while(iterator != NULL) {
         TypeV_CoreIterator* next = iterator->next;
         core_deallocate(iterator->core);
-        mi_free(iterator);
+        free(iterator);
         iterator = next;
     }
     engine->coreIterator = NULL;
     engine->coreCount = 0;
 
-    // mi_free ffi
+    // free ffi
     for(uint16_t i = 0; i < engine->ffiCount; i++) {
-        mi_free(engine->ffi[i]);
+        free(engine->ffi[i]);
     }
-    mi_free(engine->ffi);
+    free(engine->ffi);
 }
 
 void engine_run(TypeV_Engine *engine) {
@@ -941,7 +941,7 @@ void engine_update_scheduler(TypeV_Engine *engine) {
 
 TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint64_t ip) {
     uint32_t id = engine_generateNewCoreID(engine);
-    TypeV_Core* newCore = mi_malloc(sizeof(TypeV_Core));
+    TypeV_Core* newCore = malloc(sizeof(TypeV_Core));
 
 
     core_init(newCore, id, engine);
@@ -955,7 +955,7 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
                parentCore->globalPtr);
 
     // add iterator and attack to engine
-    TypeV_CoreIterator* newCoreIterator = mi_malloc(sizeof(TypeV_CoreIterator));
+    TypeV_CoreIterator* newCoreIterator = malloc(sizeof(TypeV_CoreIterator));
     newCoreIterator->next = NULL;
     newCoreIterator->currentInstructions = 0;
     newCoreIterator->maxInstructions = 0;
@@ -997,13 +997,13 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
             // Free iterator here
             TypeV_CoreIterator* next = iterator->next;
             // These cause saniation issues, must fix later
-            //mi_free(iterator);
+            //free(iterator);
             iterator = next;
             prevIterator = NULL;
 
-            // mi_free the core
+            // free the core
             //core_deallocate(core);
-            //mi_free(core);
+            //free(core);
             break;
         }
         prevIterator = iterator;
@@ -1017,10 +1017,10 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core) {
 void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlibID) {
     if(dynlibID >= engine->ffiCount) {
         engine->ffiCount = dynlibID+1;
-        engine->ffi = mi_realloc(engine->ffi, sizeof(TypeV_EngineFFI)*engine->ffiCount);
+        engine->ffi = realloc(engine->ffi, sizeof(TypeV_EngineFFI)*engine->ffiCount);
     }
 
-    engine->ffi[dynlibID] = mi_malloc(sizeof(TypeV_EngineFFI));
+    engine->ffi[dynlibID] = malloc(sizeof(TypeV_EngineFFI));
 
 
     engine->ffi[dynlibID]->dynlibName = dynlibName;

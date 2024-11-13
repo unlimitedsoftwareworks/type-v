@@ -6,10 +6,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <mimalloc.h>
+
 
 #include "stack/stack.h"
-#include "gc.h"
+#include "gc/gc.h"
 #include "engine.h"
 #include "core.h"
 #include "utils/log.h"
@@ -17,13 +17,13 @@
 #include "utils/utils.h"
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
-    TypeV_FuncState* state = mi_malloc(sizeof(TypeV_FuncState));
+    TypeV_FuncState* state = malloc(sizeof(TypeV_FuncState));
 
     state->sp = 0;
     stack_init(state, 1024);
     state->prev = prev;
     state->next = NULL;
-    state->spillSlots = mi_malloc(sizeof(TypeV_Register));
+    state->spillSlots = malloc(sizeof(TypeV_Register));
     state->spillSize = 1;
 
     return state;
@@ -74,7 +74,7 @@ void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constan
 
 
 void core_deallocate(TypeV_Core *core) {
-    // first mi_free all the function states
+    // first free all the function states
     TypeV_FuncState* state = core->funcState;
     while(state != NULL) {
         TypeV_FuncState* next = state->next;
@@ -83,26 +83,26 @@ void core_deallocate(TypeV_Core *core) {
     }
 
     //core_gc_sweep_all(core);
-    //mi_free(core->gc.memObjects);
-    mi_free(core);
+    //free(core->gc.memObjects);
+    free(core);
 }
 
 void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state) {
     stack_free(state);
-    mi_free(state->spillSlots);
-    mi_free(state);
+    free(state->spillSlots);
+    free(state);
 }
 
 uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
-    LOG_INFO("CORE[%d]: Allocating struct with %d fields and %zu bytes, total allocated size: %zu",
+    LOG_INFO("CORE[%d]: Allocating struct with %d fields and %zu bytes, total allocated cellSize: %zu",
              core->id, numfields, totalsize, sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize + numfields * sizeof(uint16_t) + numfields * sizeof(uint32_t));
 
     size_t bitmaskSize = (numfields + 7) / 8;
 
-    // Calculate the total allocation size for the struct
+    // Calculate the total allocation cellSize for the struct
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct)
                                  + bitmaskSize  // Pointer bitmask
-                                 + totalsize // Data block size
+                                 + totalsize // Data block cellSize
                                  + numfields * sizeof(uint16_t)  // fieldOffsets array
                                  + numfields * sizeof(uint32_t); // globalFields array
 
@@ -164,7 +164,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_at
 }
 
 uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size) {
-    LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of size %d", core->id, num_elements, element_size);
+    LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of cellSize %d", core->id, num_elements, element_size);
 
     static uint32_t uid = 0;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
@@ -176,7 +176,7 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint6
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
-    array_ptr->data = mi_malloc(num_elements* element_size);
+    array_ptr->data = malloc(num_elements* element_size);
     array_ptr->uid = uid++;
     array_ptr->isPointerContainer = is_pointer_container;
 
@@ -194,7 +194,7 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = array->elementSize;
     array_ptr->length = slice_length;
-    array_ptr->data = mi_malloc(slice_length* array->elementSize);
+    array_ptr->data = malloc(slice_length* array->elementSize);
     array_ptr->uid = 1000000-array->uid;
     array_ptr->isPointerContainer = array->isPointerContainer;
 
@@ -204,14 +204,14 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
 }
 
 uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_elements){
-    LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated size: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
+    LOG_INFO("Extending array %p with %"PRIu64" elements, total allocated cellSize: %d", array_ptr, num_elements, num_elements*sizeof(size_t));
     TypeV_Array* array = (TypeV_Array*)array_ptr;
 
     if(array == NULL) {
         core_panic(core, -1, "Null array");
     }
 
-    array->data = mi_realloc(array->data, num_elements*array->elementSize);
+    array->data = realloc(array->data, num_elements*array->elementSize);
     array->length = num_elements;
 
     return array_ptr;
@@ -377,7 +377,7 @@ void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...) {
 
 
 void core_spill_alloc(TypeV_Core* core, uint16_t size) {
-    core->funcState->spillSlots = mi_realloc(core->funcState->spillSlots, sizeof(TypeV_Register)*(size));
+    core->funcState->spillSlots = realloc(core->funcState->spillSlots, sizeof(TypeV_Register)*(size));
     core->funcState->spillSize = size;
 }
 
@@ -398,7 +398,7 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
     closure_ptr->fnAddress = fnPtr;
     closure_ptr->envSize = envSize;
 
-    closure_ptr->upvalues = mi_malloc(envSize* sizeof(TypeV_Register ));
+    closure_ptr->upvalues = malloc(envSize* sizeof(TypeV_Register ));
 
     return closure_ptr;
 }

@@ -11,9 +11,9 @@ set(stdcore_files source/stdcore.c
 
 set(typev_files
         ../source/core.c
-        ../source/gc.c
+        ../source/gc/gc.c
+        ../source/gc/mark.c
         ../source/stack/stack.c
-        ../source/allocator/allocator.c
         ../source/dynlib/dynlib.c
         ../source/env/env.c
         ../source/api/typev_api.c

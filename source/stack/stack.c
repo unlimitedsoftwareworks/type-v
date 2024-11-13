@@ -1,12 +1,12 @@
 
 #include <string.h>
 #include <assert.h>
-#include <mimalloc.h>
+
 #include "stack.h"
 #include "../utils/log.h"
 
 void stack_init(TypeV_FuncState* fnc, size_t capacity) {
-    fnc->stack = mi_malloc(capacity);
+    fnc->stack = malloc(capacity);
     fnc->sp = 0;
     fnc->capacity = capacity;
 }
@@ -122,6 +122,6 @@ void stack_pop_ptr(TypeV_FuncState* fnc, uintptr_t* value) {
 }
 
 void stack_free(TypeV_FuncState* fnc) {
-    mi_free(fnc->stack);
+    free(fnc->stack);
     fnc->stack = NULL;
 }

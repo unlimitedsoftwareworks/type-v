@@ -6,7 +6,7 @@
 #else
 #include <unistd.h>
 #endif
-#include <mimalloc.h>
+
 
 #include <string.h>
 #include "env.h"
@@ -50,7 +50,7 @@ void typev_env_init(char* sourceMapFile){
         env.cwd = strdup(cwd);
     }
 
-    env.searchPaths = mi_malloc(3* sizeof(char*));
+    env.searchPaths = malloc(3* sizeof(char*));
     printf("current dir: %s\n", env.cwd);
 
     /*
