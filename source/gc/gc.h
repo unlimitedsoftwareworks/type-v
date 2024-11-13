@@ -13,19 +13,19 @@
 /**
  * Size of each cell.
  */
-#define CELL_SIZE 64
+#define CELL_SIZE 16
 
 /**
  * Maximum number of cells in the nursery region.
  */
-#define NURSERY_MAX_CELLS 4096
+#define NURSERY_MAX_CELLS 409600
 
 /**
  * Initial number of cells in the old generation region.
  * The number of cells is scaled by a factor of 2 each time the old generation is extended.
  * The factor is stored in the `capacityFactor` field of the `TypeV_OldGenerationRegion` structure.
  */
-#define INITIAL_OLD_CELLS 8192
+#define INITIAL_OLD_CELLS 819200
 
 /**
  * Total cellSize of the nursery region.
@@ -137,6 +137,19 @@ typedef struct TypeV_GCUpdateList {
     uintptr_t old_address;
     uintptr_t new_address;
 } TypeV_GCUpdateList;
+
+/**
+ * Update Promise, when marking, each object that is marked will have to register 
+ * a pointer to its new address, so that it can be updated after the minor GC.
+ * This feature hasn't been studied yet, because size of the array is not predetermined.
+ */
+typedef struct TypeV_UpdatePromise {
+    uintptr_t old_address;
+    /**
+     * Pointer to the new address, so that *new_address_pointer = new_address
+     */
+    void** new_address_pointer; 
+} TypeV_UpdatePromise;
 
 /**
  * Garbage Collector struct, part of the core

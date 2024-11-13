@@ -138,6 +138,7 @@ void core_gc_mark_nursery_object(TypeV_Core* core, uintptr_t ptr) {
             break;
         }
         case OT_CLOSURE: {
+            TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
             break;
         }
         case OT_COROUTINE: {
@@ -154,8 +155,10 @@ void core_gc_mark_nursery_object(TypeV_Core* core, uintptr_t ptr) {
 void gc_mark_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery) {
     if(inNursery) {
         for(uint32_t i = 0; i < MAX_REG; i++) {
-            uintptr_t ptr = state->regs[i].ptr;
-            core_gc_mark_nursery_object(core, ptr);
+            if(IS_REG_PTR(state, i)) {
+                uintptr_t ptr = state->regs[i].ptr;
+                core_gc_mark_nursery_object(core, ptr);
+            }
         }
     }
     else {
@@ -279,12 +282,14 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
 void gc_update_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery) {
     if(inNursery) {
         for(uint32_t i = 0; i < MAX_REG; i++) {
-            uintptr_t ptr = state->regs[i].ptr;
-            TypeV_ObjectHeader* old_header = gc_ptr_in_nursery(ptr, core->gc->nurseryRegion);
-            if(old_header) {
-                void *val = core_gc_update_object_reference_nursery(core, old_header);
-                if (val != NULL) {
-                    state->regs[i].ptr = (uintptr_t) val;
+            if(IS_REG_PTR(state, i)) {
+                uintptr_t ptr = state->regs[i].ptr;
+                TypeV_ObjectHeader* old_header = gc_ptr_in_nursery(ptr, core->gc->nurseryRegion);
+                if(old_header) {
+                    void *val = core_gc_update_object_reference_nursery(core, old_header);
+                    if (val != NULL) {
+                        state->regs[i].ptr = (uintptr_t) val;
+                    }
                 }
             }
         }

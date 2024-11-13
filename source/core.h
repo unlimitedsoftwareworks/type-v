@@ -162,12 +162,26 @@ typedef struct TypeV_FuncState {
     uint64_t sp;             ///< Stack pointer
     uint64_t ip;             ///< Instruction pointer, used only as back up
     TypeV_Register regs[MAX_REG]; ///< 256 registers.
+    uint64_t regsPtrBitmap[4];   ///< 1 if the register is a pointer, 0 otherwise
+
     TypeV_Register* spillSlots; ///< Spill slots, used when registers are not enough
     uint16_t spillSize; ///< Spill cellSize
-    uint8_t ptrFields;  ///< Pointer fields
+    uint8_t* ptrFields;  ///< Pointer fields
     struct TypeV_FuncState* next; ///< Next function state, used with fn_call or fn_call_i
     struct TypeV_FuncState* prev; ///< Previous function state, used fn_ret
 }TypeV_FuncState;
+
+// Macro to set the pointer status for a given register (set to 1)
+#define SET_REG_PTR(state, reg_index) \
+    ((state)->regsPtrBitmap[(reg_index) / 64] |= (1ULL << ((reg_index) % 64)))
+
+// Macro to clear the pointer status for a given register (set to 0)
+#define CLEAR_REG_PTR(state, reg_index) \
+    ((state)->regsPtrBitmap[(reg_index) / 64] &= ~(1ULL << ((reg_index) % 64)))
+
+// Macro to check if a register holds a pointer (returns non-zero if true)
+#define IS_REG_PTR(state, reg_index) \
+    ((state)->regsPtrBitmap[(reg_index) / 64] & (1ULL << ((reg_index) % 64)))
 
 /**
  * @brief Closure, a closure is a function that has captured its environment.
@@ -178,7 +192,9 @@ typedef struct TypeV_Closure {
     uint8_t envSize;          ///< Environment cellSize
     uint8_t envCounter;       ///< Environment cellSize
     uint8_t offset;           ///< Upvalues start registers, right after the args
+    uint8_t* ptrFields;       ///< Pointer fields bitmap
 }TypeV_Closure;
+#define IS_CLOSURE_UPVALUE_POINTER(ptrFields, i) ((ptrFields[(i) / 8] >> ((i) % 8)) & 1)
 
 
 typedef enum TypeV_CoroutineExecState {

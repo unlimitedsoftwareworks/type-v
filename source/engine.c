@@ -266,9 +266,6 @@ static void* dispatch_table[] = { \
     &&DO_DEBUG_REG, \
     &&DO_HALT, \
     &&DO_LOAD_STD, \
-    &&DO_SPILL_ALLOC, \
-    &&DO_SPILL_REG, \
-    &&DO_UNSPILL_REG,   \
     &&DO_CLOSURE_ALLOC, \
     &&DO_CLOSURE_PUSH_ENV,\
     &&DO_CLOSURE_PUSH_ENV_PTR,\
@@ -862,15 +859,6 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_LOAD_STD:
             load_std(core);
-            DISPATCH();
-        DO_SPILL_ALLOC:
-            spill_alloc(core);
-            DISPATCH();
-        DO_SPILL_REG:
-            spill_reg(core);
-            DISPATCH();
-        DO_UNSPILL_REG:
-            unspill_reg(core);
             DISPATCH();
         DO_CLOSURE_ALLOC:
             closure_alloc(core);

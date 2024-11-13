@@ -151,10 +151,6 @@ void gc_minor_gc(TypeV_Core* core) {
             TypeV_ObjectHeader* obj = (TypeV_ObjectHeader*)(nursery->from + (i * CELL_SIZE));
             size_t object_cell_size = (obj->totalSize + CELL_SIZE - 1) / CELL_SIZE; // Calculate cellSize in cells
 
-            if(object_cell_size > 2) {
-                core_panic(core, -1, "Object cellSize exceeded the maximum limit");
-            }
-
             if(i + object_cell_size > NURSERY_MAX_CELLS) {
                 core_panic(core, -1, "Nursery cellSize exceeded the maximum limit");
             }

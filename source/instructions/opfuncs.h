@@ -237,10 +237,6 @@ static op_func op_funcs[] = {
 
         &load_std,
 
-        &spill_alloc,
-        &spill_reg,
-        &unspill_reg,
-
         &closure_alloc,
         &closure_push_env,
         &closure_push_env_ptr,

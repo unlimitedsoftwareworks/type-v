@@ -517,21 +517,6 @@ typedef enum TypeV_OpCode {
     OP_LOAD_STD,
 
     /**
-     * OP_SPILL_ALLOC size: I (2 bytes)
-     */
-    OP_SPILL_ALLOC,
-
-    /**
-     * OP_SPILL_REG: slot (2 bytes), source: R
-     */
-    OP_SPILL_REG,
-
-    /**
-     * OP_UNSPILL_ALLOC dest: R, slot: I (2 bytes)
-     */
-    OP_UNSPILL_REG,
-
-    /**
      * OP_CLOSURE_ALLOC, dest:R, offset_to_args: 1Byte, env_size: 1byte fn_address: I (8 bytes),
      * Allocates a closure, storing it in dest.
      * The closure will push its environment in the register starting from offset_to_args.

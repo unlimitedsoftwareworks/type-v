@@ -25,6 +25,7 @@ TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     state->next = NULL;
     state->spillSlots = malloc(sizeof(TypeV_Register));
     state->spillSize = 1;
+    memset(state->regsPtrBitmap, 0, sizeof(state->regsPtrBitmap));
 
     return state;
 }
@@ -43,6 +44,9 @@ TypeV_FuncState* core_duplicate_function_state(TypeV_FuncState* original) {
     }
 
     state->next = original->next;
+
+    state->ptrFields = malloc((original->spillSize + 7) / 8);
+    memset(state->ptrFields, 0, (original->spillSize + 7) / 8);
 
     return state;
 }
@@ -399,6 +403,10 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
     closure_ptr->envSize = envSize;
 
     closure_ptr->upvalues = malloc(envSize* sizeof(TypeV_Register ));
+
+    size_t bitmaskSize = (envSize + 7) / 8;
+    closure_ptr->ptrFields = malloc(bitmaskSize);
+    memset(closure_ptr->ptrFields, 0, bitmaskSize);
 
     return closure_ptr;
 }
