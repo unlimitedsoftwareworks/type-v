@@ -9,6 +9,8 @@
 #ifndef TYPE_V_CORE_H
 #define TYPE_V_CORE_H
 #include <stdint.h>
+#include <stdalign.h>
+
 
 #define PTR_SIZE 8
 #define MAX_REG 256
@@ -17,14 +19,15 @@
 
 
 typedef struct TypeV_Struct {
-    size_t bitMaskSize;
-    uint8_t* pointerBitmask;
-    uint32_t uid;
-    uint8_t numFields;                      //< Number of fields in the struct, needed for search
-    uint16_t* fieldOffsets;                 //< Field offsets table
-    uint32_t* globalFields;                 //< Global fields table, contains ids of global fields, sorted
-    uint8_t data[];                         //< Data block, if this is a shadow struct,
-}TypeV_Struct;
+    uint32_t* globalFields;      // Pointer to global fields
+    uint16_t* fieldOffsets;      // Pointer to offsets
+    uint8_t* pointerBitmask;     // Pointer to bitmask (8 bytes on 64-bit systems)
+    size_t bitMaskSize;          // 8 bytes on most systems (aligned for `size_t`)
+    uint32_t uid;                // 4 bytes, naturally aligned here
+    uint8_t numFields;           // 1 byte
+    uint8_t* data;               // Pointer to data block, which starts right after the struct, with a potential padding
+} TypeV_Struct;
+
 
 typedef struct TypeV_Class{
     size_t bitMaskSize;
@@ -128,6 +131,10 @@ typedef struct TypeV_GlobalPool {
 #define FLAG_CHECK(flags, flag) ((flags) & (flag))
 #define WRITE_FLAG(flags, flag, value) ((value) ? ((flags) |= (flag)) : ((flags) &= ~(flag)))
 
+
+// Helper macro to align a pointer
+#define ALIGN_PTR(ptr, alignment) \
+    ((uintptr_t)(((uintptr_t)(ptr) + (alignment - 1)) & ~(alignment - 1)))
 
 /**
  * @brief Object Types, used to identify a the underlying structure of GC allocated memory

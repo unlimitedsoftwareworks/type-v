@@ -139,9 +139,18 @@ void core_gc_mark_nursery_object(TypeV_Core* core, uintptr_t ptr) {
         }
         case OT_CLOSURE: {
             TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
+            for(size_t i = 0; i < closure_ptr->envSize; i++) {
+                if(IS_CLOSURE_UPVALUE_POINTER(closure_ptr->ptrFields, i)) {
+                    uintptr_t upvaluePtr = (uintptr_t)(closure_ptr->upvalues + i * sizeof(uintptr_t));
+                    core_gc_mark_nursery_object(core, upvaluePtr);
+                }
+            }
             break;
         }
         case OT_COROUTINE: {
+            TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
+            core_gc_mark_nursery_object(core, (uintptr_t)coroutine_ptr->closure);
+            gc_update_state(core, coroutine_ptr->state, 1);
             break;
         }
         case OT_RAWMEM: {
@@ -198,22 +207,55 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
     // If the object is a struct, mark its fields
     switch (new_ptr->type) {
         case OT_STRUCT: {
-            TypeV_Struct* struct_ptr = (TypeV_Struct*)(new_ptr + 1);
+            // Assuming `new_ptr` is the pointer to the new location of the TypeV_ObjectHeader
+            TypeV_ObjectHeader* header = new_ptr;
+            TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
             size_t bitmaskSize = (struct_ptr->numFields + 7) / 8;
 
-            size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct)
-                                         + bitmaskSize  // Pointer bitmask
-                                         // Data block cellSize
-                                         + struct_ptr->numFields * sizeof(uint16_t)  // fieldOffsets array
-                                         + struct_ptr->numFields * sizeof(uint32_t); // globalFields array
+            // Calculate the total allocation size required for the struct fields
+            size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
 
-            size_t dataSize = new_ptr->totalSize - totalAllocationSize;
+            // Align for `fieldOffsets` (2-byte alignment)
+            totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
+            totalAllocationSize += struct_ptr->numFields * sizeof(uint16_t);  // Add size for `fieldOffsets`
 
-            void* newAddr = (uint8_t *)(struct_ptr + 1);
+            // Align for `globalFields` (4-byte alignment)
+            totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
+            totalAllocationSize += struct_ptr->numFields * sizeof(uint32_t);  // Add size for `globalFields`
 
-            struct_ptr->fieldOffsets = (uint16_t*)(struct_ptr->data + dataSize);
-            struct_ptr->globalFields = (uint32_t*)(struct_ptr->fieldOffsets + struct_ptr->numFields);
-            struct_ptr->pointerBitmask = (uint8_t*)(struct_ptr->globalFields+struct_ptr->numFields);
+            // Add size for `pointerBitmask`
+            totalAllocationSize += bitmaskSize;
+
+            // Align for `data` (8-byte alignment)
+            totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
+
+            // Calculate data size from the difference between total size and the allocated header + metadata
+            size_t dataSize = header->totalSize - totalAllocationSize;
+
+            // Set pointers with updated alignments
+            uint8_t* current_ptr = (uint8_t*)struct_ptr + sizeof(TypeV_Struct);
+
+            // Set `fieldOffsets` pointer with proper alignment
+            current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
+            struct_ptr->fieldOffsets = (uint16_t*)current_ptr;
+
+            // Set `globalFields` pointer with proper alignment
+            current_ptr = (uint8_t*)(struct_ptr->fieldOffsets + struct_ptr->numFields);
+            current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
+            struct_ptr->globalFields = (uint32_t*)current_ptr;
+
+            // Set `pointerBitmask` pointer (directly after `globalFields`)
+            current_ptr = (uint8_t*)(struct_ptr->globalFields + struct_ptr->numFields);
+            struct_ptr->pointerBitmask = current_ptr;
+
+            // Set `data` pointer with proper 8-byte alignment
+            current_ptr = struct_ptr->pointerBitmask + bitmaskSize;
+            current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+            struct_ptr->data = current_ptr;
+
+            // Note: `ALIGN_PTR` macro needs to be defined as:
+            // #define ALIGN_PTR(ptr, alignment) ((uintptr_t)(((uintptr_t)(ptr) + (alignment - 1)) & ~(alignment - 1)))
+
 
             for (size_t i = 0; i < struct_ptr->numFields; i++) {
                 // Determine which byte and which bit correspond to the current field index `i`
@@ -275,9 +317,25 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
             break;
         }
         case OT_CLOSURE: {
+            TypeV_Closure* closure_ptr = (TypeV_Closure*)(new_ptr + 1);
+            for(size_t i = 0; i < closure_ptr->envSize; i++) {
+                if(IS_CLOSURE_UPVALUE_POINTER(closure_ptr->ptrFields, i)) {
+                    uintptr_t upvaluePtr = (uintptr_t)(closure_ptr->upvalues + i * sizeof(uintptr_t));
+                    TypeV_ObjectHeader* upvalueHeader = gc_ptr_in_nursery(upvaluePtr, core->gc->nurseryRegion);
+
+                    void* res = core_gc_update_object_reference_nursery(core, upvalueHeader);
+                    if(res != NULL) {
+                        memcpy((void*)upvaluePtr, &res, sizeof(void*));
+                    }
+                }
+            }
             break;
         }
         case OT_COROUTINE: {
+            TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(new_ptr + 1);
+            TypeV_ObjectHeader* closureHeader = gc_ptr_in_nursery((uintptr_t)coroutine_ptr->closure, core->gc->nurseryRegion);
+            core_gc_update_object_reference_nursery(core, closureHeader);
+            gc_update_state(core, coroutine_ptr->state, 1);
             break;
         }
         case OT_RAWMEM: {
