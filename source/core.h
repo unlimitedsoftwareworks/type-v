@@ -29,24 +29,25 @@ typedef struct TypeV_Struct {
 } TypeV_Struct;
 
 
-typedef struct TypeV_Class{
-    size_t bitMaskSize;
-    uint8_t* pointerBitmask;
-    uint8_t numFields;        //< Number of fields in the class
-    uint64_t uid;             //< Unique ID
-    uint8_t numMethods;       //< number of methods
-    uint32_t* globalMethods;  //< Global fields table, contains ids of global fields, sorted
-    size_t* methods;          //< A pointer to the method table
-    uint16_t* fieldOffsets;   //< Field offsets table
-    /** data */
-    uint8_t data[];           //< Fields start from here, direct access
-}TypeV_Class;
+typedef struct TypeV_Class {
+    uint64_t* methods;        // Pointer to method table, 8-byte alignment
+    uint32_t* globalMethods;  // Pointer to global methods table, 8-byte alignment
+    uint16_t* fieldOffsets;   // Pointer to field offsets table, 8-byte alignment (since it is a pointer)
+    uint8_t* pointerBitmask;  // Pointer to bitmask, 8-byte alignment
+    size_t bitMaskSize;       // Bitmask size, 8-byte alignment
+    uint64_t uid;             // Unique ID, 8-byte alignment
+    uint8_t numMethods;       // Number of methods, 1-byte alignment
+    uint8_t numFields;        // Number of fields, 1-byte alignment
+    uint8_t* data;            // Pointer to data block, placed last for alignment simplicity
+} TypeV_Class;
+
+
 
 typedef struct TypeV_Array {
-    uint8_t isPointerContainer;
-    uint32_t uid;
-    uint8_t elementSize;      ///< Size of each element
     uint64_t length;          ///< Array length
+    uint32_t uid;
+    uint8_t isPointerContainer;
+    uint8_t elementSize;      ///< Size of each element
     uint8_t* data;            ///< Array data
 }TypeV_Array;
 
@@ -136,6 +137,30 @@ typedef struct TypeV_GlobalPool {
 #define ALIGN_PTR(ptr, alignment) \
     ((uintptr_t)(((uintptr_t)(ptr) + (alignment - 1)) & ~(alignment - 1)))
 
+/*
+ * Check for x86/x64, which typically allows unaligned access
+ *
+ * This flag needs to be disabled when running sanitizer, unligned access
+ * should only be used when reading data from code segment, for the rest,
+ * we need to make sure type-v objects are properly aligned.
+ */
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+    #define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
+
+// Check for ARMv8 or newer, which often allows unaligned access for certain types
+#elif defined(__aarch64__) || defined(_M_ARM64) || defined(__ARM_ARCH_8A__)
+    #define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
+
+// ARMv7 and older do not support unaligned access
+#elif defined(__arm__) || defined(_M_ARM)
+    #define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
+
+// Fallback for unknown architectures
+#else
+    #define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
+#endif
+
+
 /**
  * @brief Object Types, used to identify a the underlying structure of GC allocated memory
  * object
@@ -194,12 +219,12 @@ typedef struct TypeV_FuncState {
  * @brief Closure, a closure is a function that has captured its environment.
  */
 typedef struct TypeV_Closure {
-    uintptr_t fnAddress;      ///< Function state
     TypeV_Register* upvalues; ///< Captured registers
+    uint8_t* ptrFields;       ///< Pointer fields bitmap
+    uintptr_t fnAddress;      ///< Function address
     uint8_t envSize;          ///< Environment cellSize
     uint8_t envCounter;       ///< Environment cellSize
     uint8_t offset;           ///< Upvalues start registers, right after the args
-    uint8_t* ptrFields;       ///< Pointer fields bitmap
 }TypeV_Closure;
 #define IS_CLOSURE_UPVALUE_POINTER(ptrFields, i) ((ptrFields[(i) / 8] >> ((i) % 8)) & 1)
 

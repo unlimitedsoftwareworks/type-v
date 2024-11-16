@@ -141,7 +141,7 @@ void core_gc_mark_nursery_object(TypeV_Core* core, uintptr_t ptr) {
             TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
             for(size_t i = 0; i < closure_ptr->envSize; i++) {
                 if(IS_CLOSURE_UPVALUE_POINTER(closure_ptr->ptrFields, i)) {
-                    uintptr_t upvaluePtr = (uintptr_t)(closure_ptr->upvalues + i * sizeof(uintptr_t));
+                    uintptr_t upvaluePtr = closure_ptr->upvalues[i].ptr;
                     core_gc_mark_nursery_object(core, upvaluePtr);
                 }
             }
@@ -163,19 +163,9 @@ void core_gc_mark_nursery_object(TypeV_Core* core, uintptr_t ptr) {
 
 void gc_mark_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery) {
     if (inNursery) {
-        for (uint32_t bitmap_index = 0; bitmap_index < 4; bitmap_index++) {
-            uint64_t bitmap = state->regsPtrBitmap[bitmap_index];
-            
-            while (bitmap) {
-                // Find the index of the lowest set bit
-                uint32_t bit_position = __builtin_ctzll(bitmap); // Count trailing zeros to find first set bit
-                uint32_t reg_index = (bitmap_index * 64) + bit_position;
-
-                // Clear the bit in bitmap to continue with the next set bit
-                bitmap &= ~(1ULL << bit_position);
-
-                // Now, we know reg_index holds a pointer
-                uintptr_t ptr = state->regs[reg_index].ptr;
+        for (uint32_t i = 0; i < MAX_REG; i++) {
+            if(IS_REG_PTR(state, i)) {
+                uintptr_t ptr = state->regs[i].ptr;
                 core_gc_mark_nursery_object(core, ptr);
             }
         }
@@ -190,6 +180,80 @@ void gc_mark_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery) 
     }
 }
 
+void core_struct_recompute_pointers(TypeV_Struct* struct_ptr) {
+    size_t bitmaskSize = (struct_ptr->numFields + 7) / 8;
+
+    uint8_t* current_ptr = (uint8_t*)(struct_ptr + 1);
+
+    // Set `globalFields` pointer (aligned to 4 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
+    struct_ptr->globalFields = (uint32_t*)current_ptr;
+    current_ptr += struct_ptr->numFields * sizeof(uint32_t);
+
+    // Set `fieldOffsets` pointer (aligned to 2 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
+    struct_ptr->fieldOffsets = (uint16_t*)current_ptr;
+    current_ptr += struct_ptr->numFields * sizeof(uint16_t);
+
+    // Set `pointerBitmask` pointer (aligned to 1 byte)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
+    struct_ptr->pointerBitmask = current_ptr;
+
+
+    // Set `data` pointer (aligned to 8 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+    struct_ptr->data = current_ptr;
+
+
+    // Set `bitMaskSize`
+    struct_ptr->bitMaskSize = bitmaskSize;
+}
+
+
+void core_class_recompute_pointers(TypeV_Class* class_ptr) {
+    size_t bitmaskSize = (class_ptr->numFields + 7) / 8;
+
+    uint8_t* current_ptr = (uint8_t*)(class_ptr + 1);
+
+    // Set `methods` pointer (aligned to 8 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+    class_ptr->methods = (uint64_t*)current_ptr;
+    current_ptr += class_ptr->numMethods * sizeof(uint64_t);
+
+    // Set `globalMethods` pointer (aligned to 4 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
+    class_ptr->globalMethods = (uint32_t*)current_ptr;
+    current_ptr += class_ptr->numMethods * sizeof(uint32_t);
+
+    // Set `fieldOffsets` pointer (aligned to 2 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
+    class_ptr->fieldOffsets = (uint16_t*)current_ptr;
+    current_ptr += class_ptr->numFields * sizeof(uint16_t);
+
+    // Set `pointerBitmask` pointer (aligned to 1 byte)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
+    class_ptr->pointerBitmask = current_ptr;
+    current_ptr += bitmaskSize;
+
+    // Set `data` pointer (aligned to 8 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+    class_ptr->data = current_ptr;
+}
+
+void core_closure_recompute_pointers(TypeV_Closure* closure_ptr) {
+    size_t bitmaskSize = (closure_ptr->envSize + 7) / 8;
+
+    uint8_t* current_ptr = (uint8_t*)(closure_ptr + 1);
+
+    // Set `upvalues` pointer (aligned to 8 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+    closure_ptr->upvalues = (TypeV_Register*)current_ptr;
+    current_ptr += closure_ptr->envSize * sizeof(TypeV_Register);
+
+    // Set `ptrFields` pointer (aligned to 1 byte)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
+    closure_ptr->ptrFields = current_ptr;
+}
 
 void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHeader* old_header) {
     // printf("Checking for object updates %p\n", header);
@@ -207,55 +271,10 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
     // If the object is a struct, mark its fields
     switch (new_ptr->type) {
         case OT_STRUCT: {
-            // Assuming `new_ptr` is the pointer to the new location of the TypeV_ObjectHeader
-            TypeV_ObjectHeader* header = new_ptr;
-            TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
-            size_t bitmaskSize = (struct_ptr->numFields + 7) / 8;
+            TypeV_Struct* struct_ptr = (TypeV_Struct*)(new_ptr + 1);
+            core_struct_recompute_pointers(struct_ptr);
 
-            // Calculate the total allocation size required for the struct fields
-            size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
-
-            // Align for `fieldOffsets` (2-byte alignment)
-            totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
-            totalAllocationSize += struct_ptr->numFields * sizeof(uint16_t);  // Add size for `fieldOffsets`
-
-            // Align for `globalFields` (4-byte alignment)
-            totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
-            totalAllocationSize += struct_ptr->numFields * sizeof(uint32_t);  // Add size for `globalFields`
-
-            // Add size for `pointerBitmask`
-            totalAllocationSize += bitmaskSize;
-
-            // Align for `data` (8-byte alignment)
-            totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
-
-            // Calculate data size from the difference between total size and the allocated header + metadata
-            size_t dataSize = header->totalSize - totalAllocationSize;
-
-            // Set pointers with updated alignments
-            uint8_t* current_ptr = (uint8_t*)struct_ptr + sizeof(TypeV_Struct);
-
-            // Set `fieldOffsets` pointer with proper alignment
-            current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
-            struct_ptr->fieldOffsets = (uint16_t*)current_ptr;
-
-            // Set `globalFields` pointer with proper alignment
-            current_ptr = (uint8_t*)(struct_ptr->fieldOffsets + struct_ptr->numFields);
-            current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
-            struct_ptr->globalFields = (uint32_t*)current_ptr;
-
-            // Set `pointerBitmask` pointer (directly after `globalFields`)
-            current_ptr = (uint8_t*)(struct_ptr->globalFields + struct_ptr->numFields);
-            struct_ptr->pointerBitmask = current_ptr;
-
-            // Set `data` pointer with proper 8-byte alignment
-            current_ptr = struct_ptr->pointerBitmask + bitmaskSize;
-            current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
-            struct_ptr->data = current_ptr;
-
-            // Note: `ALIGN_PTR` macro needs to be defined as:
-            // #define ALIGN_PTR(ptr, alignment) ((uintptr_t)(((uintptr_t)(ptr) + (alignment - 1)) & ~(alignment - 1)))
-
+            // Note: The order and size calculation should match exactly what was done during the initial allocation.
 
             for (size_t i = 0; i < struct_ptr->numFields; i++) {
                 // Determine which byte and which bit correspond to the current field index `i`
@@ -268,8 +287,7 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
 
                     uintptr_t fieldPtr;
                     memcpy(&fieldPtr, struct_ptr->data + struct_ptr->fieldOffsets[i], sizeof(uintptr_t));
-
-                    TypeV_ObjectHeader* fieldHeader = gc_ptr_in_nursery(fieldPtr, core->gc->nurseryRegion);
+                    TypeV_ObjectHeader* fieldHeader = (TypeV_ObjectHeader*)(fieldPtr - sizeof(TypeV_ObjectHeader));
 
                     void* res = core_gc_update_object_reference_nursery(core, fieldHeader);
                     if(res != NULL) {
@@ -283,6 +301,8 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
 
         case OT_CLASS: {
             TypeV_Class *class_ptr = (TypeV_Class *) (new_ptr + 1);
+            core_class_recompute_pointers(class_ptr);
+
             for (size_t i = 0; i < class_ptr->numFields; i++) {
                 // Determine which byte and which bit correspond to the current field index `i`
                 size_t byteIndex = i / 8;       // Which byte contains the bit for the field at index `i`
@@ -291,7 +311,7 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
                 // Check if the bit corresponding to field `i` is set
                 if (class_ptr->pointerBitmask[byteIndex] & (1 << bitOffset)) {
                     uintptr_t fieldPtr = (uintptr_t)(class_ptr->data + class_ptr->fieldOffsets[i]);
-                    TypeV_ObjectHeader* fieldHeader = gc_ptr_in_nursery(fieldPtr, core->gc->nurseryRegion);
+                    TypeV_ObjectHeader* fieldHeader = (TypeV_ObjectHeader*)(fieldPtr - sizeof(TypeV_ObjectHeader));
 
                     void* res = core_gc_update_object_reference_nursery(core, fieldHeader);
                     if(res != NULL) {
@@ -306,7 +326,7 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
             if (array_ptr->isPointerContainer) {
                 for (size_t i = 0; i < array_ptr->length; i++) {
                     uintptr_t fieldPtr = (uintptr_t)(array_ptr->data + i * array_ptr->elementSize);
-                    TypeV_ObjectHeader* fieldHeader = gc_ptr_in_nursery(fieldPtr, core->gc->nurseryRegion);
+                    TypeV_ObjectHeader* fieldHeader = (TypeV_ObjectHeader*)(fieldPtr - sizeof(TypeV_ObjectHeader));
 
                     void* res = core_gc_update_object_reference_nursery(core, fieldHeader);
                     if(res != NULL) {
@@ -318,11 +338,12 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
         }
         case OT_CLOSURE: {
             TypeV_Closure* closure_ptr = (TypeV_Closure*)(new_ptr + 1);
+            core_closure_recompute_pointers(closure_ptr);
+
             for(size_t i = 0; i < closure_ptr->envSize; i++) {
                 if(IS_CLOSURE_UPVALUE_POINTER(closure_ptr->ptrFields, i)) {
                     uintptr_t upvaluePtr = (uintptr_t)(closure_ptr->upvalues + i * sizeof(uintptr_t));
-                    TypeV_ObjectHeader* upvalueHeader = gc_ptr_in_nursery(upvaluePtr, core->gc->nurseryRegion);
-
+                    TypeV_ObjectHeader* upvalueHeader = (TypeV_ObjectHeader*)(upvaluePtr - sizeof(TypeV_ObjectHeader));
                     void* res = core_gc_update_object_reference_nursery(core, upvalueHeader);
                     if(res != NULL) {
                         memcpy((void*)upvaluePtr, &res, sizeof(void*));
@@ -333,8 +354,9 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
         }
         case OT_COROUTINE: {
             TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(new_ptr + 1);
-            TypeV_ObjectHeader* closureHeader = gc_ptr_in_nursery((uintptr_t)coroutine_ptr->closure, core->gc->nurseryRegion);
-            core_gc_update_object_reference_nursery(core, closureHeader);
+            TypeV_ObjectHeader* closureHeader = (TypeV_ObjectHeader*)(coroutine_ptr->closure - sizeof(TypeV_ObjectHeader));
+            
+            coroutine_ptr->closure = core_gc_update_object_reference_nursery(core, closureHeader);
             gc_update_state(core, coroutine_ptr->state, 1);
             break;
         }
@@ -353,7 +375,7 @@ void gc_update_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery
     if (inNursery) {
         for (uint32_t bitmap_index = 0; bitmap_index < 4; bitmap_index++) {
             uint64_t bitmap = state->regsPtrBitmap[bitmap_index];
-            
+
             while (bitmap) {
                 // Find the index of the lowest set bit
                 uint32_t bit_position = __builtin_ctzll(bitmap); // Count trailing zeros (GCC/Clang intrinsic)

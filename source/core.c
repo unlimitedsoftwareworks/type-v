@@ -106,28 +106,30 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     LOG_INFO("CORE[%d]: Allocating struct with %d fields and %zu bytes, total allocated cellSize: %zu",
              core->id, numfields, totalsize, sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize + numfields * sizeof(uint16_t) + numfields * sizeof(uint32_t));
 
+    // Ensure minimum data size is 8 bytes for alignment purposes
     if (totalsize < 8) {
-        totalsize = 8; // Ensure minimum size of 8 bytes for alignment purposes
+        totalsize = 8;
     }
 
-    // Initial allocation size including header and struct
+    // Calculate sizes for each component
+    size_t bitmaskSize = (numfields + 7) / 8;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
 
-    // Align `fieldOffsets` (2-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
-    totalAllocationSize += numfields * sizeof(uint16_t); // Add fieldOffsets array size
-
-    // Align `globalFields` (4-byte alignment)
+    // Align for `globalFields` (4-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
-    totalAllocationSize += numfields * sizeof(uint32_t); // Add globalFields array size
+    totalAllocationSize += numfields * sizeof(uint32_t);  // Global fields array
 
-    // Add space for pointer bitmask
-    size_t bitmaskSize = (numfields + 7) / 8;
-    totalAllocationSize += bitmaskSize;
+    // Align for `fieldOffsets` (2-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
+    totalAllocationSize += numfields * sizeof(uint16_t);  // Field offsets array
 
-    // Align `data` (8-byte alignment)
+    // Align for `pointerBitmask` (1-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint8_t));
+    totalAllocationSize += bitmaskSize;  // Pointer bitmask size
+
+    // Align for `data` (8-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
-    totalAllocationSize += totalsize; // Add data block size
+    totalAllocationSize += totalsize;  // Data block size
 
     // Allocate the entire memory block
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
@@ -135,30 +137,40 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
 
     // Initialize the object header
     header->type = OT_STRUCT;
+    header->totalSize = totalAllocationSize;
+    header->survivedCount = 0;
 
     // Place the `TypeV_Struct` directly after the header
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
     struct_ptr->numFields = numfields;
     struct_ptr->uid = uid++;
 
-    // Set `fieldOffsets` pointer with proper 2-byte alignment
-    uint8_t* current_ptr = (uint8_t*)struct_ptr + sizeof(TypeV_Struct);
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
-    struct_ptr->fieldOffsets = (uint16_t*)current_ptr;
+    // Set pointers for subsequent arrays with alignment adjustments
 
-    // Set `globalFields` pointer with proper 4-byte alignment
-    current_ptr = (uint8_t*)(struct_ptr->fieldOffsets + numfields);
+    uint8_t* current_ptr = (uint8_t*)(struct_ptr + 1);
+
+    // Set `globalFields` pointer (aligned to 4 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
     struct_ptr->globalFields = (uint32_t*)current_ptr;
+    current_ptr += numfields * sizeof(uint32_t);
 
-    // Set `pointerBitmask` pointer
-    current_ptr = (uint8_t*)(struct_ptr->globalFields + numfields);
+    // Set `fieldOffsets` pointer (aligned to 2 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
+    struct_ptr->fieldOffsets = (uint16_t*)current_ptr;
+    current_ptr += numfields * sizeof(uint16_t);
+
+    // Set `pointerBitmask` pointer (aligned to 1 byte)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
     struct_ptr->pointerBitmask = current_ptr;
 
-    // Set `data` pointer, aligned to 8 bytes
-    current_ptr = struct_ptr->pointerBitmask + bitmaskSize;
+    // Set `data` pointer (aligned to 8 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
     struct_ptr->data = current_ptr;
+    current_ptr += totalsize;
+
+
+    // Set `bitMaskSize`
+    struct_ptr->bitMaskSize = bitmaskSize;
 
     // Zero out the bitmask
     memset(struct_ptr->pointerBitmask, 0, bitmaskSize);
@@ -167,41 +179,86 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     return (uintptr_t)struct_ptr;
 }
 
-
-
-
 uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId) {
-    LOG_INFO("CORE[%d]: Allocating class with %d methods and %d bytes, uid: %d", core->id, num_methods, total_fields_size, classId);
+    LOG_INFO("CORE[%d]: Allocating class with %d methods and %d attributes, uid: %llu", core->id, num_methods, num_attributes, classId);
 
+    // Calculate bitmask size for pointers
     size_t bitmaskSize = (num_attributes + 7) / 8;
-    
-    if(total_fields_size < 8) {
+
+    // Ensure minimum data size for alignment purposes
+    if (total_fields_size < 8) {
         total_fields_size = 8;
     }
 
+    // Start calculating the total size required for allocation
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class);
 
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class)
-                                + bitmaskSize
-                                + total_fields_size
-                                + num_methods * sizeof(size_t)
-                                + num_methods * sizeof(uint32_t)
-                                + num_attributes * sizeof(uint16_t);
+    // Align for `methods` (8-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
+    totalAllocationSize += num_methods * sizeof(uint64_t);  // Methods array
 
+    // Align for `globalMethods` (4-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
+    totalAllocationSize += num_methods * sizeof(uint32_t);  // Global methods array
+
+    // Align for `fieldOffsets` (2-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
+    totalAllocationSize += num_attributes * sizeof(uint16_t);  // Field offsets array
+
+    // Align for `pointerBitmask` (1-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint8_t));
+    totalAllocationSize += bitmaskSize;  // Pointer bitmask size
+
+    // Align for `data` (8-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
+    totalAllocationSize += total_fields_size;  // Data block size
+
+    // Allocate memory for the entire class object
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
     header->type = OT_CLASS;
+    header->totalSize = totalAllocationSize;
+    header->survivedCount = 0;  // Assuming survived count is initialized to 0
 
-    // Get a pointer to the actual class, which comes after the header
+    // Get a pointer to the class, which comes after the header
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
     class_ptr->numMethods = num_methods;
     class_ptr->numFields = num_attributes;
     class_ptr->uid = classId;
-    class_ptr->methods = (size_t*)(class_ptr->data + total_fields_size);
-    class_ptr->globalMethods = (uint32_t*)(class_ptr->methods + num_methods);
-    class_ptr->fieldOffsets = (uint16_t*)(class_ptr->globalMethods + num_methods);
-    class_ptr->pointerBitmask = (uint8_t*)(class_ptr->fieldOffsets + num_attributes);
 
+    // Set pointers for subsequent arrays, ensuring alignment is handled
+
+    uint8_t* current_ptr = (uint8_t*)(class_ptr + 1);
+
+    // Set `methods` pointer (aligned to 8 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+    class_ptr->methods = (uint64_t*)current_ptr;
+    current_ptr += num_methods * sizeof(uint64_t);
+
+    // Set `globalMethods` pointer (aligned to 4 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
+    class_ptr->globalMethods = (uint32_t*)current_ptr;
+    current_ptr += num_methods * sizeof(uint32_t);
+
+    // Set `fieldOffsets` pointer (aligned to 2 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
+    class_ptr->fieldOffsets = (uint16_t*)current_ptr;
+    current_ptr += num_attributes * sizeof(uint16_t);
+
+    // Set `pointerBitmask` pointer (aligned to 1 byte)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
+    class_ptr->pointerBitmask = current_ptr;
+    current_ptr += bitmaskSize;
+
+    // Set `data` pointer (aligned to 8 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+    class_ptr->data = current_ptr;
+
+    // Zero out the bitmask
+    memset(class_ptr->pointerBitmask, 0, bitmaskSize);
+
+    // Return the pointer to the class
     return (uintptr_t)class_ptr;
 }
 
@@ -328,8 +385,8 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *globalFields
     /*int cache_index = find_in_cache(globalID);
     if (__builtin_expect(cache_index != (uint8_t)-1, 1)) {
         return cache_index;  // Cache hit
-    }
-     */
+    }     */
+
 
     // Perform binary search if cache miss
     int left = 0;
@@ -423,29 +480,55 @@ void core_spill_alloc(TypeV_Core* core, uint16_t size) {
     core->funcState->spillSize = size;
 }
 
+
 TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t argsOffset, uint8_t envSize) {
     LOG_WARN("CORE[%d]: Allocating closure with %d bytes", core->id, envSize);
+
+    // Calculate bitmask size for pointers
+    size_t bitmaskSize = (envSize + 7) / 8;
+
+    // Start calculating the total size required for allocation
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Closure);
+
+    // Align for `upvalues` (8-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
+    totalAllocationSize += envSize * sizeof(TypeV_Register);  // Upvalues array
+
+    // Align for `ptrFields` (1-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint8_t));
+    totalAllocationSize += bitmaskSize;  // Pointer bitmask size
+
+    // Allocate memory for the entire closure object
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
     // Set header information
     header->type = OT_CLOSURE;
-    //header->ptrs = calloc(envSize, sizeof(void*));
+    header->totalSize = totalAllocationSize;
+    header->survivedCount = 0;
 
     // Get a pointer to the actual closure, which comes after the header
     TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
-    //closure_ptr->fnPtr = fnPtr;
+    closure_ptr->fnAddress = fnPtr;
     closure_ptr->envCounter = 0;
     closure_ptr->offset = argsOffset;
-    closure_ptr->fnAddress = fnPtr;
     closure_ptr->envSize = envSize;
 
-    closure_ptr->upvalues = malloc(envSize* sizeof(TypeV_Register ));
+    // Set pointers for subsequent arrays, ensuring alignment is handled
+    uint8_t* current_ptr = (uint8_t*)(closure_ptr + 1);
 
-    size_t bitmaskSize = (envSize + 7) / 8;
-    closure_ptr->ptrFields = malloc(bitmaskSize);
+    // Set `upvalues` pointer (aligned to 8 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+    closure_ptr->upvalues = (TypeV_Register*)current_ptr;
+    current_ptr += envSize * sizeof(TypeV_Register);
+
+    // Set `ptrFields` pointer (aligned to 1 byte)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
+    closure_ptr->ptrFields = current_ptr;
+
+    // Zero out the bitmask
     memset(closure_ptr->ptrFields, 0, bitmaskSize);
 
+    // Return the pointer to the closure
     return closure_ptr;
 }
 

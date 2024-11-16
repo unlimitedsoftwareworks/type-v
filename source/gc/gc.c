@@ -128,7 +128,7 @@ TypeV_ObjectHeader *gc_alloc(TypeV_Core* core, size_t size) {
 }
 
 void gc_minor_gc(TypeV_Core* core) {
-    printf("Performing minor GC\n");
+    //printf("Performing minor GC\n");
     TypeV_GC *gc = core->gc;
     TypeV_NurseryRegion *nursery = gc->nurseryRegion;
     TypeV_OldGenerationRegion *old = gc->oldRegion;
@@ -259,7 +259,6 @@ void gc_update_object_pointers(TypeV_Core* core, uintptr_t old_address, uintptr_
     core->gc->nurseryUpdateList[core->gc->updateListSize].old_address = old_address;
     core->gc->nurseryUpdateList[core->gc->updateListSize++].new_address = new_address;
 }
-
 uintptr_t gc_get_new_ptr_location(TypeV_Core* core, uintptr_t oldPtr) {
     if(core->gc->updateListSize == 0) {
         // gc_log("Failed to find new address for %p, 0 updates to be made\n", oldPtr);
@@ -270,7 +269,6 @@ uintptr_t gc_get_new_ptr_location(TypeV_Core* core, uintptr_t oldPtr) {
         if (core->gc->nurseryUpdateList[0].old_address == oldPtr) {
             return core->gc->nurseryUpdateList[0].new_address;
         } else {
-            //core_panic(core, -1, "Failed to find new address for %p", oldPtr);
             // gc_log("Failed to find new address for %p\n", oldPtr);
             return oldPtr;
         }
@@ -287,12 +285,18 @@ uintptr_t gc_get_new_ptr_location(TypeV_Core* core, uintptr_t oldPtr) {
         if (core->gc->nurseryUpdateList[mid].old_address < oldPtr) {
             left = mid + 1;
         } else {
+            // Ensure `right` does not underflow
+            if (mid == 0) {
+                break; // Prevent underflow of `right`
+            }
             right = mid - 1;
         }
     }
+
     // gc_log("Failed to find new address for %p\n", oldPtr);
     return oldPtr;
 }
+
 
 
 
