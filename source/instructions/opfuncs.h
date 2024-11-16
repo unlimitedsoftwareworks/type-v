@@ -31,6 +31,8 @@ static op_func op_funcs[] = {
         &mv_reg_global_ptr,
 
         &s_alloc,
+        &s_alloc_t,
+
         &s_reg_field,
         &s_loadf,
         &s_loadf_ptr,
@@ -42,6 +44,7 @@ static op_func op_funcs[] = {
         &s_storef_reg_ptr,
 
         &c_alloc,
+        &c_alloc_t,
         &c_reg_field,
         &c_storem,
         &c_loadm,

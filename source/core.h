@@ -36,7 +36,7 @@ typedef struct TypeV_Class {
     uint8_t* pointerBitmask;  // Pointer to bitmask, 8-byte alignment
     size_t bitMaskSize;       // Bitmask size, 8-byte alignment
     uint64_t uid;             // Unique ID, 8-byte alignment
-    uint8_t numMethods;       // Number of methods, 1-byte alignment
+    uint16_t numMethods;       // Number of methods, 1-byte alignment
     uint8_t numFields;        // Number of fields, 1-byte alignment
     uint8_t* data;            // Pointer to data block, placed last for alignment simplicity
 } TypeV_Class;
@@ -344,7 +344,7 @@ uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint
  * @param total_fields_size  total cellSize of fields in bytes
  * @return new Class object initialized.
  */
-uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId);
+uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId);
 
 /**
  * Allocates an array object

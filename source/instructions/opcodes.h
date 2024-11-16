@@ -76,7 +76,12 @@ typedef enum TypeV_OpCode {
      * (arg2 and arg3), stores the address of the new struct into dest.
      */
     OP_S_ALLOC,
-    //OP_S_ALLOC_T,
+
+    /**
+     * OP_S_ALLOC_T dest: R, template_offset: I (8 bytes)
+     * Creates new struct from a template, stored at template_offset
+     */
+    OP_S_ALLOC_T,
 
 
     /**
@@ -95,7 +100,7 @@ typedef enum TypeV_OpCode {
     OP_S_LOADF_PTR,
 
     /**
-     * OP_S_STOREF_CONST_[size] dest: R, fieldIndex: I, constant-offset: I (8 bytes), byteSize: S
+     * OP_S_STOREF_CONST_[size] dest: R, fieldIndex: I, constant-offset: I (4 bytes), byteSize: S
      * Stores [size] bytes from constant pool address offset to field I of
      * struct stored at dest
      */
@@ -110,13 +115,17 @@ typedef enum TypeV_OpCode {
     OP_S_STOREF_REG_PTR,
 
     /**
-     * OP_C_ALLOC dest: R num-methods: I, num-fields: I(1b), class-fields-size: I (2 bytes), classId-size: Z, classId: I
+     * OP_C_ALLOC dest: R num-fields: I(1b), num-methods: I (2 bytes), class-fields-size: I (2 bytes), classId-size: I(4 bytes)
      * Allocates new class of given total ﬁelds count (arg1) and total fields
      * size of (arg2 and arg3), stores the address of the new class into dest.
      */
     OP_C_ALLOC,
 
-    //OP_C_ALLOC_T,
+    /**
+     * OP_C_ALLOC_T dest: R, template_offset: I (8 bytes)
+     * Creates new class from a template, stored at template_offset
+     */
+    OP_C_ALLOC_T,
 
     /**
      * OP_C_REG_FIELD dest: R, local_field_index: I(1byte), field offset: I (2 bytes)
@@ -126,7 +135,7 @@ typedef enum TypeV_OpCode {
     OP_C_REG_FIELD,
 
     /**
-     * OP_C_STOREM destReg: R, localMethodIndex: I (1b), globalMethodIndex: I(4bytes), methodAddress: I(8 bytes)
+     * OP_C_STOREM destReg: R, localMethodIndex: I (1b), globalMethodIndex: I(4bytes), methodAddress: I(4 bytes)
      * Stores methodAddress into method table index methodIndex of class stored in destReg
      */
     OP_C_STOREM,
@@ -145,7 +154,7 @@ typedef enum TypeV_OpCode {
     OP_C_STOREF_REG_PTR,
 
     /**
-     * OP_C_STOREF_CONST_[size] classReg: R, fieldIndex: I (1b), offset: I (8 bytes), byteSize: S
+     * OP_C_STOREF_CONST_[size] classReg: R, fieldIndex: I (1b), offset: I (4 bytes), byteSize: S
      */
     OP_C_STOREF_CONST,
     OP_C_STOREF_CONST_PTR,
@@ -158,14 +167,14 @@ typedef enum TypeV_OpCode {
     OP_C_LOADF_PTR,
 
     /**
-     * OP_I_IS_C dest: R, src: R, classId: I (8 bytes)
+     * OP_I_IS_C dest: R, src: R, classId: I (4 bytes)
      * Checks if the given interface who's stored in src class id is the
      * same as the given id. Storecls the result in R
      */
     OP_I_IS_C,
 
     /**
-     * OP_I_HAS_M method_id: I (4 bytes), src: R, jump-address: I (8 bytes)
+     * OP_I_HAS_M method_id: I (4 bytes), src: R, jump-address: I (4 bytes)
      * Checks if the base class of the interface which is stored in src has
      * a method with the same given ID. If a method with the same ID is found,
      * it continues. Otherwise, it jumps to the given address.
@@ -213,7 +222,7 @@ typedef enum TypeV_OpCode {
     OP_A_STOREF_REG_PTR,
 
     /**
-     * OP_A_STOREF_CONST_[size] dest: R, index: R, offset: I (8 bytes), byteSize: S
+     * OP_A_STOREF_CONST_[size] dest: R, index: R, offset: I (4 bytes), byteSize: S
      * Stores [size] bytes from constant pool address offset to field
      * value stored in register index of array stored at dest
      */
@@ -270,7 +279,7 @@ typedef enum TypeV_OpCode {
      */
     OP_FN_CALL,
     /**
-     * OP_FN_CALLI function-address-size: Z, function-address: I
+     * OP_FN_CALLI function-address-size: Z, function-address: I (4 bytes)
      * Calls the function at the given address
      * This function is called after the stack frame is initialized
      * and the arguments are pushed to the stack
@@ -449,7 +458,7 @@ typedef enum TypeV_OpCode {
 
     OP_J,
     /**
-     * OP_J_CMP_[type] arg1, arg2, cmpType: I(1 byte), jump-address: I (8 bytes)
+     * OP_J_CMP_[type] arg1, arg2, cmpType: I(1 byte), jump-address: I (4 bytes)
      * compares arg1 and arg2 using the given comparison type
      * 0: equal
      * 1: not equal
@@ -517,7 +526,7 @@ typedef enum TypeV_OpCode {
     OP_LOAD_STD,
 
     /**
-     * OP_CLOSURE_ALLOC, dest:R, offset_to_args: 1Byte, env_size: 1byte fn_address: I (8 bytes),
+     * OP_CLOSURE_ALLOC, dest:R, offset_to_args: 1Byte, env_size: 1byte fn_address: I (4 bytes),
      * Allocates a closure, storing it in dest.
      * The closure will push its environment in the register starting from offset_to_args.
      */

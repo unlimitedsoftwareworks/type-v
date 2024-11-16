@@ -180,7 +180,7 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     return (uintptr_t)struct_ptr;
 }
 
-uintptr_t core_class_alloc(TypeV_Core *core, uint8_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId) {
+uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId) {
     LOG_INFO("CORE[%d]: Allocating class with %d methods and %d attributes, uid: %llu", core->id, num_methods, num_attributes, classId);
 
     // Calculate bitmask size for pointers

@@ -93,6 +93,7 @@ static void* dispatch_table[] = { \
     &&DO_MV_REG_GLOBAL, \
     &&DO_MV_REG_GLOBAL_PTR, \
     &&DO_S_ALLOC, \
+    &&DO_S_ALLOC_T, \
     &&DO_S_REG_FIELD, \
     &&DO_S_LOADF, \
     &&DO_S_LOADF_PTR, \
@@ -100,7 +101,8 @@ static void* dispatch_table[] = { \
     &&DO_S_STOREF_CONST_PTR, \
     &&DO_S_STOREF_REG, \
     &&DO_S_STOREF_REG_PTR, \
-    &&DO_C_ALLOC,      \
+    &&DO_C_ALLOC, \
+    &&DO_C_ALLOC_T, \
     &&DO_C_REG_FIELD, \
     &&DO_C_STOREM, \
     &&DO_C_LOADM, \
@@ -339,6 +341,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_S_ALLOC:
             s_alloc(core);
             DISPATCH();
+        DO_S_ALLOC_T:
+            s_alloc_t(core);
+            DISPATCH();
         DO_S_REG_FIELD:
             s_reg_field(core);
             DISPATCH();
@@ -362,6 +367,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_C_ALLOC:
             c_alloc(core);
+            DISPATCH();
+        DO_C_ALLOC_T:
+            c_alloc_t(core);
             DISPATCH();
         DO_C_REG_FIELD:
             c_reg_field(core);
