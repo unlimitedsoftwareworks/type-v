@@ -58,6 +58,8 @@ add_executable(type_v
         source/vendor/cpu_info/cpu_info.h
         source/gc/mark.c
         source/gc/mark.h
+        source/errors/errors.c
+        source/errors/errors.h
 )
 
 target_link_libraries(type_v stdio string stdcore )

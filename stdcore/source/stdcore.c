@@ -12,6 +12,7 @@
 #include "vendor/yy.h"
 #include "../../source/core.h"
 #include "../../source/api/typev_api.h"
+#include "../../source/errors/errors.h"
 
 #define MAX_NUM_STR_SIZE 64
 
@@ -338,7 +339,7 @@ void string_append_u16(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf((char*)str->data+pos, MAX_UINT16_STR_SIZE, "%" PRIu16, value);
     if(gap < 0){
-        core_panic(core, 1, "Failed to convert uint16_t to string, snprintf returned %d\n", gap);
+        core_panic(core, RT_ERROR_CUSTOM, "Failed to convert uint16_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -359,7 +360,7 @@ void string_append_i16(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf((char*)str->data+pos, MAX_INT16_STR_SIZE, "%" PRId16, value);
     if(gap < 0){
-        core_panic(core, 1, "Failed to convert int16_t to string, snprintf returned %d\n", gap);
+        core_panic(core, RT_ERROR_CUSTOM, "Failed to convert int16_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -380,7 +381,7 @@ void string_append_u8(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf((char*)str->data+pos, MAX_UINT8_STR_SIZE, "%" PRIu8, value);
     if(gap < 0){
-        core_panic(core, 1, "Failed to convert uint8_t to string, snprintf returned %d\n");
+        core_panic(core, RT_ERROR_CUSTOM, "Failed to convert uint8_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -401,7 +402,7 @@ void string_append_i8(TypeV_Core* core){
     // convert the value to string
     int32_t gap = snprintf((char*)str->data+pos, MAX_INT8_STR_SIZE, "%" PRId8, value);
     if(gap < 0){
-        core_panic(core, 1, "Failed to convert int8_t to string, snprintf returned %d\n", gap);
+        core_panic(core, RT_ERROR_CUSTOM, "Failed to convert int8_t to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -420,7 +421,7 @@ void string_append_bool(TypeV_Core* core){
 
     int32_t gap = snprintf((char*)str->data+pos, 6, "%s", bool_str);
     if(gap < 0){
-        core_panic(core, 1, "Failed to convert bool to string, snprintf returned %d\n", gap);
+        core_panic(core, RT_ERROR_CUSTOM, "Failed to convert bool to string, snprintf returned %d\n", gap);
     }
 
     typev_api_return_u32(core, gap);
@@ -433,7 +434,7 @@ void string_toF64(TypeV_Core* core){
     double value = yy_string_to_double((char*)str->data, &ptr);
 
     if (ptr == (char*)str->data) {
-        typev_api_core_panic(core, 1, "Failed to convert string to float\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to float\n");
         return;
     }
 
@@ -445,7 +446,7 @@ void string_toF32(TypeV_Core* core){
     char* ptr;
     double value = yy_string_to_double((char*)str->data, &ptr);
     if(ptr == (char*)str->data){
-        typev_api_core_panic(core, 1, "Failed to convert string to float\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to float\n");
         return;
     }
 
@@ -460,7 +461,7 @@ void string_toBool(TypeV_Core* core){
     }else if(str->length == 5 && strncmp((char*)str->data, "false", 5) == 0){
         typev_api_return_u8(core, 0);
     }else{
-        typev_api_core_panic(core, 1, "Failed to convert string to bool\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to bool\n");
     }
 }
 
@@ -481,7 +482,7 @@ void string_toI8(TypeV_Core* core) {
 
     // Check if the value is within the int8_t range
     if (value < INT8_MIN || value > INT8_MAX) {
-        typev_api_core_panic(core, 1, "Value out of range for int8_t\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Value out of range for int8_t\n");
         return;
     }
 
@@ -504,7 +505,7 @@ void string_toI16(TypeV_Core* core) {
 
     // Check if the value is within the int16_t range
     if (value < INT16_MIN || value > INT16_MAX) {
-        typev_api_core_panic(core, 1, "Value out of range for int16_t\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Value out of range for int16_t\n");
         return;
     }
 
@@ -520,11 +521,11 @@ void string_toU32(TypeV_Core* core){
     uint32_t value = atoi_u32_yy((char*)str->data, str->length, &endPtr, &res);
 
     if(res == atoi_result_fail){
-        typev_api_core_panic(core, 1, "Failed to convert string to uint32_t\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to uint32_t\n");
         return;
     }
     if(res == atoi_result_overflow) {
-        typev_api_core_panic(core, 1, "Failed to convert string to uint32_t, overflow\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to uint32_t, overflow\n");
         return;
     }
 
@@ -539,11 +540,11 @@ void string_toI32(TypeV_Core* core){
     int32_t value = atoi_i32_yy((char*)str->data, str->length, &endPtr, &res);
 
     if(res == atoi_result_fail){
-        typev_api_core_panic(core, 1, "Failed to convert string to int32_t\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to int32_t\n");
         return;
     }
     if(res == atoi_result_overflow) {
-        typev_api_core_panic(core, 1, "Failed to convert string to int32_t, overflow\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to int32_t, overflow\n");
         return;
     }
 
@@ -558,11 +559,11 @@ void string_toU64(TypeV_Core* core){
     uint64_t value = atoi_u64_yy((char*)str->data, str->length, &endPtr, &res);
 
     if(res == atoi_result_fail){
-        typev_api_core_panic(core, 1, "Failed to convert string to uint64_t\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to uint64_t\n");
         return;
     }
     if(res == atoi_result_overflow) {
-        typev_api_core_panic(core, 1, "Failed to convert string to uint64_t, overflow\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to uint64_t, overflow\n");
         return;
     }
 
@@ -577,11 +578,11 @@ void string_toI64(TypeV_Core* core){
     int64_t value = atoi_i64_yy((char*)str->data, str->length, &endPtr, &res);
 
     if(res == atoi_result_fail){
-        typev_api_core_panic(core, 1, "Failed to convert string to int64_t\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to int64_t\n");
         return;
     }
     if(res == atoi_result_overflow) {
-        typev_api_core_panic(core, 1, "Failed to convert string to int64_t, overflow\n");
+        typev_api_core_panic(core, RT_ERROR_CUSTOM, "Failed to convert string to int64_t, overflow\n");
         return;
     }
 

@@ -12,7 +12,8 @@ set(typev_files
         ../source/env/env.c
         ../source/api/typev_api.c
         ../source/utils/utils.c
-        )
+        ../source/errors/errors.c
+)
 
 
 add_library(string SHARED ${string_files} ${typev_files})

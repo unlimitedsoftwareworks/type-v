@@ -5,6 +5,7 @@
 #include "gc.h"
 #include "mark.h"
 #include "../utils/log.h"
+#include "../errors/errors.h"
 
 void gc_log(const char * fmt, ...) {
     char temp[1024];
@@ -152,7 +153,7 @@ void gc_minor_gc(TypeV_Core* core) {
             size_t object_cell_size = (obj->totalSize + CELL_SIZE - 1) / CELL_SIZE; // Calculate cellSize in cells
 
             if(i + object_cell_size > NURSERY_MAX_CELLS) {
-                core_panic(core, -1, "Nursery cellSize exceeded the maximum limit");
+                core_panic(core, RT_ERROR_NURSERY_FULL, "Nursery cellSize exceeded the maximum limit");
             }
 
             obj->survivedCount++;
@@ -180,7 +181,7 @@ void gc_minor_gc(TypeV_Core* core) {
                 // Keep in the nursery, move to other half
 
                 if(i + object_cell_size > NURSERY_MAX_CELLS) {
-                    core_panic(core, -1, "Nursery cellSize exceeded the maximum limit");
+                    core_panic(core, RT_ERROR_NURSERY_FULL, "Nursery cellSize exceeded the maximum limit");
                 }
 
                 // gc_log("Copying object %p to %p\n", obj, new_position_in_nursery);
@@ -229,7 +230,7 @@ void gc_minor_gc(TypeV_Core* core) {
     //gc_debug_nursery(gc);
 
     if(nursery->cellSize > NURSERY_MAX_CELLS) {
-        core_panic(core, -1, "Nursery cellSize exceeded the maximum limit");
+        core_panic(core, RT_ERROR_NURSERY_FULL, "Nursery cellSize exceeded the maximum limit");
     }
 
     core->gc->minorGCCount++;
@@ -244,7 +245,7 @@ void gc_extend_old(TypeV_Core* core) {
     TypeV_OldGenerationRegion* old = gc->oldRegion;
 
     if(old->cellSize >= INITIAL_OLD_CELLS - 10) {
-        core_panic(core, -1, "Old generation cellSize exceeded the maximum limit");
+        core_panic(core, RT_ERROR_OOM, "Old generation cellSize exceeded the maximum limit");
     }
 
 }
@@ -252,7 +253,7 @@ void gc_extend_old(TypeV_Core* core) {
 
 void gc_update_object_pointers(TypeV_Core* core, uintptr_t old_address, uintptr_t new_address) {
     if (core->gc->updateListSize >= NURSERY_MAX_CELLS) {
-        core_panic(core, -1, "Exceeded nursery update list capacity");
+        core_panic(core, RT_ERROR_OOM, "Exceeded nursery update list capacity");
         return;
     }
 

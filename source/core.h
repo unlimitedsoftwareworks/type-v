@@ -437,12 +437,4 @@ typedef struct TypeV_FFI {
 TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t offset, uint8_t envSize);
 TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure);
 
-typedef enum TypeV_RTError {
-    /**
-     * Error: Coroutine reached its end and did not yield
-     */
-    TVRT_ERROR_COROUTINE_QUIT_NO_YIELD,
-
-}TypeV_RTError;
-
 #endif //TYPE_V_CORE_H

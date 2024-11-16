@@ -15,6 +15,7 @@
 #include "utils/log.h"
 #include "dynlib/dynlib.h"
 #include "utils/utils.h"
+#include "errors/errors.h"
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     TypeV_FuncState* state = malloc(sizeof(TypeV_FuncState));
@@ -307,7 +308,7 @@ uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_
     TypeV_Array* array = (TypeV_Array*)array_ptr;
 
     if(array == NULL) {
-        core_panic(core, -1, "Null array");
+        core_panic(core, RT_ERROR_NULL_POINTER, "Cannot extend null array");
     }
 
     array->data = realloc(array->data, num_elements*array->elementSize);
@@ -406,12 +407,9 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *globalFields
 
     // If we reach here, it means the ID was not found
     // This is an unlikely case, so mark it as such
-    if (__builtin_expect(1, 1)) {
-        core_panic(core, -1, "Global ID %d not found in field array", globalID);
-        exit(-1);
-    }
-
-    return -1;  // Return an invalid index (in theory, should not be reached)
+    core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", globalID);
+    // Return an invalid index (in theory, should not be reached)
+    return (uint8_t)-1;
 }
 
 

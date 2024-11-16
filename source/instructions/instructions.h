@@ -23,7 +23,7 @@
 #include "../utils/log.h"
 #include "../vendor/libtable/table.h"
 #include "../engine.h"
-
+#include "../errors/errors.h"
 
 #define CORE_ASSERT(condition, message)
 
@@ -596,7 +596,7 @@ static inline void a_alloc(TypeV_Core* core){
     // next read the element size
     uint8_t element_size = core->codePtr[core->ip++];
     if(element_size > 8) {
-        core_panic(core, 1, "Element size too large %d", element_size);
+        core_panic(core, RT_ERROR_ENTITY_TOO_LARGE, "Element size too large %d", element_size);
     }
 
     // allocate memory for struct
@@ -672,7 +672,7 @@ static inline void a_storef_reg_ptr(TypeV_Core* core){
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
 
     if(core->regs[index].u64 >= array->length) {
-        core_panic(core, 1, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
+        core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
     }
     typev_memcpy_aligned_8(array->data + (core->regs[index].u64 * array->elementSize), &core->regs[source]);
 }
@@ -714,7 +714,7 @@ static inline void a_loadf(TypeV_Core* core) {
     uint64_t idx = core->regs[index].u64;
 
     if(idx >= array->length) {
-        core_panic(core, 1, "Index out of bounds %d >= %d", idx, array->length);
+        core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", idx, array->length);
     }
 
 
@@ -1474,7 +1474,7 @@ static inline void j_cmp_##name(TypeV_Core* core) {\
             if(v1 <= v2) core->ip = offset;\
             break;\
         default:\
-            core_panic(core, -1, "Invalid comparison type");\
+            core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);\
     }\
 }\
@@ -1511,7 +1511,7 @@ static inline void j_cmp_u8(TypeV_Core* core) {
             if(v1 <= v2) core->ip = offset;
             break;
         default:
-            core_panic(core, -1, "Invalid comparison type");\
+            core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);
     }
 }
@@ -1550,7 +1550,7 @@ static inline void j_cmp_u32(TypeV_Core* core) {
             if(v1 <= v2) core->ip = offset;
             break;
         default:
-            core_panic(core, -1, "Invalid comparison type");\
+            core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);
     }
 }
@@ -1586,7 +1586,7 @@ static inline void j_cmp_u64(TypeV_Core* core) {
             if(v1 <= v2) core->ip = offset;
             break;
         default:
-            core_panic(core, -1, "Invalid comparison type");\
+            core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);
     }
 }
@@ -1625,7 +1625,7 @@ static inline void j_cmp_ptr(TypeV_Core* core) {
             if(v1 <= v2) core->ip = offset;
             break;
         default:
-            core_panic(core, -1, "Invalid comparison type");\
+            core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);
     }
 }
@@ -1658,7 +1658,7 @@ static inline void j_cmp_bool(TypeV_Core* core) {
     else if(!result && (cmpType == 1)){
         core->ip = offset;
     }else {
-        core_panic(core, -1, "Invalid comparison type");
+        core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");
     }
 }
 
@@ -1888,7 +1888,7 @@ static inline void coroutine_call(TypeV_Core* core) {
 
     // make sure the coroutine is not finished
     if(coroutine->executionState == TV_COROUTINE_FINISHED) {
-        core_panic(core, -1, "Coroutine finished");
+        core_panic(core, RT_ERROR_COROUTINE_FINISHED, "Coroutine finished");
     }
 
     coroutine->executionState = TV_COROUTINE_RUNNING;
@@ -1936,7 +1936,7 @@ static inline void coroutine_ret(TypeV_Core* core) {
 
 static inline void throw_rt(TypeV_Core* core) {
     uint8_t code = core->codePtr[core->ip++];
-    core_panic(core, code, "Runtime error: %d", code);
+    core_panic(core, code, "Runtime error: %s", TypeV_RTErrorMessages[code]);
 }
 
 #endif //TYPE_V_INSTRUCTIONS_H
