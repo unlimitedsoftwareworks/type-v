@@ -25,14 +25,22 @@ char* read_file(char* src){
 uint8_t *readSegment(FILE *file, uint64_t offset, size_t size);
 
 int main(int argc, char **argv) {
-
+    int readArgs = 0;
     char *filePath = "/Users/praisethemoon/projects/type-c/type-c/output/bin.tcv"; // Change to your file's path
     char *srcMapFile = "/Users/praisethemoon/projects/type-c/type-c/output/src_map.map.txt";
     if (argc > 1){
         filePath = argv[1];
+        readArgs++;
     }
     if (argc > 2){
         srcMapFile = argv[2];
+        readArgs++;
+    }
+
+
+    if(argc < 2){
+        printf("Usage: %s <path to bin.tcv> <path to src_map.map.txt>\n", argv[0]);
+        return 1;
     }
 
     FILE *file = fopen(filePath, "rb");

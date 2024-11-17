@@ -298,9 +298,7 @@ static inline void s_alloc_t(TypeV_Core* core){
         }
 
         field_index++;
-
     }
-
 }
 
 static inline void s_reg_field(TypeV_Core* core){
@@ -453,9 +451,61 @@ static inline void c_alloc(TypeV_Core* core){
 
 
 static inline void c_alloc_t(TypeV_Core* core){
-    // TODO!
     const uint8_t dest_reg = core->codePtr[core->ip++];
-    uint8_t template_offset = core->codePtr[core->ip++];
+    uint32_t template_offset;
+    typev_memcpy_unaligned_4(&template_offset, &core->codePtr[core->ip]);
+    core->ip += 4;
+
+    uint8_t num_attrs = core->templatePtr[template_offset++];
+    uint16_t num_methods;
+    typev_memcpy_unaligned_2(&num_methods, &core->templatePtr[template_offset]);
+
+    uint16_t total_fields_size;
+    typev_memcpy_unaligned_2(&total_fields_size, &core->templatePtr[template_offset + 2]);
+    template_offset += 4;
+
+    uint32_t class_id;
+    typev_memcpy_unaligned_4(&class_id, &core->templatePtr[template_offset]);
+    template_offset += 4;
+
+    TypeV_Class* class_ptr = (TypeV_Class*)core_class_alloc(core, num_methods, num_attrs, total_fields_size, class_id);
+
+    core->regs[dest_reg].ptr = (uintptr_t)class_ptr;
+
+    uint8_t attributeCounter = 0;
+    while(attributeCounter < num_attrs) {
+        uint16_t offset;
+        typev_memcpy_unaligned_2(&offset, &core->templatePtr[template_offset]);
+        template_offset += 2;
+
+        uint8_t isPtr = core->templatePtr[template_offset++];
+
+        class_ptr->fieldOffsets[attributeCounter] = offset;
+
+        if (isPtr) {
+            size_t byteIndex = attributeCounter / 8;      // Determine which byte contains the bit
+            uint8_t bitOffset = attributeCounter % 8;     // Determine the bit position within the byte
+            class_ptr->pointerBitmask[byteIndex] |= (1 << bitOffset); // Set the bit to mark as a pointer
+        }
+
+        attributeCounter++;
+    }
+
+    uint16_t methodCounter = 0;
+    while(methodCounter < num_methods) {
+        uint32_t globalMethodIndex;
+        typev_memcpy_unaligned_4(&globalMethodIndex, &core->templatePtr[template_offset]);
+        template_offset += 4;
+
+        uint32_t methodAddress;
+        typev_memcpy_unaligned_4(&methodAddress, &core->templatePtr[template_offset]);
+        template_offset += 4;
+
+        class_ptr->globalMethods[methodCounter] = globalMethodIndex;
+        class_ptr->methods[methodCounter] = methodAddress;
+
+        methodCounter++;
+    }
 }
 
 static inline void c_reg_field(TypeV_Core* core){

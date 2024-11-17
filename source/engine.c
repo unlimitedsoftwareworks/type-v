@@ -25,6 +25,9 @@ void engine_init(TypeV_Engine *engine) {
 
     core_init(engine->coreIterator->core, engine_generateNewCoreID(engine), engine);
     engine->coreCount++;
+
+    engine->argv = NULL;
+    engine->argc = 0;
 }
 
 void engine_setmain(
@@ -88,6 +91,29 @@ void engine_run(TypeV_Engine *engine) {
             break;
         }
     }
+}
+
+
+void engine_set_args(TypeV_Engine *engine, int argc, char** argv) {
+    // copy the arguments
+    if(argc == 0) {
+        return;
+    }
+
+    engine->argc = argc;
+
+    // allocate memory for the arguments
+    engine->argv = malloc(argc * sizeof(char*));
+    for(int i = 0; i < argc; i++) {
+        engine->argv[i] = malloc(strlen(argv[i]) + 1);
+        strcpy(engine->argv[i], argv[i]);
+    }
+
+    // create a new String object for each argument
+    for(int i = 0; i < argc; i++) {
+
+    }
+
 }
 
 #define DISPATCH_TABLE \

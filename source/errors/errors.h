@@ -19,7 +19,7 @@ typedef enum TypeV_RTError {
 } TypeV_RTError;
 
 static const char* TypeV_RTErrorMessages[] = {
-    "Unreachable code executed",
+    "Unreachable code reached",
     "Coroutine has already finished",
     "Out of memory",
     "Overflow occurred",
