@@ -38,10 +38,12 @@ int main(int argc, char **argv) {
     }
 
 
+    /*
     if(argc < 2){
         printf("Usage: %s <path to bin.tcv> <path to src_map.map.txt>\n", argv[0]);
         return 1;
     }
+    */
 
     FILE *file = fopen(filePath, "rb");
     if (file == NULL) {
