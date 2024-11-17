@@ -70,10 +70,11 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->ip = 0;
 }
 
-void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, uint8_t* globalPool){
+void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, uint8_t* globalPool, const uint8_t* templatePool) {
     core->codePtr = program;
     core->constPtr = constantPool;
     core->globalPtr = globalPool;
+    core->templatePtr = templatePool;
     core->state = CS_RUNNING;
 }
 

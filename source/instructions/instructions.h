@@ -267,7 +267,40 @@ static inline void s_alloc(TypeV_Core* core){
 
 static inline void s_alloc_t(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
-    const uint8_t template_offset = core->codePtr[core->ip++];
+    uint32_t template_offset;
+    typev_memcpy_unaligned_4(&template_offset, &core->codePtr[core->ip]);
+    core->ip += 4;
+
+    uint8_t numFields = core->templatePtr[template_offset++];
+    uint16_t structSize;
+    typev_memcpy_unaligned_2(&structSize, &core->templatePtr[template_offset]);
+    template_offset += 2;
+
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)core_struct_alloc(core, numFields, structSize);
+    core->regs[dest_reg].ptr = (uintptr_t)struct_ptr;
+
+    uint8_t field_index = 0;
+    while(field_index < numFields){
+        uint32_t globalFieldIndex;
+        typev_memcpy_unaligned_4(&globalFieldIndex, &core->templatePtr[template_offset]);
+        uint16_t offset;
+        typev_memcpy_unaligned_2(&offset, &core->templatePtr[template_offset + 4]);
+        uint8_t isPtr = core->templatePtr[template_offset + 6];
+        template_offset += 7;
+
+        struct_ptr->globalFields[field_index] = globalFieldIndex;
+        struct_ptr->fieldOffsets[field_index] = offset;
+
+        if (isPtr) {
+            size_t byteIndex = field_index / 8;      // Determine which byte contains the bit
+            uint8_t bitOffset = field_index % 8;     // Determine the bit position within the byte
+            struct_ptr->pointerBitmask[byteIndex] |= (1 << bitOffset); // Set the bit to mark as a pointer
+        }
+
+        field_index++;
+
+    }
+
 }
 
 static inline void s_reg_field(TypeV_Core* core){
@@ -420,8 +453,9 @@ static inline void c_alloc(TypeV_Core* core){
 
 
 static inline void c_alloc_t(TypeV_Core* core){
+    // TODO!
     const uint8_t dest_reg = core->codePtr[core->ip++];
-    const uint8_t template_offset = core->codePtr[core->ip++];
+    uint8_t template_offset = core->codePtr[core->ip++];
 }
 
 static inline void c_reg_field(TypeV_Core* core){

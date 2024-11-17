@@ -27,8 +27,19 @@ void engine_init(TypeV_Engine *engine) {
     engine->coreCount++;
 }
 
-void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit){
-    core_setup(engine->coreIterator->core, program, constantPool, globalPool);
+void engine_setmain(
+        TypeV_Engine *engine,
+        uint8_t* program,
+        uint64_t programLength,
+        uint8_t* constantPool,
+        uint64_t constantPoolLength,
+        uint8_t* globalPool,
+        uint64_t globalPoolLength,
+        uint8_t* templatePool,
+        uint64_t templatePoolLength,
+        uint64_t stackCapacity,
+        uint64_t stackLimit){
+    core_setup(engine->coreIterator->core, program, constantPool, globalPool, templatePool);
 }
 
 void engine_deallocate(TypeV_Engine *engine) {
@@ -948,7 +959,8 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
     core_setup(newCore,
                parentCore->codePtr,
                parentCore->constPtr,
-               parentCore->globalPtr);
+               parentCore->globalPtr,
+               parentCore->templatePtr);
 
     // add iterator and attack to engine
     TypeV_CoreIterator* newCoreIterator = malloc(sizeof(TypeV_CoreIterator));

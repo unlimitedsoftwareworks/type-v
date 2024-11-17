@@ -88,7 +88,7 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter);
  * @param stackCapacity
  * @param stackLimit
  */
-void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength, uint64_t stackCapacity, uint64_t stackLimit);
+void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength,  uint8_t* templatePool, uint64_t templatePoolLength, uint64_t stackCapacity, uint64_t stackLimit);
 
 /**
  * @brief engine_deallocate Deallocate the engine

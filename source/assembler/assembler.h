@@ -415,10 +415,12 @@ typedef struct TypeV_ASM_Program {
     uint8_t version;
     uint64_t constPoolSize;
     uint64_t globalPoolSize;
+    uint64_t templatePoolSize;
     uint64_t codePoolSize;
 
     uint8_t *constPool;
     uint8_t *globalPool;
+    uint8_t *templatePool;
     uint8_t *codePool;
 }TypeV_ASM_Program;
 
