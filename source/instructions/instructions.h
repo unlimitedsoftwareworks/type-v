@@ -1111,6 +1111,12 @@ static inline void upcast_u(TypeV_Core* core) {
     CLEAR_REG_PTR(core->funcState, reg);
 }
 
+
+/**
+ * Upcast is only called when casting f32 to f64
+ * @param core
+ * TODO: remove from/to from VM and compiler
+ */
 static inline void upcast_f(TypeV_Core* core) {
     uint8_t reg = core->codePtr[core->ip++];
     uint8_t from = core->codePtr[core->ip++];
@@ -1120,14 +1126,7 @@ static inline void upcast_f(TypeV_Core* core) {
     ASSERT((from == 4 && to == 8), "Invalid byte sizes for floating-point upcasting");
 
     // Extract the float value from the register
-    float floatValue = 0.0f;
-    typev_memcpy_unaligned(&floatValue, &core->regs[reg], from);
-
-    // Convert to double
-    double doubleValue = (double)floatValue;
-
-    // Store the result back in the register
-    typev_memcpy_unaligned(&core->regs[reg], &doubleValue, to);
+    core->regs[reg].f64 = (double)core->regs[reg].f32;
     CLEAR_REG_PTR(core->funcState, reg);
 }
 
@@ -2001,9 +2000,20 @@ static inline void coroutine_call(TypeV_Core* core) {
 
     // set the registers to the coroutine's function state
     core->regs = core->funcState->regs;
+
+    // copy the closure's environment to the function's environment
+    TypeV_Closure* cl = coroutine->closure;
+    uint8_t offset = cl->offset;
+    for (uint8_t i = 0; i < cl->envSize; i++) {
+        core->funcState->regs[i+offset] = cl->upvalues[i];
+        if(IS_CLOSURE_UPVALUE_POINTER(cl->ptrFields, i)) {
+            SET_REG_PTR(core->funcState, i+offset);
+        }
+    }
 }
 
 static inline void coroutine_yield(TypeV_Core* core) {
+    // we do not need to back up state as the coroutine will do that
     TypeV_Coroutine* coroutine = core->activeCoroutine;
     coroutine->executionState = TV_COROUTINE_SUSPENDED;
     coroutine->ip = core->ip;
