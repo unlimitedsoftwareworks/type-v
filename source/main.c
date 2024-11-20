@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     fclose(file);
 
     typev_env_init(srcMapFile);
-    typev_env_log();
+    //typev_env_log();
 
     TypeV_Engine engine;
     engine_init(&engine);

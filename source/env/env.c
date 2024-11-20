@@ -51,7 +51,7 @@ void typev_env_init(char* sourceMapFile){
     }
 
     env.searchPaths = malloc(3* sizeof(char*));
-    printf("current dir: %s\n", env.cwd);
+    //printf("current dir: %s\n", env.cwd);
 
     /*
     int err = cpui_get_info(&env.result);
@@ -63,7 +63,7 @@ void typev_env_init(char* sourceMapFile){
     env.sourceMapFile = sourceMapFile;
 
     if(env.sourceMapFile != NULL) {
-        printf("Source map file: %s\n", env.sourceMapFile);
+        //printf("Source map file: %s\n", env.sourceMapFile);
     }
 }
 
