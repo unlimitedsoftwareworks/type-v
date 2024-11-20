@@ -229,6 +229,12 @@ static op_func op_funcs[] = {
         &j_cmp_ptr,
         &j_cmp_bool,
 
+        &j_eq_null_8,
+        &j_eq_null_16,
+        &j_eq_null_32,
+        &j_eq_null_64,
+        &j_eq_null_ptr,
+
         &reg_ffi,
         &open_ffi,
         &ld_ffi,

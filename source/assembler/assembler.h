@@ -245,6 +245,10 @@ static char* instructions[] = {
         "j_cmp_f64",
         "j_cmp_ptr",
         "j_cmp_bool",
+        "j_cmp_null_8",
+        "j_cmp_null_16",
+        "j_cmp_null_32",
+        "j_cmp_null_64",
 
         "reg_ffi",
         "open_ffi",

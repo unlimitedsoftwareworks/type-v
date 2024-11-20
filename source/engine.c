@@ -296,7 +296,12 @@ static void* dispatch_table[] = { \
     &&DO_J_CMP_F32, \
     &&DO_J_CMP_F64, \
     &&DO_J_CMP_PTR, \
-    &&DO_J_CMP_BOOL, \
+    &&DO_J_CMP_BOOL,   \
+    &&DO_J_EQ_NULL_8, \
+    &&DO_J_EQ_NULL_16, \
+    &&DO_J_EQ_NULL_32, \
+    &&DO_J_EQ_NULL_64, \
+    &&DO_J_EQ_NULL_PTR, \
     &&DO_REG_FFI, \
     &&DO_OPEN_FFI, \
     &&DO_LD_FFI, \
@@ -878,6 +883,21 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_J_CMP_BOOL:
             j_cmp_bool(core);
+            DISPATCH();
+        DO_J_EQ_NULL_8:
+            j_eq_null_8(core);
+            DISPATCH();
+        DO_J_EQ_NULL_16:
+            j_eq_null_16(core);
+            DISPATCH();
+        DO_J_EQ_NULL_32:
+            j_eq_null_32(core);
+            DISPATCH();
+        DO_J_EQ_NULL_64:
+            j_eq_null_64(core);
+            DISPATCH();
+        DO_J_EQ_NULL_PTR:
+            j_eq_null_ptr(core);
             DISPATCH();
         DO_REG_FFI:
             reg_ffi(core);

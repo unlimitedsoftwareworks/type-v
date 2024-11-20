@@ -1755,6 +1755,50 @@ static inline void j_cmp_bool(TypeV_Core* core) {
     }
 }
 
+static inline void j_eq_null_8(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint32_t offset;
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
+    uint8_t v1 = core->regs[op1].u8;
+    if(v1 == 0) core->ip = offset;
+}
+
+static inline void j_eq_null_16(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint32_t offset;
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
+    uint16_t v1 = core->regs[op1].u16;
+    if(v1 == 0) core->ip = offset;
+}
+
+static inline void j_eq_null_32(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint32_t offset;
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
+    uint32_t v1 = core->regs[op1].u32;
+    if(v1 == 0) core->ip = offset;
+}
+
+static inline void j_eq_null_64(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint32_t offset;
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
+    uint64_t v1 = core->regs[op1].u64;
+    if(v1 == 0) core->ip = offset;
+}
+
+static inline void j_eq_null_ptr(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint32_t offset;
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
+    uintptr_t v1 = core->regs[op1].ptr;
+    if(v1 == 0) core->ip = offset;
+}
 
 static inline void reg_ffi(TypeV_Core* core){
     uint8_t offsetSize = core->codePtr[core->ip++];
