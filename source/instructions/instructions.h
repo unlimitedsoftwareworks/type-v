@@ -205,10 +205,9 @@ static inline void mv_reg_const_ptr(TypeV_Core* core){
 }
 
 static inline void mv_global_reg(TypeV_Core* core){
-    const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy_unaligned(&offset, &core->codePtr[core->ip], offset_length);
-    core->ip += offset_length;
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
     const uint8_t source = core->codePtr[core->ip++];
     uint8_t byteSize = core->codePtr[core->ip++];
 
@@ -218,10 +217,9 @@ static inline void mv_global_reg(TypeV_Core* core){
 }
 
 static inline void mv_global_reg_ptr(TypeV_Core* core){
-    const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy_unaligned(&offset, &core->codePtr[core->ip], offset_length);
-    core->ip += offset_length;
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
     const uint8_t source = core->codePtr[core->ip++];
 
     typev_memcpy_aligned_8(&core->globalPtr[offset], &core->regs[source]);
@@ -229,10 +227,9 @@ static inline void mv_global_reg_ptr(TypeV_Core* core){
 
 static inline void mv_reg_global(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
-    const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy_unaligned(&offset, &core->codePtr[core->ip], offset_length);
-    core->ip += offset_length;
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
     uint8_t byteSize = core->codePtr[core->ip++];
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
@@ -241,11 +238,9 @@ static inline void mv_reg_global(TypeV_Core* core){
 
 static inline void mv_reg_global_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
-    const uint8_t offset_length = core->codePtr[core->ip++];
     size_t offset = 0;
-    typev_memcpy_unaligned(&offset, &core->codePtr[core->ip], offset_length);
-    core->ip += offset_length;
-
+    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+    core->ip += 4;
 
     typev_memcpy_aligned_8(&core->regs[target], &core->globalPtr[offset]);
 }
