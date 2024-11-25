@@ -46,12 +46,13 @@ Type-V performance is very comparable to node in interpreter mode (JIT off, sinc
 ## Why Type-V
 Type-V is a runtime environment for type-c. All instructions are optimized for type-c source code, they are all typed and the VM tries to store minimal RTTI (yet somehow i feel like i'm not succeeding).
 
-
-
 ### Licenses
 | Name   |License|     Usage      |Link|
 |:-------|:---|:--------------|:---|
 | libtable|MIT| Table printing |https://github.com/marchelzo/libtable|
+
+## Need help
+Head over to the discussion section, and start a discussion. **Please do not open an issue, start with a discussion and if the issue is verified (or a feature request is accepted), then we will create an issue.** Thank you!
 
 ### Notes
 - Type-V is not production ready yet.
