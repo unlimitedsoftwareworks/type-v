@@ -87,11 +87,17 @@ static char* instructions[] = {
         "a_storef_reg",
         "a_storef_reg_ptr",
 
+        "a_rstoref_reg",
+        "a_rstoref_reg_ptr",
+
         "a_storef_const",
         "a_storef_const_ptr",
 
         "a_loadf",
         "a_loadf_ptr",
+
+        "a_rloadf",
+        "a_rloadf_ptr",
 
         "push",
         "push_ptr",
@@ -187,8 +193,10 @@ static char* instructions[] = {
         "mod_u16",
         "mod_i32",
         "mod_u32",
+        "mod_f32",
         "mod_i64",
         "mod_u64",
+        "mod_f64",
 
         "lshift_i8",
         "lshift_u8",
@@ -249,6 +257,7 @@ static char* instructions[] = {
         "j_cmp_null_16",
         "j_cmp_null_32",
         "j_cmp_null_64",
+        "j_cmp_null_ptr",
 
         "reg_ffi",
         "open_ffi",

@@ -222,6 +222,14 @@ typedef enum TypeV_OpCode {
     OP_A_STOREF_REG_PTR,
 
     /**
+     * OP_A_RSTOREF_REG_[size] dest: R, index: R, source: R, byteSize: S
+     * Stores [size] bytes from register src to field
+     * index of array dest, reverse indexing
+     */
+    OP_A_RSTOREF_REG,
+    OP_A_RSTOREF_REG_PTR,
+
+    /**
      * OP_A_STOREF_CONST_[size] dest: R, index: R, offset: I (4 bytes), byteSize: S
      * Stores [size] bytes from constant pool address offset to field
      * value stored in register index of array stored at dest
@@ -236,6 +244,14 @@ typedef enum TypeV_OpCode {
      */
     OP_A_LOADF,
     OP_A_LOADF_PTR,
+
+    /**
+     * OP_A_RLOADF dest: R, index: R, src: R, byteSize: S
+     * Loads [size] bytes from field value stored in register index
+     * of array stored at src to register dest. Uses reverse indexing
+     */
+    OP_A_RLOADF,
+    OP_A_RLOADF_PTR,
 
 
     /**
@@ -411,8 +427,10 @@ typedef enum TypeV_OpCode {
     OP_MOD_U16,
     OP_MOD_I32,
     OP_MOD_U32,
+    OP_MOD_F32,
     OP_MOD_I64,
     OP_MOD_U64,
+    OP_MOD_F64,
 
     OP_LSHIFT_I8,
     OP_LSHIFT_U8,
@@ -561,7 +579,6 @@ typedef enum TypeV_OpCode {
      * Backs up the changes from the func state to the closure
      */
     OP_CLOSURE_BACKUP,
-
 
     /**
      * OP_COROUTINE_ALLOC: dest: R, src-func: I (8bytes)

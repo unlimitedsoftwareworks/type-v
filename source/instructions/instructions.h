@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <math.h>
 #include "../core.h"
 #include "./opcodes.h"
 
@@ -751,6 +751,11 @@ static inline void a_storef_reg(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
+
+    if(core->regs[index].u64 >= array->length) {
+        core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
+    }
+
     ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
     typev_memcpy_unaligned(array->data + (core->regs[index].u64 * array->elementSize), &core->regs[source], byteSize);
 }
@@ -766,6 +771,41 @@ static inline void a_storef_reg_ptr(TypeV_Core* core){
         core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
     }
     typev_memcpy_aligned_8(array->data + (core->regs[index].u64 * array->elementSize), &core->regs[source]);
+}
+
+
+static inline void a_rstoref_reg(TypeV_Core* core){
+    const uint8_t array_reg = core->codePtr[core->ip++];
+    const uint8_t index = core->codePtr[core->ip++];
+    const uint8_t source = core->codePtr[core->ip++];
+    uint8_t byteSize = core->codePtr[core->ip++];
+    CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
+
+    TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
+
+    if(core->regs[index].u64 > array->length) {
+        core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
+    }
+
+    uint64_t idx = core->regs[index].u64;
+
+    ASSERT(core->regs[index].u64 < array->length, "Index out of bounds");
+    typev_memcpy_unaligned(array->data + ((array->length - idx) * array->elementSize), &core->regs[source], byteSize);
+}
+
+static inline void a_rstoref_reg_ptr(TypeV_Core* core){
+    const uint8_t array_reg = core->codePtr[core->ip++];
+    const uint8_t index = core->codePtr[core->ip++];
+    const uint8_t source = core->codePtr[core->ip++];
+
+    TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
+    uint64_t idx = core->regs[index].u64;
+
+    // strict comparison here
+    if(core->regs[index].u64 > array->length) {
+        core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
+    }
+    typev_memcpy_aligned_8(array->data + ((array->length - idx) * array->elementSize), &core->regs[source]);
 }
 
 static inline void a_storef_const(TypeV_Core* core){
@@ -830,6 +870,44 @@ static inline void a_loadf_ptr(TypeV_Core* core) {
     }
 
     typev_memcpy_aligned_8(&core->regs[target], array->data + (core->regs[index].u64 * array->elementSize));
+    SET_REG_PTR(core->funcState, target);
+}
+
+static inline void a_rloadf(TypeV_Core* core) {
+    const uint8_t target = core->codePtr[core->ip++];
+    const uint8_t index = core->codePtr[core->ip++];
+    const uint8_t array_reg = core->codePtr[core->ip++];
+
+    TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
+
+    uint64_t idx = core->regs[index].u64;
+
+    if(idx > array->length) {
+        core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", idx, array->length);
+    }
+
+
+    uint8_t byteSize = core->codePtr[core->ip++];
+    CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
+
+    typev_memcpy_unaligned(&core->regs[target], array->data + ((array->length - idx) * array->elementSize), byteSize);
+    CLEAR_REG_PTR(core->funcState, target);
+}
+
+static inline void a_rloadf_ptr(TypeV_Core* core) {
+    const uint8_t target = core->codePtr[core->ip++];
+    const uint8_t index = core->codePtr[core->ip++];
+    const uint8_t array_reg = core->codePtr[core->ip++];
+
+    TypeV_Array* array = (TypeV_Array*)core->regs[array_reg].ptr;
+
+    uint64_t idx = core->regs[index].u64;
+    if(idx > array->length) {
+        core_panic(core, 1, "Index out of bounds %d <= %d", idx, array->length);
+        return;
+    }
+
+    typev_memcpy_aligned_8(&core->regs[target], array->data + ((array->length - idx) * array->elementSize));
     SET_REG_PTR(core->funcState, target);
 }
 
@@ -1338,8 +1416,26 @@ OP_BINARY(mod, i16, %)
 OP_BINARY(mod, u16, %)
 OP_BINARY(mod, i32, %)
 OP_BINARY(mod, u32, %)
+
+static inline void mod_f32(TypeV_Core* core){
+    uint8_t target = core->codePtr[core->ip++];
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    core->regs[target].f32 = fmodf(core->regs[op1].f32, core->regs[op2].f32);
+    CLEAR_REG_PTR(core->funcState, target);
+}
+
 OP_BINARY(mod, i64, %)
 OP_BINARY(mod, u64, %)
+
+static inline void mod_f64(TypeV_Core* core){
+    uint8_t target = core->codePtr[core->ip++];
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    core->regs[target].f64 = fmod(core->regs[op1].f64, core->regs[op2].f64);
+    CLEAR_REG_PTR(core->funcState, target);
+}
+
 
 OP_BINARY(lshift, i8, <<)
 OP_BINARY(lshift, u8, <<)

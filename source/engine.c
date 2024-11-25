@@ -157,11 +157,15 @@ static void* dispatch_table[] = { \
     &&DO_A_SLICE,      \
     &&DO_A_INSERT_A, \
     &&DO_A_STOREF_REG, \
-    &&DO_A_STOREF_REG_PTR, \
+    &&DO_A_STOREF_REG_PTR,        \
+    &&DO_A_RSTOREF_REG, \
+    &&DO_A_RSTOREF_REG_PTR,        \
     &&DO_A_STOREF_CONST, \
     &&DO_A_STOREF_CONST_PTR, \
     &&DO_A_LOADF, \
     &&DO_A_LOADF_PTR, \
+    &&DO_A_RLOADF, \
+    &&DO_A_RLOADF_PTR, \
     &&DO_PUSH, \
     &&DO_PUSH_PTR, \
     &&DO_PUSH_CONST, \
@@ -247,8 +251,10 @@ static void* dispatch_table[] = { \
     &&DO_MOD_U16, \
     &&DO_MOD_I32, \
     &&DO_MOD_U32, \
+    &&DO_MOD_F32, \
     &&DO_MOD_I64, \
     &&DO_MOD_U64, \
+    &&DO_MOD_F64, \
     &&DO_LSHIFT_I8, \
     &&DO_LSHIFT_U8, \
     &&DO_LSHIFT_I16, \
@@ -467,6 +473,12 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_A_STOREF_REG_PTR:
             a_storef_reg_ptr(core);
             DISPATCH();
+        DO_A_RSTOREF_REG:
+            a_rstoref_reg(core);
+            DISPATCH();
+        DO_A_RSTOREF_REG_PTR:
+            a_rstoref_reg_ptr(core);
+            DISPATCH();
         DO_A_STOREF_CONST:
             a_storef_const(core);
             DISPATCH();
@@ -478,6 +490,12 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
             DISPATCH();
         DO_A_LOADF_PTR:
             a_loadf_ptr(core);
+            DISPATCH();
+        DO_A_RLOADF:
+            a_rloadf(core);
+            DISPATCH();
+        DO_A_RLOADF_PTR:
+            a_rloadf_ptr(core);
             DISPATCH();
         DO_PUSH:
             push(core);
@@ -734,11 +752,17 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_MOD_U32:
             mod_u32(core);
             DISPATCH();
+        DO_MOD_F32:
+            mod_f32(core);
+            DISPATCH();
         DO_MOD_I64:
             mod_i64(core);
             DISPATCH();
         DO_MOD_U64:
             mod_u64(core);
+            DISPATCH();
+        DO_MOD_F64:
+            mod_f64(core);
             DISPATCH();
         DO_LSHIFT_I8:
             lshift_i8(core);
