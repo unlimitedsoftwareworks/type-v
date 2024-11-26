@@ -7,6 +7,26 @@
 #include <string.h>
 
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#pragma intrinsic(_BitScanForward64)
+
+static inline uint32_t count_trailing_zeros_64(uint64_t value) {
+    unsigned long index;
+    if (_BitScanForward64(&index, value)) {
+        return (uint32_t)index;
+    } else {
+        // If value is 0, behavior is undefined for __builtin_ctzll
+        return 64; // All bits are zero
+    }
+}
+#else
+// GCC and Clang support __builtin_ctzll
+static inline uint32_t count_trailing_zeros_64(uint64_t value) {
+    return __builtin_ctzll(value);
+}
+#endif
+
 static inline TypeV_ObjectHeader* gc_ptr_in_nursery(uintptr_t ptr, TypeV_NurseryRegion* nursery) {
     // Check if the pointer falls within the nursery space (either `from` or `to`)
     uintptr_t headerPtr = ptr - sizeof(TypeV_ObjectHeader);
@@ -378,7 +398,7 @@ void gc_update_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery
 
             while (bitmap) {
                 // Find the index of the lowest set bit
-                uint32_t bit_position = __builtin_ctzll(bitmap); // Count trailing zeros (GCC/Clang intrinsic)
+                uint32_t bit_position = count_trailing_zeros_64(bitmap); // Count trailing zeros (GCC/Clang intrinsic)
                 uint32_t reg_index = (bitmap_index * 64) + bit_position;
 
                 // Clear the bit so we can find the next one
