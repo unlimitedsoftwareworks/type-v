@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 project(type_v C)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Your other subdirectories
 add_subdirectory(stdio)
@@ -58,4 +59,4 @@ add_executable(type_v
         source/errors/errors.h
 )
 
-target_link_libraries(type_v stdio string stdcore )
+target_link_libraries(type_v stdio string stdcore m)
