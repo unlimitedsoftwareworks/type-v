@@ -16,9 +16,9 @@ if(UNIX AND NOT APPLE)  # UNIX includes Linux, but excludes macOS with the NOT A
 endif()
 # Enforce the C11 standard explicitly for Windows (MSVC)
 if(MSVC)
-    # Add MSVC-specific flag to use C11
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /std:c11")
+    add_compile_options(/std:c11 /Zc:__cplusplus)
 endif()
+
 
 # Compiler flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
