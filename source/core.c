@@ -315,6 +315,11 @@ uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_
     array->data = realloc(array->data, num_elements*array->elementSize);
     array->length = num_elements;
 
+    // if we have increased the size, we fill the new elements with 0
+    if(num_elements > array->length){
+        memset(array->data + array->length * array->elementSize, 0, (num_elements - array->length) * array->elementSize);
+    }
+
     return array_ptr;
 }
 uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src, uint64_t position) {
