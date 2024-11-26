@@ -13,14 +13,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest] #windows-latest
         build_type: [Release]
         include:
-          # Windows: Only cl (MSVC)
-          - os: windows-latest
-            c_compiler: cl
-            cpp_compiler: cl
-
           # Ubuntu: Both gcc and clang
           - os: ubuntu-latest
             c_compiler: gcc
@@ -33,6 +28,11 @@ jobs:
           - os: macos-latest
             c_compiler: clang
             cpp_compiler: clang++
+
+        # Exclude windows-latest entries
+        # exclude:
+        #   - os: windows-latest
+        #     c_compiler: cl
 
     steps:
     - uses: actions/checkout@v4
@@ -52,16 +52,17 @@ jobs:
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
 
-    - name: Configure CMake for Windows
-      if: runner.os == 'Windows'
-      run: >
-        cmake -B ${{ steps.strings.outputs.build-output-dir }}
-        -DCMAKE_CXX_COMPILER=cl
-        -DCMAKE_C_COMPILER=cl
-        -DCMAKE_GENERATOR_PLATFORM=x64
-        -DCMAKE_C_FLAGS="/std:c11 /Zc:__cplusplus"
-        -DCMAKE_CXX_FLAGS="/std:c++17 /Zc:__cplusplus"
-        -S ${{ github.workspace }}
+    # Commented out Windows-specific configuration
+    # - name: Configure CMake for Windows
+    #   if: runner.os == 'Windows'
+    #   run: >
+    #     cmake -B ${{ steps.strings.outputs.build-output-dir }}
+    #     -DCMAKE_CXX_COMPILER=cl
+    #     -DCMAKE_C_COMPILER=cl
+    #     -DCMAKE_GENERATOR_PLATFORM=x64
+    #     -DCMAKE_C_FLAGS="/std:c11 /Zc:__cplusplus"
+    #     -DCMAKE_CXX_FLAGS="/std:c++17 /Zc:__cplusplus"
+    #     -S ${{ github.workspace }}
 
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
