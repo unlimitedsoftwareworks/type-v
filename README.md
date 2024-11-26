@@ -80,8 +80,9 @@ The performance evaluation was conducted on a system powered by **AMD EPYC Proce
 - **OS**: Ubuntu 24.04.1 LTS codename `noble`
 
 <hr/>
+
 - Python: `Python 3.12.3 (main, Sep 11 2024, 14:17:37) [GCC 13.2.0] on linux`
-- Node: `Welcome to Node.js v18.19.1.`
+- Node: `Node.js v18.19.1.`
 
 #### Fibonacci(40), recursive
 Non-optimized versions, just to test context switching.
