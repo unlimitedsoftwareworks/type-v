@@ -1,6 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifdef _MSC_VER
+#include <malloc.h> // For _aligned_malloc and _aligned_free
+#else
+#include <stdlib.h> // For aligned_alloc
+#endif
+
 #include <string.h>
 #include "gc.h"
 #include "mark.h"
@@ -18,6 +24,21 @@ void gc_log(const char * fmt, ...) {
 }
 
 
+void* aligned_alloc_wrapper(size_t alignment, size_t size) {
+#ifdef _MSC_VER
+    return _aligned_malloc(size, alignment);
+#else
+    return aligned_alloc(alignment, size);
+#endif
+}
+
+void aligned_free_wrapper(void* ptr) {
+#ifdef _MSC_VER
+    _aligned_free(ptr);
+#else
+    free(ptr);
+#endif
+}
 
 
 TypeV_NurseryRegion* gc_create_nursery() {
@@ -26,9 +47,9 @@ TypeV_NurseryRegion* gc_create_nursery() {
     if (!nursery) return NULL;
 
     // Allocate and initialize the nursery data buffer
-    nursery->data = (uint8_t*)aligned_alloc(NURSERY_SIZE, NURSERY_SIZE);
+    nursery->data = (uint8_t*)aligned_alloc_wrapper(NURSERY_SIZE, NURSERY_SIZE);
     if (!nursery->data) {
-        free(nursery);
+        aligned_free_wrapper(nursery);
         return NULL;
     }
 
