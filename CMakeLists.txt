@@ -14,6 +14,11 @@ if(UNIX AND NOT APPLE)  # UNIX includes Linux, but excludes macOS with the NOT A
     add_definitions(-D_ISOC11_SOURCE)
     add_definitions(-D_POSIX_C_SOURCE=200809L)
 endif()
+# Enforce the C11 standard explicitly for Windows (MSVC)
+if(MSVC)
+    # Add MSVC-specific flag to use C11
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /std:c11")
+endif()
 
 # Compiler flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
