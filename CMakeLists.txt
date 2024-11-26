@@ -8,7 +8,11 @@ add_subdirectory(stdio)
 add_subdirectory(string)
 add_subdirectory(stdcore)
 
-# Compiler flags
+
+if(UNIX AND NOT APPLE)  # UNIX includes Linux, but excludes macOS with the NOT APPLE condition
+    add_definitions(-D_ISOC11_SOURCE)
+    add_definitions(-D_POSIX_C_SOURCE=200809L)
+endif()
 
 # Compiler flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
