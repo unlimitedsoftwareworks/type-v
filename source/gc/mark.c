@@ -204,20 +204,22 @@ void core_struct_recompute_pointers(TypeV_Struct* struct_ptr) {
     size_t bitmaskSize = (struct_ptr->numFields + 7) / 8;
 
     uint8_t* current_ptr = (uint8_t*)(struct_ptr + 1);
+    const uint32_t numFields = struct_ptr->numFields;
 
     // Set `globalFields` pointer (aligned to 4 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
     struct_ptr->globalFields = (uint32_t*)current_ptr;
-    current_ptr += struct_ptr->numFields * sizeof(uint32_t);
+    current_ptr += (numFields+1) * sizeof(uint32_t);
 
     // Set `fieldOffsets` pointer (aligned to 2 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
     struct_ptr->fieldOffsets = (uint16_t*)current_ptr;
-    current_ptr += struct_ptr->numFields * sizeof(uint16_t);
+    current_ptr += numFields * sizeof(uint16_t);
 
     // Set `pointerBitmask` pointer (aligned to 1 byte)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
     struct_ptr->pointerBitmask = current_ptr;
+    current_ptr += bitmaskSize;
 
 
     // Set `data` pointer (aligned to 8 bytes)
@@ -375,7 +377,7 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
         case OT_COROUTINE: {
             TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(new_ptr + 1);
             TypeV_ObjectHeader* closureHeader = (TypeV_ObjectHeader*)(coroutine_ptr->closure - sizeof(TypeV_ObjectHeader));
-            
+
             coroutine_ptr->closure = core_gc_update_object_reference_nursery(core, closureHeader);
             gc_update_state(core, coroutine_ptr->state, 1);
             break;

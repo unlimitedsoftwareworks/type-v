@@ -130,7 +130,7 @@ static inline void mv_reg_reg(TypeV_Core* core){
     // CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     //typev_memcpy_unaligned(&core->regs[target], &core->regs[source], byteSize);
-    core->regs[target].ptr = core->regs[source].ptr;
+    core->regs[target] = core->regs[source];
     CLEAR_REG_PTR(core->funcState, target);
 }
 
@@ -283,7 +283,7 @@ static inline void s_alloc_t(TypeV_Core* core){
         uint8_t isPtr = core->templatePtr[template_offset + 6];
         template_offset += 7;
 
-        struct_ptr->globalFields[field_index] = globalFieldIndex;
+        struct_ptr->globalFields[field_index+1] = globalFieldIndex;
         struct_ptr->fieldOffsets[field_index] = offset;
 
         if (isPtr) {
@@ -311,7 +311,7 @@ static inline void s_reg_field(TypeV_Core* core){
     uint8_t isPtr = core->codePtr[core->ip++];
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[src_reg].ptr;
-    struct_ptr->globalFields[field_index] = globalFieldIndex;
+    struct_ptr->globalFields[field_index+1] = globalFieldIndex;
     struct_ptr->fieldOffsets[field_index] = offset;
 
     if (isPtr) {
@@ -1634,33 +1634,56 @@ static inline void j_cmp_##name(TypeV_Core* core) {\
     uint8_t op2 = core->codePtr[core->ip++];\
     uint8_t cmpType = core->codePtr[core->ip++];\
     uint32_t offset;\
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);\
-    core->ip += 4;\
     type v1 = core->regs[op1].name;\
     type v2 = core->regs[op2].name;\
     switch(cmpType) {\
         case 0:\
-            if(v1 == v2) core->ip = offset;\
+            if(v1 == v2) {\
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);\
+                core->ip = offset;\
+                return;\
+            }\
             break;\
         case 1:\
-            if(v1 != v2) core->ip = offset;\
+            if(v1 != v2) {\
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);\
+                core->ip = offset;\
+                return;\
+            }\
             break;\
         case 2:\
-            if(v1 > v2) core->ip = offset;\
+            if(v1 > v2) {\
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);\
+                core->ip = offset;\
+                return;\
+            }\
             break;\
         case 3:\
-            if(v1 >= v2) core->ip = offset;\
+            if(v1 >= v2) {\
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);\
+                core->ip = offset;\
+                return;\
+            }\
             break;\
         case 4:\
-            if(v1 < v2) core->ip = offset;\
+            if(v1 < v2) {\
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);\
+                core->ip = offset;\
+                return;\
+            }\
             break;\
         case 5:\
-            if(v1 <= v2) core->ip = offset;\
+            if(v1 <= v2){\
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);\
+                core->ip = offset;\
+                return;\
+            }\
             break;\
         default:\
             core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);\
     }\
+    core->ip += 4;\
 }\
 
 
@@ -1671,33 +1694,58 @@ static inline void j_cmp_u8(TypeV_Core* core) {
     uint8_t op2 = core->codePtr[core->ip++];
     uint8_t cmpType = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
     uint8_t v1 = core->regs[op1].u8;
     uint8_t v2 = core->regs[op2].u8;
     switch(cmpType) {
         case 0:
-            if(v1 == v2) core->ip = offset;
+            if(v1 == v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 1:
-            if(v1 != v2) core->ip = offset;
+            if(v1 != v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 2:
-            if(v1 > v2) core->ip = offset;
+            if(v1 > v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 3:
-            if(v1 >= v2) core->ip = offset;
+            if(v1 >= v2) {
+
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 4:
-            if(v1 < v2) core->ip = offset;
+            if(v1 < v2) {
+
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 5:
-            if(v1 <= v2) core->ip = offset;
+            if(v1 <= v2){
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         default:
             core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);
     }
+    core->ip += 4;
 }
 
 OP_CMP(i8, int8_t)
@@ -1710,33 +1758,58 @@ static inline void j_cmp_u32(TypeV_Core* core) {
     uint8_t op2 = core->codePtr[core->ip++];
     uint8_t cmpType = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
     uint32_t v1 = core->regs[op1].u32;
     uint32_t v2 = core->regs[op2].u32;
     switch(cmpType) {
         case 0:
-            if(v1 == v2) core->ip = offset;
+            if(v1 == v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 1:
-            if(v1 != v2) core->ip = offset;
+            if(v1 != v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 2:
-            if(v1 > v2) core->ip = offset;
+            if(v1 > v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 3:
-            if(v1 >= v2) core->ip = offset;
+            if(v1 >= v2) {
+
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 4:
-            if(v1 < v2) core->ip = offset;
+            if(v1 < v2) {
+
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 5:
-            if(v1 <= v2) core->ip = offset;
+            if(v1 <= v2){
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         default:
             core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);
     }
+    core->ip += 4;
 }
 
 OP_CMP(i32, int32_t)
@@ -1746,33 +1819,59 @@ static inline void j_cmp_u64(TypeV_Core* core) {
     uint8_t op2 = core->codePtr[core->ip++];
     uint8_t cmpType = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
+
     uint64_t v1 = core->regs[op1].u32;
     uint64_t v2 = core->regs[op2].u32;
     switch(cmpType) {
         case 0:
-            if(v1 == v2) core->ip = offset;
+            if(v1 == v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 1:
-            if(v1 != v2) core->ip = offset;
+            if(v1 != v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 2:
-            if(v1 > v2) core->ip = offset;
+            if(v1 > v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 3:
-            if(v1 >= v2) core->ip = offset;
+            if(v1 >= v2) {
+
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 4:
-            if(v1 < v2) core->ip = offset;
+            if(v1 < v2) {
+
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 5:
-            if(v1 <= v2) core->ip = offset;
+            if(v1 <= v2){
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         default:
             core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);
     }
+    core->ip += 4;
 }
 
 OP_CMP(i64, int64_t)
@@ -1785,33 +1884,57 @@ static inline void j_cmp_ptr(TypeV_Core* core) {
     uint8_t op2 = core->codePtr[core->ip++];
     uint8_t cmpType = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
+
     uintptr_t v1 = core->regs[op1].ptr;
     uintptr_t v2 = core->regs[op2].ptr;
     switch(cmpType) {
         case 0:
-            if(v1 == v2) core->ip = offset;
+            if(v1 == v2){
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 1:
-            if(v1 != v2) core->ip = offset;
+            if(v1 != v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 2:
-            if(v1 > v2) core->ip = offset;
+            if(v1 > v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 3:
-            if(v1 >= v2) core->ip = offset;
+            if(v1 >= v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 4:
-            if(v1 < v2) core->ip = offset;
+            if(v1 < v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         case 5:
-            if(v1 <= v2) core->ip = offset;
+            if(v1 <= v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
             break;
         default:
             core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
             exit(-1);
     }
+    core->ip += 4;
 }
 
 #undef OP_CMP
@@ -1822,8 +1945,7 @@ static inline void j_cmp_bool(TypeV_Core* core) {
     uint8_t op2 = core->codePtr[core->ip++];
     uint8_t cmpType = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
+
     // Fetch the register values once, store them in registers
     uint8_t v1 = core->regs[op1].u8;
     uint8_t v2 = core->regs[op2].u8;
@@ -1837,58 +1959,89 @@ static inline void j_cmp_bool(TypeV_Core* core) {
     // If the result is zero, jump to the offset by setting the instruction pointer
     //core->ip = core->ip + (result ? 0 : (offset - core->ip));
     if(result && (cmpType == 0)){
+        typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
         core->ip = offset;
+        return;
     }
     else if(!result && (cmpType == 1)){
+        typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
         core->ip = offset;
+        return;
     }else {
         core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");
     }
+
+    core->ip += 4;
 }
 
 static inline void j_eq_null_8(TypeV_Core* core) {
     uint8_t op1 = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
+
     uint8_t v1 = core->regs[op1].u8;
-    if(v1 == 0) core->ip = offset;
+    if(v1 == 0) {
+        typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+        core->ip = offset;
+        return;
+    }
+
+    core->ip += 4;
 }
 
 static inline void j_eq_null_16(TypeV_Core* core) {
     uint8_t op1 = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
+
     uint16_t v1 = core->regs[op1].u16;
-    if(v1 == 0) core->ip = offset;
+    if(v1 == 0) {
+        typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+        core->ip = offset;
+        return;
+    }
+
+    core->ip += 4;
 }
 
 static inline void j_eq_null_32(TypeV_Core* core) {
     uint8_t op1 = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
+
+
     uint32_t v1 = core->regs[op1].u32;
-    if(v1 == 0) core->ip = offset;
+    if(v1 == 0) {
+        typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+        core->ip = offset;
+        return;
+    }
+
+    core->ip += 4;
 }
 
 static inline void j_eq_null_64(TypeV_Core* core) {
     uint8_t op1 = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
     uint64_t v1 = core->regs[op1].u64;
-    if(v1 == 0) core->ip = offset;
+    if(v1 == 0) {
+        typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+        core->ip = offset;
+        return;
+    }
+
+    core->ip += 4;
 }
 
 static inline void j_eq_null_ptr(TypeV_Core* core) {
     uint8_t op1 = core->codePtr[core->ip++];
     uint32_t offset;
-    typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
-    core->ip += 4;
+
     uintptr_t v1 = core->regs[op1].ptr;
-    if(v1 == 0) core->ip = offset;
+    if(v1 == 0) {
+        typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+        core->ip = offset;
+        return;
+    }
+
+    core->ip += 4;
 }
 
 static inline void reg_ffi(TypeV_Core* core){

@@ -145,15 +145,15 @@ typedef struct TypeV_GlobalPool {
  * we need to make sure type-v objects are properly aligned.
  */
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-    #define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
+#define ARCH_SUPPORTS_UNALIGNED_ACCESS 1
 
 // Check for ARMv8 or newer, which often allows unaligned access for certain types
 #elif defined(__aarch64__) || defined(_M_ARM64) || defined(__ARM_ARCH_8A__)
-    #define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
+#define ARCH_SUPPORTS_UNALIGNED_ACCESS 1
 
 // ARMv7 and older do not support unaligned access
 #elif defined(__arm__) || defined(_M_ARM)
-    #define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
+#define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
 
 // Fallback for unknown architectures
 #else

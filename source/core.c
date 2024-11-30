@@ -117,9 +117,12 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     size_t bitmaskSize = (numfields + 7) / 8;
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
 
+
+    const uint32_t numFieldsP1 = numfields + 1;
+
     // Align for `globalFields` (4-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
-    totalAllocationSize += numfields * sizeof(uint32_t);  // Global fields array
+    totalAllocationSize += numFieldsP1 * sizeof(uint32_t);  // Global fields array
 
     // Align for `fieldOffsets` (2-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
@@ -154,7 +157,7 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     // Set `globalFields` pointer (aligned to 4 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
     struct_ptr->globalFields = (uint32_t*)current_ptr;
-    current_ptr += numfields * sizeof(uint32_t);
+    current_ptr += numFieldsP1 * sizeof(uint32_t);
 
     // Set `fieldOffsets` pointer (aligned to 2 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
@@ -164,6 +167,7 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     // Set `pointerBitmask` pointer (aligned to 1 byte)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
     struct_ptr->pointerBitmask = current_ptr;
+    current_ptr += bitmaskSize;
 
     // Set `data` pointer (aligned to 8 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
@@ -387,36 +391,94 @@ void update_cache(uint32_t globalID, uint8_t index) {
 }
  */
 
-inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *globalFields, uint8_t numFields, uint32_t globalID) {
-    // First, try to find the index in the cache
-    /*int cache_index = find_in_cache(globalID);
-    if (__builtin_expect(cache_index != (uint8_t)-1, 1)) {
-        return cache_index;  // Cache hit
-    }     */
+/*
+inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
+    int k = 1;
+    while (__builtin_expect(k <= (n), 1)) {
+        __builtin_prefetch(b + k * 16, 0, 1);
+        k = 2 * k + (b[k] < x);  // Adjust for 0-based indexing
+    }
+    k >>= __builtin_ffs(~k);
+    return k-1;  // Convert 1-based to 0-based index
+}
+*/
+#include <immintrin.h>  // For SIMD intrinsics
 
+/*
+inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
+    int k = 1;
 
-    // Perform binary search if cache miss
-    int left = 0;
-    int right = numFields - 1;
-    while (__builtin_expect(left <= right, 1)) {  // Loop is likely to continue
-        int mid = left + (right - left) / 2;
+    // Traverse the Eytzinger layout: Continue until we either find x or run out of nodes
+    while (k <= n) {
+        __builtin_prefetch(&b[2 * k], 0, 1);  // Prefetch next likely elements
 
-        if (__builtin_expect(globalFields[mid] == globalID, 1)) {  // Likely to find ID in the array
-            //update_cache(globalID, (uint8_t)mid);  // Update cache with the result
-            return (uint8_t)mid;
-        } else if (globalFields[mid] < globalID) {
-            left = mid + 1;
+        // Unrolling the traversal for efficiency
+        if (b[k] == x) {
+            return (uint8_t)(k - 1);  // Found the value, convert to 0-based indexing
+        }
+        if (b[k] < x) {
+            k = 2 * k + 1;
         } else {
-            right = mid - 1;
+            k = 2 * k;
+        }
+
+        if (k > n) break;  // Added extra boundary check to prevent overflows
+
+        // Unroll second step
+        __builtin_prefetch(&b[2 * k], 0, 1);  // Prefetch again for the next iteration
+        if (b[k] == x) {
+            return (uint8_t)(k - 1);
+        }
+        if (b[k] < x) {
+            k = 2 * k + 1;
+        } else {
+            k = 2 * k;
         }
     }
 
-    // If we reach here, it means the ID was not found
-    // This is an unlikely case, so mark it as such
-    core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", globalID);
-    // Return an invalid index (in theory, should not be reached)
+    // Not found
+    core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
     return (uint8_t)-1;
 }
+
+*/
+
+#include <immintrin.h>  // For SIMD intrinsics
+
+inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
+    int k = 1;
+
+    // Use SIMD to compare four elements at once, where applicable
+    while (k + 4 <= n) {
+        __m128i keys = _mm_loadu_si128((__m128i*)&b[k]);  // Load four elements starting from b[k]
+        __m128i target = _mm_set1_epi32(x);  // Set all four parts to the target value x
+        __m128i cmp = _mm_cmpeq_epi32(keys, target);  // Compare
+
+        int mask = _mm_movemask_epi8(cmp);  // Create a bitmask of the results
+        if (mask != 0) {
+            // If there is a match, determine the exact index
+            for (int i = 0; i < 4; i++) {
+                if (b[k + i] == x) {
+                    return (uint8_t)(k + i - 1);  // Convert to 0-based indexing
+                }
+            }
+        }
+
+        k += 4;  // Move forward by 4 elements
+    }
+
+    // Fallback for remaining elements
+    while (k <= n) {
+        if (b[k] == x) {
+            return (uint8_t)(k - 1);
+        }
+        k++;
+    }
+
+    core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
+    return (uint8_t)-1;
+}
+
 
 
 
