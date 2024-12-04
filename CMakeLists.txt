@@ -8,6 +8,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 add_subdirectory(stdio)
 add_subdirectory(string)
 add_subdirectory(stdcore)
+add_subdirectory(stdmath)
 
 
 if(UNIX AND NOT APPLE)  # UNIX includes Linux, but excludes macOS with the NOT APPLE condition
@@ -64,4 +65,4 @@ add_executable(type_v
         source/errors/errors.h
 )
 
-target_link_libraries(type_v stdio string stdcore m)
+target_link_libraries(type_v stdio string stdcore stdmath m)
