@@ -237,15 +237,17 @@ void core_class_recompute_pointers(TypeV_Class* class_ptr) {
 
     uint8_t* current_ptr = (uint8_t*)(class_ptr + 1);
 
+    uint16_t numMethods = class_ptr->numMethods;
+
     // Set `methods` pointer (aligned to 8 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
     class_ptr->methods = (uint64_t*)current_ptr;
-    current_ptr += class_ptr->numMethods * sizeof(uint64_t);
+    current_ptr += numMethods * sizeof(uint64_t);
 
     // Set `globalMethods` pointer (aligned to 4 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
     class_ptr->globalMethods = (uint32_t*)current_ptr;
-    current_ptr += class_ptr->numMethods * sizeof(uint32_t);
+    current_ptr += (numMethods+1) * sizeof(uint32_t);
 
     // Set `fieldOffsets` pointer (aligned to 2 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));

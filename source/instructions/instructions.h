@@ -496,7 +496,7 @@ static inline void c_alloc_t(TypeV_Core* core){
         typev_memcpy_unaligned_4(&methodAddress, &core->templatePtr[template_offset]);
         template_offset += 4;
 
-        class_ptr->globalMethods[methodCounter] = globalMethodIndex;
+        class_ptr->globalMethods[methodCounter+1] = globalMethodIndex;
         class_ptr->methods[methodCounter] = methodAddress;
 
         methodCounter++;
@@ -538,7 +538,7 @@ static inline void c_storem(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->regs[dest_reg].ptr;
     //LOG_INFO("Storing method %d at method_address %d in class %p", method_index, method_address, (void*)c);
-    c->globalMethods[local_method_index] = global_method_index;
+    c->globalMethods[local_method_index+1] = global_method_index;
     c->methods[local_method_index] = method_address;
 }
 
@@ -550,6 +550,11 @@ static inline void c_loadm(TypeV_Core* core){
     core->ip += 4;
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
+
+    if(c == NULL){
+        core_panic(core, -1, "Class is NULL");
+        return;
+    }
 
     //uint8_t idx = class_find_global_index(c, method_index);
     uint8_t idx = object_find_global_index(core, c->globalMethods, c->numMethods, method_index);

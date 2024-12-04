@@ -205,7 +205,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
 
     // Align for `globalMethods` (4-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
-    totalAllocationSize += num_methods * sizeof(uint32_t);  // Global methods array
+    totalAllocationSize += (num_methods+1) * sizeof(uint32_t);  // Global methods array
 
     // Align for `fieldOffsets` (2-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
@@ -245,7 +245,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
     // Set `globalMethods` pointer (aligned to 4 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
     class_ptr->globalMethods = (uint32_t*)current_ptr;
-    current_ptr += num_methods * sizeof(uint32_t);
+    current_ptr += (num_methods+1) * sizeof(uint32_t);
 
     // Set `fieldOffsets` pointer (aligned to 2 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
@@ -402,7 +402,6 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n
     return k-1;  // Convert 1-based to 0-based index
 }
 */
-#include <immintrin.h>  // For SIMD intrinsics
 
 /*
 inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
@@ -443,6 +442,7 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n
 
 */
 
+/*
 #include <immintrin.h>  // For SIMD intrinsics
 
 inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
@@ -478,7 +478,47 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n
     core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
     return (uint8_t)-1;
 }
+*/
 
+inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
+    int k = 1;
+
+    // Traverse the Eytzinger layout: Continue until we either find x or run out of nodes
+    while (k <= n) {
+        __builtin_prefetch(&b[2 * k], 0, 1);  // Prefetch next likely elements
+
+        // Unrolling the traversal for efficiency
+        if (b[k] == x) {
+            return (uint8_t)(k - 1);  // Found the value, convert to 0-based indexing
+        }
+        if (b[k] < x) {
+            k = 2 * k + 1;
+        } else {
+            k = 2 * k;
+        }
+
+        if (k > n) break;  // Added extra boundary check to prevent overflows
+
+        // Unroll second step
+        __builtin_prefetch(&b[2 * k], 0, 1);  // Prefetch again for the next iteration
+        if (b[k] == x) {
+            return (uint8_t)(k - 1);
+        }
+        if (b[k] < x) {
+            k = 2 * k + 1;
+        } else {
+            k = 2 * k;
+        }
+    }
+
+    for(int i = 1; i <= n; i++){
+        printf("%d ", b[i]);
+    }
+
+    // Not found
+    core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
+    return (uint8_t)-1;
+}
 
 
 
