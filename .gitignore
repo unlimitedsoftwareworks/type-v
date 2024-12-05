@@ -4,3 +4,4 @@ cmake-build-release/
 build/
 .DS_Store
 .vscode/settings.json
+.cache

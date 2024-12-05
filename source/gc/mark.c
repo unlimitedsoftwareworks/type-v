@@ -173,7 +173,7 @@ void core_gc_mark_nursery_object(TypeV_Core* core, uintptr_t ptr) {
             gc_update_state(core, coroutine_ptr->state, 1);
             break;
         }
-        case OT_RAWMEM: {
+        case OT_CUSTOM_OBJECT: {
             break;
         }
     }
@@ -209,7 +209,7 @@ void core_struct_recompute_pointers(TypeV_Struct* struct_ptr) {
     // Set `globalFields` pointer (aligned to 4 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
     struct_ptr->globalFields = (uint32_t*)current_ptr;
-    current_ptr += (numFields+1) * sizeof(uint32_t);
+    current_ptr += (numFields) * sizeof(uint32_t);
 
     // Set `fieldOffsets` pointer (aligned to 2 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
@@ -247,7 +247,7 @@ void core_class_recompute_pointers(TypeV_Class* class_ptr) {
     // Set `globalMethods` pointer (aligned to 4 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
     class_ptr->globalMethods = (uint32_t*)current_ptr;
-    current_ptr += (numMethods+1) * sizeof(uint32_t);
+    current_ptr += (numMethods) * sizeof(uint32_t);
 
     // Set `fieldOffsets` pointer (aligned to 2 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
@@ -384,7 +384,7 @@ void* core_gc_update_object_reference_nursery(TypeV_Core* core, TypeV_ObjectHead
             gc_update_state(core, coroutine_ptr->state, 1);
             break;
         }
-        case OT_RAWMEM: {
+        case OT_CUSTOM_OBJECT: {
             break;
         }
     }

@@ -146,7 +146,6 @@ typedef struct TypeV_GlobalPool {
  */
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #define ARCH_SUPPORTS_UNALIGNED_ACCESS 1
-
 // Check for ARMv8 or newer, which often allows unaligned access for certain types
 #elif defined(__aarch64__) || defined(_M_ARM64) || defined(__ARM_ARCH_8A__)
 #define ARCH_SUPPORTS_UNALIGNED_ACCESS 1
@@ -171,7 +170,8 @@ typedef enum {
     OT_ARRAY,
     OT_CLOSURE,
     OT_COROUTINE,
-    OT_RAWMEM,
+    OT_CUSTOM_OBJECT,
+    OT_CUSTOM_COLLECTABLE_OBJECT,
 }TypeV_ObjectType;
 
 typedef struct {
@@ -247,6 +247,10 @@ typedef struct TypeV_Coroutine {
     TypeV_CoroutineExecState executionState;
 }TypeV_Coroutine;
 
+
+typedef struct TypeV_CustomObject {
+    uintptr_t data;
+}TypeV_CustomObject;
 
 /**
  * @brief Core structure, a core is the equivalent of a process in type-c.

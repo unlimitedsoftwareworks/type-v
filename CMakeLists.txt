@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Your other subdirectories
 add_subdirectory(stdio)
+add_subdirectory(stdfs)
 add_subdirectory(string)
 add_subdirectory(stdcore)
 add_subdirectory(stdmath)
@@ -65,4 +66,4 @@ add_executable(type_v
         source/errors/errors.h
 )
 
-target_link_libraries(type_v stdio string stdcore stdmath m)
+target_link_libraries(type_v stdio string stdcore stdmath stdfs m)

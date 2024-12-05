@@ -118,7 +118,7 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
 
 
-    const uint32_t numFieldsP1 = numfields + 1;
+    const uint32_t numFieldsP1 = numfields;
 
     // Align for `globalFields` (4-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
@@ -205,7 +205,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
 
     // Align for `globalMethods` (4-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
-    totalAllocationSize += (num_methods+1) * sizeof(uint32_t);  // Global methods array
+    totalAllocationSize += (num_methods) * sizeof(uint32_t);  // Global methods array
 
     // Align for `fieldOffsets` (2-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
@@ -245,7 +245,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
     // Set `globalMethods` pointer (aligned to 4 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
     class_ptr->globalMethods = (uint32_t*)current_ptr;
-    current_ptr += (num_methods+1) * sizeof(uint32_t);
+    current_ptr += (num_methods) * sizeof(uint32_t);
 
     // Set `fieldOffsets` pointer (aligned to 2 bytes)
     current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
@@ -481,44 +481,24 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n
 */
 
 inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
-    int k = 1;
+    unsigned int step = 1u << (31 - __builtin_clz(n)); // Closest power of two ≤ numFields
+    unsigned int index = 0;
 
-    // Traverse the Eytzinger layout: Continue until we either find x or run out of nodes
-    while (k <= n) {
-        __builtin_prefetch(&b[2 * k], 0, 1);  // Prefetch next likely elements
+    while (step > 0) {
+        unsigned int new_index = index + step;
+        // Clamp to numFields - 1 to stay in bounds
+        new_index = (new_index < n) ? new_index : n - 1;
 
-        // Unrolling the traversal for efficiency
-        if (b[k] == x) {
-            return (uint8_t)(k - 1);  // Found the value, convert to 0-based indexing
-        }
-        if (b[k] < x) {
-            k = 2 * k + 1;
-        } else {
-            k = 2 * k;
-        }
+        // Branchless comparison using conditional move
+        index = (b[new_index] <= x) ? new_index : index;
 
-        if (k > n) break;  // Added extra boundary check to prevent overflows
-
-        // Unroll second step
-        __builtin_prefetch(&b[2 * k], 0, 1);  // Prefetch again for the next iteration
-        if (b[k] == x) {
-            return (uint8_t)(k - 1);
-        }
-        if (b[k] < x) {
-            k = 2 * k + 1;
-        } else {
-            k = 2 * k;
-        }
+        step >>= 1; // Halve the step size
     }
 
-    for(int i = 1; i <= n; i++){
-        printf("%d ", b[i]);
-    }
-
-    // Not found
-    core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
-    return (uint8_t)-1;
+    // Final check if the value at `index` is equal to `id`
+    return (b[index] == x) ? index : (core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x), -1); // Return -1 if not found
 }
+
 
 
 

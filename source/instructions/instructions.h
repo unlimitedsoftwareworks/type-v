@@ -283,7 +283,7 @@ static inline void s_alloc_t(TypeV_Core* core){
         uint8_t isPtr = core->templatePtr[template_offset + 6];
         template_offset += 7;
 
-        struct_ptr->globalFields[field_index+1] = globalFieldIndex;
+        struct_ptr->globalFields[field_index] = globalFieldIndex;
         struct_ptr->fieldOffsets[field_index] = offset;
 
         if (isPtr) {
@@ -311,7 +311,7 @@ static inline void s_reg_field(TypeV_Core* core){
     uint8_t isPtr = core->codePtr[core->ip++];
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[src_reg].ptr;
-    struct_ptr->globalFields[field_index+1] = globalFieldIndex;
+    struct_ptr->globalFields[field_index] = globalFieldIndex;
     struct_ptr->fieldOffsets[field_index] = offset;
 
     if (isPtr) {
@@ -496,7 +496,7 @@ static inline void c_alloc_t(TypeV_Core* core){
         typev_memcpy_unaligned_4(&methodAddress, &core->templatePtr[template_offset]);
         template_offset += 4;
 
-        class_ptr->globalMethods[methodCounter+1] = globalMethodIndex;
+        class_ptr->globalMethods[methodCounter] = globalMethodIndex;
         class_ptr->methods[methodCounter] = methodAddress;
 
         methodCounter++;
@@ -538,7 +538,7 @@ static inline void c_storem(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->regs[dest_reg].ptr;
     //LOG_INFO("Storing method %d at method_address %d in class %p", method_index, method_address, (void*)c);
-    c->globalMethods[local_method_index+1] = global_method_index;
+    c->globalMethods[local_method_index] = global_method_index;
     c->methods[local_method_index] = method_address;
 }
 

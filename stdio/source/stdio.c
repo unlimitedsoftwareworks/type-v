@@ -50,15 +50,10 @@ void println_stdstring(TypeV_Core *core) {
 }
 
 
-void stdio_print_u64(TypeV_Core *core) {
-    uint64_t value = typev_api_stack_pop_u64(core);
-    printf("%llu\n", value);
-}
 
 static TypeV_FFIFunc stdio_lib[] = {
         (TypeV_FFIFunc)stdio_print,
         (TypeV_FFIFunc)stdio_println,
-        (TypeV_FFIFunc)stdio_print_u64,
         (TypeV_FFIFunc)print_stdstring,
         (TypeV_FFIFunc)println_stdstring,
         NULL

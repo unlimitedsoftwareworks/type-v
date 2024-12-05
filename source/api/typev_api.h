@@ -78,4 +78,14 @@ void typev_api_struct_set_field(struct TypeV_Core *core, TypeV_Struct *structPtr
 
 void typev_api_core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...);
 
+
+
+TypeV_Array* typev_api_array_create(TypeV_Core* core, uint64_t count, uint8_t elementSize, uint8_t ptr);
+void typev_api_array_set(TypeV_Core* core, TypeV_Array* array, uint64_t index, void** value);
+void* typev_api_array_get(TypeV_Core* core, TypeV_Array* array, uint64_t index);
+
+
+
+
+
 #endif //TYPE_V_TYPEV_API_H
