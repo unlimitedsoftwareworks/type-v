@@ -47,6 +47,7 @@ typedef enum {
     FS_ERROR_NOT_DIRECTORY,      // Path is not a directory
     FS_ERROR_IS_DIRECTORY,       // Path is a directory when file expected
     FS_ERROR_DIRECTORY_NOT_EMPTY,// Directory not empty on removal
+    FS_ERROR_FILE_CLOSED,       // File was closed
     
     // I/O errors
     FS_ERROR_EOF,               // End of file reached

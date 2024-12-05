@@ -92,6 +92,7 @@ uint64_t fs_read(fs_file *file, void *buffer, uint64_t size, uint8_t *error) {
     *error = fs_map_system_error();
     return 0;
 }
+
 uint64_t fs_readline(fs_file *file, char **buffer, uint8_t *error) {
     if (!file || !file->is_open || !buffer) {
         if (error) *error = FS_ERROR_INVALID_ARGUMENT;
@@ -116,12 +117,14 @@ uint64_t fs_readline(fs_file *file, char **buffer, uint8_t *error) {
     uint64_t total_read = 0;
 
     // Internal buffer for efficient chunked reading
-    static char read_buf[64];
-    static uint64_t read_pos = 0, read_count = 0;
+    char read_buf[64];
+    uint64_t read_pos = 0, read_count = 0;
+
+    // Temporary buffer for rollback calculations
     uint64_t rollback_bytes = 0;
 
     while (1) {
-        // If internal buffer is empty, read more data from the file
+        // Refill the internal buffer if empty
         if (read_pos >= read_count) {
 #ifdef _WIN32
             DWORD bytes_read;
@@ -140,17 +143,17 @@ uint64_t fs_readline(fs_file *file, char **buffer, uint8_t *error) {
 #endif
             read_pos = 0;
 
-            // If no more data is available, return what we have
+            // If no more data is available, handle EOF
             if (read_count == 0) {
                 if (total_read == 0) {
-                    // No data read at all
+                    if (error) *error = FS_ERROR_FILE_CLOSED;
                     return 0;
                 }
                 break;
             }
         }
 
-        // Process data in the internal buffer
+        // Process the internal buffer
         while (read_pos < read_count) {
             char c = read_buf[read_pos++];
             rollback_bytes++;
@@ -163,20 +166,17 @@ uint64_t fs_readline(fs_file *file, char **buffer, uint8_t *error) {
                     rollback_bytes++;
                 }
 
-                // Null-terminate the buffer and reset rollback_bytes
+                // Roll back to the start of the next line
+#ifdef _WIN32
+                SetFilePointer(file->win_handle, -(LONG)(read_count - read_pos), NULL, FILE_CURRENT);
+#else
+                lseek(file->fd, -(off_t)(read_count - read_pos), SEEK_CUR);
+#endif
+
                 if (total_read > 0 && buf[total_read - 1] == '\r') {
                     total_read--; // Remove '\r' if it's at the end
                 }
 
-                buf[total_read] = '\0';
-
-                // Roll back to the beginning of the next line
-                rollback_bytes -= (read_count - read_pos);
-#ifdef _WIN32
-                SetFilePointer(file->win_handle, -((LONG)rollback_bytes), NULL, FILE_CURRENT);
-#else
-                lseek(file->fd, -((off_t)rollback_bytes), SEEK_CUR);
-#endif
                 if (error) *error = FS_OK;
                 return total_read;
             }
@@ -193,17 +193,15 @@ uint64_t fs_readline(fs_file *file, char **buffer, uint8_t *error) {
                 *buffer = buf;
             }
 
-            // Add character to the buffer
+            // Append the character to the buffer
             buf[total_read++] = c;
         }
     }
 
-    // Handle end of file without a trailing newline
-    buf[total_read] = '\0';
+    // Handle EOF without a trailing newline
     if (error) *error = FS_OK;
     return total_read;
 }
-
 
 
 uint64_t fs_readall(fs_file *file, char **buffer, uint8_t *error) {
