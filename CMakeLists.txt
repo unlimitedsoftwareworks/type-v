@@ -4,31 +4,35 @@ project(type_v C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Your other subdirectories
-add_subdirectory(stdio)
-add_subdirectory(stdfs)
-add_subdirectory(string)
-add_subdirectory(stdcore)
-add_subdirectory(stdmath)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -funroll-loops -finline-functions")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -funroll-loops -finline-functions")
 
 
-if(UNIX AND NOT APPLE)  # UNIX includes Linux, but excludes macOS with the NOT APPLE condition
-    add_definitions(-D_ISOC11_SOURCE)
-    add_definitions(-D_POSIX_C_SOURCE=200809L)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
+
+if(UNIX AND NOT APPLE)
+    add_compile_options(-D_POSIX_C_SOURCE=200809L -D_ISOC11_SOURCE -D_GNU_SOURCE)
 endif()
+
 # Enforce the C11 standard explicitly for Windows (MSVC)
 if(MSVC)
     add_compile_options(/std:c11 /Zc:__cplusplus)
 endif()
 
 
-# Compiler flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 
-# disable inlining
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline")
+
+# other subdirectories
+add_subdirectory(stdio)
+add_subdirectory(stdfs)
+add_subdirectory(string)
+add_subdirectory(stdcore)
+add_subdirectory(stdmath)
+
 
 # Your executable target
 add_executable(type_v

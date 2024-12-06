@@ -19,7 +19,7 @@ set(typev_files
 add_library(stdio SHARED ${stdio_files} ${typev_files})
 
 set_target_properties(stdio PROPERTIES
-    C_STANDARD 99
+    C_STANDARD 11
     C_STANDARD_REQUIRED YES
     C_EXTENSIONS NO
 )

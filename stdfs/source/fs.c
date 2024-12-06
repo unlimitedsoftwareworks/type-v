@@ -1,3 +1,4 @@
+
 #include "fs.h"
 
 #ifdef _WIN32
@@ -6,7 +7,6 @@
 #else
 #include <string.h>
 #include <errno.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <pwd.h>
@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <limits.h>
+#include <stdlib.h>
 
 uint8_t fs_open(fs_file *file, const char *filename, uint8_t mode) {
     if (!file || !filename) {
@@ -683,11 +685,11 @@ uint8_t fs_get_file_attributes(const char *filename, struct stat *attributes) {
             if (GetFileInformationByHandle(hFile, &fileInfo)) {
                 // Number of links
                 attributes->st_nlink = fileInfo.nNumberOfLinks;
-                
+
                 // Device and inode information
                 attributes->st_dev = fileInfo.dwVolumeSerialNumber;
                 attributes->st_ino = ((uint64_t)fileInfo.nFileIndexHigh << 32) | fileInfo.nFileIndexLow;
-                
+
                 // User and group IDs (Windows doesn't have direct equivalents)
                 attributes->st_uid = 0;  // Current user
                 attributes->st_gid = 0;  // Primary group
@@ -755,36 +757,34 @@ uint8_t fs_copy(const char *source, const char *destination) {
         return open_error;
     }
 
-    char buffer[4096];
+    void *buffer = NULL;
     uint64_t bytes_read;
     uint8_t read_error, write_error;
     bool success = true;
 
-
-    while ((bytes_read = fs_read(&src_file, buffer, sizeof(buffer), &read_error)) > 0) {
+    while ((bytes_read = fs_read(&src_file, &buffer, 4096, &read_error)) > 0) {
         if (read_error != FS_OK) {
             success = false;
-            return read_error;
+            break;
         }
         uint64_t bytes_written = fs_write(&dest_file, buffer, bytes_read, &write_error);
+        free(buffer); // Free the buffer allocated by fs_read
         if (write_error != FS_OK || bytes_written != bytes_read) {
             success = false;
-            return write_error;
+            break;
         }
     }
 
     if (read_error != FS_OK && read_error != FS_ERROR_EOF) {
-        return read_error;
+        success = false;
     }
 
     fs_close(&src_file);
     fs_close(&dest_file);
 
-    if (success) {
-        return FS_OK;
-    }
-    return FS_ERROR_IO_ERROR;
+    return success ? FS_OK : FS_ERROR_IO_ERROR;
 }
+
 
 uint8_t fs_move(const char *source, const char *destination) {
     if (!source || !destination) {
@@ -940,7 +940,7 @@ uint8_t fs_get_extension(const char *path, char *extension, uint32_t size) {
     return FS_OK;
 }
 
-uint8_t fs_path_split(const char *path, char *dirname, uint32_t dir_size, 
+uint8_t fs_path_split(const char *path, char *dirname, uint32_t dir_size,
                       char *basename, uint32_t base_size) {
     if (!path || !dirname || !basename || dir_size == 0 || base_size == 0) {
         return FS_ERROR_INVALID_ARGUMENT;

@@ -28,7 +28,7 @@ add_library(stdcore SHARED ${stdcore_files} ${typev_files}
         source/datetime.h)
 
 set_target_properties(stdcore PROPERTIES
-        C_STANDARD 99
+        C_STANDARD 11
         C_STANDARD_REQUIRED YES
         C_EXTENSIONS NO
 )
