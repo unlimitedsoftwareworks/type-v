@@ -33,14 +33,17 @@ void _fs_close(TypeV_Core* core) {
 
 void _fs_read(TypeV_Core* core) {
     fs_file* f = (fs_file*)typev_api_stack_pop_u64(core);
-    TypeV_Array* buffer = typev_api_stack_pop_array(core);
     uint64_t size = typev_api_stack_pop_u64(core);
+
+    char** buffer = NULL;
     
     uint8_t error = 0;
-    uint64_t result = fs_read(f, buffer->data, size, &error);
+    uint64_t result = fs_read(f, &buffer, size, &error);
+
+    TypeV_Array* array = typev_api_array_create(core, result, 1, 0);
     
-    typev_api_return_u64(core, result);
     typev_api_return_u8(core, error);
+    typev_api_return_array(core, array);
 }
 
 void _fs_readline(TypeV_Core* core) {

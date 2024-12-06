@@ -104,7 +104,7 @@ uint8_t fs_close(fs_file *file);
  * @param error Pointer to store error code
  * @return Number of bytes actually read
  */
-uint64_t fs_read(fs_file *file, void *buffer, uint64_t size, uint8_t *error);
+uint64_t fs_read(fs_file *file, void **buffer, uint64_t size, uint8_t *error);
 
 /**
  * @brief Reads a single line from a file

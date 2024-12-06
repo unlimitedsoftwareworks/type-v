@@ -9,6 +9,7 @@
 #include <string.h>
 #include <inttypes.h>
 
+#include "datetime.h"
 #include "vendor/yy.h"
 #include "../../source/core.h"
 #include "../../source/api/typev_api.h"
@@ -589,6 +590,106 @@ void string_toI64(TypeV_Core* core){
     typev_api_return_i64(core, (int64_t)value);
 }
 
+/**
+ * Date time API
+ */
+
+void _dt_now(TypeV_Core* core){
+    bool valid = true;
+    dt_t dt = dt_now(&valid);
+
+    typev_api_return_u8(core, valid);
+    typev_api_return_u16(core, dt.millisecond);
+    typev_api_return_u8(core, dt.second);
+    typev_api_return_u8(core, dt.minute);
+    typev_api_return_u8(core, dt.hour);
+    typev_api_return_u8(core, dt.day);
+    typev_api_return_u8(core, dt.month);
+    typev_api_return_u16(core, dt.year);
+}
+
+void _dt_parse(TypeV_Core* core){
+    TypeV_Array* str = (TypeV_Array*)typev_api_stack_pop_ptr(core);
+    bool valid = true;
+    dt_t dt = dt_parse((char*)str->data, &valid);
+
+    typev_api_return_u8(core, valid);
+    typev_api_return_u16(core, dt.millisecond);
+    typev_api_return_u8(core, dt.second);
+    typev_api_return_u8(core, dt.minute);
+    typev_api_return_u8(core, dt.hour);
+    typev_api_return_u8(core, dt.day);
+    typev_api_return_u8(core, dt.month);
+    typev_api_return_u16(core, dt.year);
+}
+
+void _dt_toUnixTimestamp(TypeV_Core* core){
+    uint16_t year = typev_api_stack_pop_u16(core);
+    uint8_t month = typev_api_stack_pop_u8(core);
+    uint8_t day = typev_api_stack_pop_u8(core);
+    uint8_t hour = typev_api_stack_pop_u8(core);
+    uint8_t minute = typev_api_stack_pop_u8(core);
+    uint8_t second = typev_api_stack_pop_u8(core);
+    uint16_t millisecond = typev_api_stack_pop_u16(core);
+
+    dt_t dt = {year, month, day, hour, minute, second, millisecond};
+    bool valid = true;
+    int64_t timestamp = dt_toUnixTimestamp(&dt, &valid);
+
+    typev_api_return_u8(core, valid);
+    typev_api_return_i64(core, timestamp);
+}
+
+void _dt_fromUnixTimestamp(TypeV_Core* core){
+    int64_t timestamp = typev_api_stack_pop_i64(core);
+    bool valid = true;
+    dt_t dt = dt_fromUnixTimestamp(timestamp, &valid);
+
+    typev_api_return_u8(core, valid);
+    typev_api_return_u16(core, dt.millisecond);
+}
+
+void _dt_getDayOfWeek(TypeV_Core* core){
+    uint16_t year = typev_api_stack_pop_u16(core);
+    uint8_t month = typev_api_stack_pop_u8(core);
+    uint8_t day = typev_api_stack_pop_u8(core);
+
+    dt_t dt = {year, month, day, 0, 0, 0, 0};
+    bool valid = true;
+    int dayOfWeek = dt_getDayOfWeek(&dt);
+    if(dayOfWeek == -1){
+        valid = false;
+        dayOfWeek = 0;
+    }
+
+    typev_api_return_u8(core, valid);
+    typev_api_return_u8(core, dayOfWeek);
+}
+
+void _dt_toLocalTime(TypeV_Core* core){
+    uint16_t year = typev_api_stack_pop_u16(core);
+    uint8_t month = typev_api_stack_pop_u8(core);
+    uint8_t day = typev_api_stack_pop_u8(core);
+    uint8_t hour = typev_api_stack_pop_u8(core);
+    uint8_t minute = typev_api_stack_pop_u8(core);
+    uint8_t second = typev_api_stack_pop_u8(core);
+    uint16_t millisecond = typev_api_stack_pop_u16(core);
+
+    dt_t dt = {year, month, day, hour, minute, second, millisecond};
+
+    bool valid = true;
+    dt_t local = dt_toLocalTime(&dt, &valid);
+
+    typev_api_return_u8(core, valid);
+    typev_api_return_u16(core, local.millisecond);
+    typev_api_return_u8(core, local.second);
+    typev_api_return_u8(core, local.minute);
+    typev_api_return_u8(core, local.hour);
+    typev_api_return_u8(core, local.day);
+    typev_api_return_u8(core, local.month);
+    typev_api_return_u16(core, local.year);
+}
+
 
 
 static TypeV_FFIFunc stdcore_lib[] = {
@@ -629,6 +730,16 @@ static TypeV_FFIFunc stdcore_lib[] = {
         string_toI32,
         string_toU64,
         string_toI64,
+
+        // datetime
+
+        _dt_now,
+        _dt_parse,
+        _dt_toUnixTimestamp,
+        _dt_fromUnixTimestamp,
+        _dt_getDayOfWeek,
+        _dt_toLocalTime,
+
         NULL
 };
 

@@ -2,6 +2,7 @@ project(stdcore VERSION 1.0)
 
 
 set(stdcore_files source/stdcore.c
+        source/datetime.c
         source/vendor/yy.c
         source/vendor/yy.h
         source/vendor/atoi_yy.c
@@ -22,7 +23,9 @@ set(typev_files
 )
 
 
-add_library(stdcore SHARED ${stdcore_files} ${typev_files})
+add_library(stdcore SHARED ${stdcore_files} ${typev_files}
+        source/datetime.c
+        source/datetime.h)
 
 set_target_properties(stdcore PROPERTIES
         C_STANDARD 99

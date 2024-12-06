@@ -70,28 +70,38 @@ uint8_t fs_close(fs_file *file) {
     return fs_map_system_error();
 }
 
-
-
-uint64_t fs_read(fs_file *file, void *buffer, uint64_t size, uint8_t *error) {
-    if (!file || !file->is_open || !buffer) {
+uint64_t fs_read(fs_file *file, void **buffer, uint64_t size, uint8_t *error) {
+    if (!file || !file->is_open || !buffer || size == 0) {
         *error = FS_ERROR_INVALID_ARGUMENT;
+        return 0;
+    }
+
+    // Allocate memory for the buffer
+    *buffer = malloc(size);
+    if (*buffer == NULL) {
+        *error = FS_ERROR_OUT_OF_MEMORY;
         return 0;
     }
 
 #ifdef _WIN32
     DWORD bytes_read;
-    if (ReadFile(file->win_handle, buffer, size, &bytes_read, NULL)) {
-        return (int64_t)bytes_read;
+    if (ReadFile(file->win_handle, *buffer, (DWORD)size, &bytes_read, NULL)) {
+        return (uint64_t)bytes_read;
     }
 #else
-    ssize_t result = read(file->fd, buffer, size);
+    ssize_t result = read(file->fd, *buffer, size);
     if (result >= 0) {
-        return (int64_t)result;
+        return (uint64_t)result;
     }
 #endif
+
+    // Cleanup buffer if read operation failed
+    free(*buffer);
+    *buffer = NULL;
     *error = fs_map_system_error();
     return 0;
 }
+
 
 uint64_t fs_readline(fs_file *file, char **buffer, uint8_t *error) {
     if (!file || !file->is_open || !buffer) {

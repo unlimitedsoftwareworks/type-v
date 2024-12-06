@@ -13,19 +13,14 @@
 #include "../../source/api/typev_api.h"
 
 void stdio_print(TypeV_Core *core) {
-    size_t ptr = typev_api_stack_pop_u64(core);
-    TypeV_Array* arr = (TypeV_Array*)(ptr);
+    TypeV_Array* arr = typev_api_stack_pop_array(core);
 
     //write(1, arr->data, arr->length);
     printf("%.*s", (int)arr->length, arr->data);
 }
 
 void stdio_println(TypeV_Core *core) {
-    size_t ptr = typev_api_stack_pop_u64(core);
-    TypeV_Array* arr = (TypeV_Array*)(ptr);
-
-    //write(1, arr->data, arr->length);
-    //write(1, "\n", 1);
+    TypeV_Array* arr = typev_api_stack_pop_array(core);
 
     printf("%.*s", (int)arr->length, arr->data);
 }
@@ -49,6 +44,36 @@ void println_stdstring(TypeV_Core *core) {
     printf("%.*s\n", (int)length, arr->data);
 }
 
+void stdio_print_stderr(TypeV_Core *core) {
+    size_t ptr = typev_api_stack_pop_u64(core);
+    TypeV_Array* arr = (TypeV_Array*)(ptr);
+
+    //write(2, arr->data, arr->length);
+    //write(2, "\n", 1);
+
+    fprintf(stderr, "%.*s", (int)arr->length, arr->data);
+}
+
+void stdio_println_stderr(TypeV_Core *core) {
+    size_t ptr = typev_api_stack_pop_u64(core);
+    TypeV_Array *arr = (TypeV_Array *) (ptr);
+
+    fprintf(stderr, "%.*s\n", (int) arr->length, arr->data);
+}
+
+void print_stdstring_stderr(TypeV_Core *core) {
+    TypeV_Array *arr = typev_api_stack_pop_array(core);
+    uint64_t length = typev_api_stack_pop_u64(core);
+
+    fprintf(stderr, "%.*s", (int) length, arr->data);
+}
+
+void println_stdstring_stderr(TypeV_Core *core) {
+    TypeV_Array *arr = typev_api_stack_pop_array(core);
+    uint64_t length = typev_api_stack_pop_u64(core);
+
+    fprintf(stderr, "%.*s\n", (int) length, arr->data);
+}
 
 
 static TypeV_FFIFunc stdio_lib[] = {
@@ -56,6 +81,10 @@ static TypeV_FFIFunc stdio_lib[] = {
         (TypeV_FFIFunc)stdio_println,
         (TypeV_FFIFunc)print_stdstring,
         (TypeV_FFIFunc)println_stdstring,
+        (TypeV_FFIFunc)stdio_print_stderr,
+        (TypeV_FFIFunc)stdio_println_stderr,
+        (TypeV_FFIFunc)print_stdstring_stderr,
+        (TypeV_FFIFunc)println_stdstring_stderr,
         NULL
 };
 
