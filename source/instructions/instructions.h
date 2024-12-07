@@ -1537,32 +1537,36 @@ static inline void bor_64(TypeV_Core* core){
 static inline void bxor_8(TypeV_Core* core){
     uint8_t target = core->codePtr[core->ip++];
     uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
 
-    core->regs[target].u8 = core->regs[op1].u8 ^ core->regs[target].u8;
+    core->regs[target].u8 = core->regs[op1].u8 ^ core->regs[op2].u8;
     CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bxor_16(TypeV_Core* core){
     uint8_t target = core->codePtr[core->ip++];
     uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
 
-    core->regs[target].u16 = core->regs[op1].u16 ^ core->regs[target].u16;
+    core->regs[target].u16 = core->regs[op1].u16 ^ core->regs[op2].u16;
     CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bxor_32(TypeV_Core* core){
     uint8_t target = core->codePtr[core->ip++];
     uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
 
-    core->regs[target].u32 = core->regs[op1].u32 ^ core->regs[target].u32;
+    core->regs[target].u32 = core->regs[op1].u32 ^ core->regs[op2].u32;
     CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void bxor_64(TypeV_Core* core){
     uint8_t target = core->codePtr[core->ip++];
     uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
 
-    core->regs[target].u64 = core->regs[op1].u64 ^ core->regs[target].u64;
+    core->regs[target].u64 = core->regs[op1].u64 ^ core->regs[op2].u64;
     CLEAR_REG_PTR(core->funcState, target);
 }
 
