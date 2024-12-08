@@ -272,7 +272,7 @@ void string_append_i64(TypeV_Core* core){
         return;
     }
 
-    ptrdiff_t gap = ending - ((char*)str->data+pos-1);
+    ptrdiff_t gap = ending - ((char*)str->data+pos);
 
     if (gap < 0 || gap > UINT32_MAX) {
         typev_api_core_panic(core, 2, "Gap value is out of range for uint32_t\n");
