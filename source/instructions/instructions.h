@@ -1124,13 +1124,28 @@ OP_CAST(u16, i16, int16_t)
 OP_CAST(i32, u32, uint32_t)
 OP_CAST(u32, i32, int32_t)
 OP_CAST(i64, u64, uint64_t)
-OP_CAST(u64, i64, int64_t)
+//OP_CAST(u64, i64, int64_t)
 
 OP_CAST(i32, f32, float)
 OP_CAST(f32, i32, int32_t)
-OP_CAST(i64, f64, double)
+//OP_CAST(i64, f64, double)
 OP_CAST(f64, i64, int64_t)
 #undef OP_CAST
+
+static inline void cast_u64_i64(TypeV_Core* core){
+    uint8_t op1 = core->codePtr[core->ip++];
+    core->regs[op1].i64 = (int64_t) core->regs[op1].u64;
+    CLEAR_REG_PTR(core->funcState, op1);
+}
+
+static inline void cast_i64_f64(TypeV_Core* core){
+    uint8_t op1 = core->codePtr[core->ip++];
+    core->regs[op1].f64 = (double) core->regs[op1].i64;
+    CLEAR_REG_PTR(core->funcState, op1);
+}
+
+
+
 
 static inline void upcast_i(TypeV_Core* core) {
     uint8_t reg = core->codePtr[core->ip++];
@@ -1829,8 +1844,69 @@ static inline void j_cmp_u64(TypeV_Core* core) {
     uint8_t cmpType = core->codePtr[core->ip++];
     uint32_t offset;
 
-    uint64_t v1 = core->regs[op1].u32;
-    uint64_t v2 = core->regs[op2].u32;
+    uint64_t v1 = core->regs[op1].u64;
+    uint64_t v2 = core->regs[op2].u64;
+    switch(cmpType) {
+        case 0:
+            if(v1 == v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
+            break;
+        case 1:
+            if(v1 != v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
+            break;
+        case 2:
+            if(v1 > v2) {
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
+            break;
+        case 3:
+            if(v1 >= v2) {
+
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
+            break;
+        case 4:
+            if(v1 < v2) {
+
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
+            break;
+        case 5:
+            if(v1 <= v2){
+                typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
+                core->ip = offset;
+                return;
+            }
+            break;
+        default:
+            core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");\
+            exit(-1);
+    }
+    core->ip += 4;
+}
+
+
+static inline void j_cmp_f64(TypeV_Core* core) {
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    uint8_t cmpType = core->codePtr[core->ip++];
+    uint32_t offset;
+
+    double v1 = core->regs[op1].f64;
+    double v2 = core->regs[op2].f64;
     switch(cmpType) {
         case 0:
             if(v1 == v2) {
@@ -1885,7 +1961,7 @@ static inline void j_cmp_u64(TypeV_Core* core) {
 
 OP_CMP(i64, int64_t)
 OP_CMP(f32, float)
-OP_CMP(f64, double)
+//OP_CMP(f64, double)
 //OP_CMP(ptr, uintptr_t)
 
 static inline void j_cmp_ptr(TypeV_Core* core) {
@@ -1977,7 +2053,7 @@ static inline void j_cmp_bool(TypeV_Core* core) {
         core->ip = offset;
         return;
     }else {
-        core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");
+        //core_panic(core, RT_ERROR_INVALID_COMPARISON_OPERATOR, "Invalid comparison type");
     }
 
     core->ip += 4;

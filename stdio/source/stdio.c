@@ -12,6 +12,14 @@
 #include "../../source/core.h"
 #include "../../source/api/typev_api.h"
 
+void stdio_getstdout(TypeV_Core *core) {
+    typev_api_return_u64(core, (uintptr_t)stdout);
+}
+
+void stdio_getstderr(TypeV_Core *core) {
+    typev_api_return_u64(core, (uintptr_t)stderr);
+}
+
 void stdio_print(TypeV_Core *core) {
     TypeV_Array* arr = typev_api_stack_pop_array(core);
 
@@ -75,8 +83,14 @@ void println_stdstring_stderr(TypeV_Core *core) {
     fprintf(stderr, "%.*s\n", (int) length, arr->data);
 }
 
+void stdio_flush(TypeV_Core *core) {
+    FILE* file = (FILE*)typev_api_stack_pop_u64(core);
+    fflush(file);
+}
 
 static TypeV_FFIFunc stdio_lib[] = {
+        (TypeV_FFIFunc)stdio_getstdout,
+        (TypeV_FFIFunc)stdio_getstderr,
         (TypeV_FFIFunc)stdio_print,
         (TypeV_FFIFunc)stdio_println,
         (TypeV_FFIFunc)print_stdstring,
@@ -85,6 +99,7 @@ static TypeV_FFIFunc stdio_lib[] = {
         (TypeV_FFIFunc)stdio_println_stderr,
         (TypeV_FFIFunc)print_stdstring_stderr,
         (TypeV_FFIFunc)println_stdstring_stderr,
+        (TypeV_FFIFunc)stdio_flush,
         NULL
 };
 
