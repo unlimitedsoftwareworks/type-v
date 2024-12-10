@@ -1417,7 +1417,15 @@ OP_BINARY(mul, u32, *)
 OP_BINARY(mul, i64, *)
 OP_BINARY(mul, u64, *)
 OP_BINARY(mul, f32, *)
-OP_BINARY(mul, f64, *)
+//OP_BINARY(mul, f64, *)
+
+static inline void mul_f64(TypeV_Core* core){\
+    uint8_t target = core->codePtr[core->ip++];
+    uint8_t op1 = core->codePtr[core->ip++];
+    uint8_t op2 = core->codePtr[core->ip++];
+    core->regs[target].f64 = core->regs[op1].f64 * core->regs[op2].f64;
+    CLEAR_REG_PTR(core->funcState, target);
+}
 
 OP_BINARY(div, i8, /)
 OP_BINARY(div, u8, /)
@@ -2409,6 +2417,19 @@ static inline void coroutine_ret(TypeV_Core* core) {
 
     coroutine->state = core_duplicate_function_state(coroutine->state);
     core->activeCoroutine = NULL;
+}
+
+static inline void coroutine_reset(TypeV_Core* core) {
+    uint8_t coReg = core->codePtr[core->ip++];
+    TypeV_Coroutine* coroutine = (TypeV_Coroutine*) core->regs[coReg].ptr;
+    coroutine->ip = coroutine->closure->fnAddress;
+    coroutine->executionState = TV_COROUTINE_RUNNING;
+}
+
+static inline void coroutine_finish(TypeV_Core* core) {
+    uint8_t coReg = core->codePtr[core->ip++];
+    TypeV_Coroutine* coroutine = (TypeV_Coroutine*) core->regs[coReg].ptr;
+    coroutine->executionState = TV_COROUTINE_FINISHED;
 }
 
 static inline void throw_rt(TypeV_Core* core) {

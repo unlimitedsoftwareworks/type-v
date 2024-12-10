@@ -617,6 +617,18 @@ typedef enum TypeV_OpCode {
      */
     OP_COROUTINE_RET,
 
+    /**
+     * OP_COROUTINE_RESET: coroutine: R
+     * Resets a coroutine IP to the beginning of the function
+     */
+    OP_COROUTINE_RESET,
+
+    /**
+     * OP_COROUTINE_FINISH: coroutine: R
+     * Marks a coroutine as finished
+     */
+    OP_COROUTINE_FINISH,
+
     OP_THROW_RT,
 
 }TypeV_OpCode;

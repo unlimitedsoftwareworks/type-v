@@ -265,6 +265,8 @@ static op_func op_funcs[] = {
         &coroutine_call,
         &coroutine_yield,
         &coroutine_ret,
+        &coroutine_reset,
+        &coroutine_finish,
         &throw_rt
 };
 
