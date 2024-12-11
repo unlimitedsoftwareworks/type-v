@@ -11,7 +11,7 @@
 #include "utils/log.h"
 #include "utils/utils.h"
 
-void engine_init(TypeV_Engine *engine) {
+void engine_init(TypeV_Engine *engine, int argc, char** argv) {
     // we will allocate memory for cores later
     engine->coreCount = 0;
     engine->runningCoresCount = 0;
@@ -26,8 +26,8 @@ void engine_init(TypeV_Engine *engine) {
     core_init(engine->coreIterator->core, engine_generateNewCoreID(engine), engine);
     engine->coreCount++;
 
-    engine->argv = NULL;
-    engine->argc = 0;
+    engine->argv = argv;
+    engine->argc = argc;
 }
 
 void engine_setmain(

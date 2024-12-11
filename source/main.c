@@ -23,27 +23,25 @@ char* read_file(char* src){
 }
 
 uint8_t *readSegment(FILE *file, uint64_t offset, size_t size);
+char* replace_with_src_map(const char* filepath);
 
 int main(int argc, char **argv) {
-    int readArgs = 0;
-    char *filePath = "/Users/praisethemoon/projects/type-c/type-c/output/bin.tcv"; // Change to your file's path
-    char *srcMapFile = "/Users/praisethemoon/projects/type-c/type-c/output/src_map.map.txt";
-    if (argc > 1){
-        filePath = argv[1];
+    int readArgs = 1;
+    char *filePath = "../../type-c/output/bin.tcv"; // Change to your file's path
+
+    if (argc >= 2){
+        if(argv[1] != NULL) {
+            filePath = argv[1];
+        }
         readArgs++;
     }
-    if (argc > 2){
-        srcMapFile = argv[2];
-        readArgs++;
-    }
-
-
-    /*
-    if(argc < 2){
-        printf("Usage: %s <path to bin.tcv> <path to src_map.map.txt>\n", argv[0]);
+    
+    char *srcMapFile = replace_with_src_map(filePath);
+    if (srcMapFile == NULL) {
+        fprintf(stderr, "Failed to get srcMapPath\n");
         return 1;
     }
-    */
+
 
     FILE *file = fopen(filePath, "rb");
     if (file == NULL) {
@@ -77,7 +75,7 @@ int main(int argc, char **argv) {
     //typev_env_log();
 
     TypeV_Engine engine;
-    engine_init(&engine);
+    engine_init(&engine, argc-readArgs, argv+readArgs);
 
     TypeV_ASM_Program program = {
             .codePool = codeSegment,
@@ -125,4 +123,41 @@ uint8_t *readSegment(FILE *file, uint64_t offset, size_t size) {
     fseek(file, offset, SEEK_SET);
     fread(buffer, 1, size, file);
     return buffer;
+}
+
+
+// Function to replace the file name and extension with "src_map.map.txt"
+char* replace_with_src_map(const char* filepath) {
+    if (filepath == NULL) {
+        return NULL;
+    }
+
+    // Find the last occurrence of the directory separator
+#ifdef _WIN32
+    const char separator = '\\';
+#else
+    const char separator = '/';
+#endif
+
+    const char* last_separator = strrchr(filepath, separator);
+    size_t base_len = (last_separator != NULL) ? (last_separator - filepath + 1) : 0;
+
+    // Allocate memory for the new path
+    const char* replacement = "src_map.map.txt";
+    size_t new_path_len = base_len + strlen(replacement) + 1;
+    char* new_path = (char*)malloc(new_path_len);
+
+    if (new_path == NULL) {
+        perror("Failed to allocate memory");
+        return NULL;
+    }
+
+    // Construct the new path
+    if (base_len > 0) {
+        strncpy(new_path, filepath, base_len);
+    }
+    new_path[base_len] = '\0';
+    strcat(new_path, replacement);
+
+    return new_path;
 }

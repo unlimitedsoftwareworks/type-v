@@ -63,7 +63,7 @@ typedef struct TypeV_Engine {
  * @brief engine_init Initialize the engine
  * @param engine
  */
-void engine_init(TypeV_Engine *engine);
+void engine_init(TypeV_Engine *engine, int argc, char** argv);
 
 /**
  * @brief engine_run Run the engine

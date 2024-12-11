@@ -638,3 +638,21 @@ TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) 
 
     return coroutine_ptr;
 }
+
+void* core_load_runtime_env(TypeV_Core* core, const char* name) {
+    TypeV_Engine* engine = core->engineRef;
+
+    if(strcmp(name, "args") == 0) {
+        TypeV_Array* arr = (TypeV_Array*)core_array_alloc(core, 1, engine->argc, sizeof(uint64_t));
+        for(uint64_t i = 0; i < engine->argc; i++) {
+            // we do not require \0
+            TypeV_Array* arg = (TypeV_Array*)core_array_alloc(core, 0, strlen(engine->argv[i]), sizeof(char));
+            memcpy((void*)arg->data, engine->argv[i], strlen(engine->argv[i]) );
+            memcpy(arr->data + (i * arr->elementSize), &arg, sizeof(uint64_t));
+        }
+
+        return (void*)arr;
+    }
+
+    core_panic(core, 1, "Runtime environment %s not found", name);
+}

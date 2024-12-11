@@ -441,4 +441,7 @@ typedef struct TypeV_FFI {
 TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t offset, uint8_t envSize);
 TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure);
 
+
+void* core_load_runtime_env(TypeV_Core* core, const char* name);
+
 #endif //TYPE_V_CORE_H

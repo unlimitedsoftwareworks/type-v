@@ -17,6 +17,12 @@
 
 #define MAX_NUM_STR_SIZE 64
 
+void load_runtimeEnv(TypeV_Core *core) {
+    TypeV_Array* arr = typev_api_stack_pop_array(core);
+    TypeV_Array* value = (TypeV_Array*)core_load_runtime_env(core, arr->data);
+    typev_api_return_array(core, value);
+}
+
 // Convert floating point types to string
 void double_to_str(TypeV_Core *core) {
     char buffer[MAX_NUM_STR_SIZE] = {0};
@@ -693,6 +699,7 @@ void _dt_toLocalTime(TypeV_Core* core){
 
 
 static TypeV_FFIFunc stdcore_lib[] = {
+        load_runtimeEnv,
         double_to_str,
         float_to_str,
         bool_to_str,
