@@ -19,6 +19,7 @@ such as offset-based data types (structs, arrays, classes, interfaces, etc),
     </tr>
 </table>
 
+[![CMake on multiple platforms](https://github.com/unlimitedsoftwareworks/type-v/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/unlimitedsoftwareworks/type-v/actions/workflows/cmake-multi-platform.yml)
 
 ## About
 Type-V is a virtual machine and runtime environment for type-c programs. 

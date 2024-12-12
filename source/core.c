@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <stdalign.h>
 
 #include "stack/stack.h"
 #include "gc/gc.h"
@@ -99,7 +99,6 @@ void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state) {
     free(state);
 }
 
-#include <stdalign.h>
 
 #define ALIGN_PTR(ptr, alignment) \
     ((uintptr_t)(((uintptr_t)(ptr) + (alignment - 1)) & ~(alignment - 1)))
