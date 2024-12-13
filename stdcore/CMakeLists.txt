@@ -8,25 +8,29 @@ set(stdcore_files source/stdcore.c
         source/vendor/atoi_yy.c
         source/vendor/utils_yy.h
         source/vendor/itoa_yy.c
-        source/vendor/dtoa_yy.c)
-
-set(typev_files
-        ../source/core.c
-        ../source/gc/gc.c
-        ../source/gc/mark.c
-        ../source/stack/stack.c
-        ../source/dynlib/dynlib.c
-        ../source/env/env.c
-        ../source/api/typev_api.c
-        ../source/utils/utils.c
-        ../source/errors/errors.c
-)
-
-
-add_library(stdcore SHARED ${stdcore_files} ${typev_files}
+        source/vendor/dtoa_yy.c
         source/datetime.c
         source/datetime.h)
 
+
+add_library(stdcore SHARED ${stdcore_files})
+
+target_include_directories(stdcore PUBLIC ../source) # Include VM headers for reference
+
+# Add linker options for deferring symbol resolution based on OS
+if(APPLE)
+    target_link_options(stdcore PRIVATE -undefined dynamic_lookup)
+
+elseif(UNIX)
+    # Linux: Allow undefined symbols in shared libraries
+    target_link_options(stdcore PRIVATE -Wl,--unresolved-symbols=ignore-in-shared-libs)
+elseif(WIN32)
+    # Windows: Use /DELAYLOAD to defer DLL resolution until runtime (if applicable)
+    # Note: Symbols need to be exported correctly from the main executable
+    target_link_options(stdcore PRIVATE /DELAYLOAD:type_v.exe)
+endif()
+
+# Use proper C standard
 set_target_properties(stdcore PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES

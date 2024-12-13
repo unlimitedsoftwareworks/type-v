@@ -520,19 +520,7 @@ typedef enum TypeV_OpCode {
     OP_REG_FFI,
 
     /**
-     * OP_OPEN_FFI ffi-id: I (2 bytes)
-     * Opens the FFI with the given ID
-     */
-    OP_OPEN_FFI,
-
-    /**
-     * OP_LD_FFI dest: R, ffi-id I (2 bytes), fn-id: I (1b)
-     * Load an FFI method into dest register, from ffi-id and fn-id
-     */
-    OP_LD_FFI,
-
-    /**
-     * OP_CALL_FFI reg: R
+     * OP_CALL_FFI ffi-id I (2 bytes), fn-id: I (1b)
      * calls a FFI stored in reg
      */
     OP_CALL_FFI,

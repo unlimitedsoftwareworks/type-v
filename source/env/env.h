@@ -7,7 +7,7 @@
 #ifndef TYPE_V_ENV_H
 #define TYPE_V_ENV_H
 
-#include "../vendor/cpu_info/cpu_info.h"
+//#include "../vendor/cpu_info/cpu_info.h"
 
 #include "../platform/platform.h"
 #include "../dynlib/dynlib.h"
@@ -24,7 +24,7 @@ typedef struct  {
     const char* os;
     const char* arch;
     const char* dynlib_ext;
-    cpui_result result;
+    //cpui_result result;
     char** searchPaths;
     char* sourceMapFile;
 }TypeV_ENV;

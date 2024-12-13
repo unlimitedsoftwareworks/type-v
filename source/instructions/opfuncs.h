@@ -243,8 +243,6 @@ static op_func op_funcs[] = {
         &j_eq_null_ptr,
 
         &reg_ffi,
-        &open_ffi,
-        &ld_ffi,
         &call_ffi,
         &close_ffi,
 

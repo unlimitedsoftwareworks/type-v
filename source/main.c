@@ -9,6 +9,12 @@
 #include "platform/platform.h"
 #include "instructions/instructions.h"
 #include "assembler/assembler.h"
+#include "api/typev_api.h"
+
+// to forcibly include the library
+void force_include() {
+    typev_api_register_lib(NULL); // Dummy call to force inclusion
+}
 
 char* read_file(char* src){
     FILE* file = fopen(src, "r");

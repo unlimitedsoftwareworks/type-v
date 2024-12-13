@@ -309,8 +309,6 @@ static void* dispatch_table[] = { \
     &&DO_J_EQ_NULL_64, \
     &&DO_J_EQ_NULL_PTR, \
     &&DO_REG_FFI, \
-    &&DO_OPEN_FFI, \
-    &&DO_LD_FFI, \
     &&DO_CALL_FFI, \
     &&DO_CLOSE_FFI, \
     &&DO_DEBUG_REG, \
@@ -928,12 +926,6 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_REG_FFI:
         reg_ffi(core);
         DISPATCH();
-        DO_OPEN_FFI:
-        open_ffi(core);
-        DISPATCH();
-        DO_LD_FFI:
-        ld_ffi(core);
-        DISPATCH();
         DO_CALL_FFI:
         call_ffi(core);
         DISPATCH();
@@ -1136,14 +1128,14 @@ void engine_ffi_open(TypeV_Engine *engine, uint16_t dynlibID) {
     engine->ffi[dynlibID] = ffi;
 }
 
-size_t engine_ffi_get(TypeV_Engine *engine, uint16_t dynlibID, uint8_t methodId){
+TypeV_FFIFunc engine_ffi_get(TypeV_Engine *engine, uint16_t dynlibID, uint8_t methodId){
     TypeV_EngineFFI* ffi = engine->ffi[dynlibID];
 
     ASSERT(ffi->dynlibHandle != NULL, "Library %s not loaded", ffi_find_dynlib(ffi->dynlibName));
     ASSERT(ffi->ffi != NULL, "Library %s not opened", ffi_find_dynlib(ffi->dynlibName));
     ASSERT(methodId < ffi->ffi->functionCount, "Method %d not found in library %s", methodId, ffi_find_dynlib(ffi->dynlibName));
 
-    return (size_t)ffi->ffi->functions[methodId];
+    return ffi->ffi->functions[methodId];
 }
 
 void engine_ffi_close(TypeV_Engine *engine, uint16_t dynlibID) {

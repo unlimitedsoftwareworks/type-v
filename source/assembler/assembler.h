@@ -260,8 +260,6 @@ static char* instructions[] = {
         "j_cmp_null_ptr",
 
         "reg_ffi",
-        "open_ffi",
-        "ld_ffi",
         "call_ffi",
         "close_ffi",
 

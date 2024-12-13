@@ -22,7 +22,7 @@ void* ffi_dynlib_getsym(TV_LibraryHandle handle, const char* symbol_name);
 #if defined(_WIN32) || defined(_WIN64)
 #define DYNLIB_EXPORT __declspec(dllexport)
 #else
-#define DYNLIB_EXPORT
+#define DYNLIB_EXPORT __attribute__((visibility("default")))
 #endif
 
 #endif // TYPEV_DYNLIB_H

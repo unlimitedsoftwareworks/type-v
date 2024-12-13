@@ -133,7 +133,7 @@ void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core);
 
 void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlibID);
 void engine_ffi_open(TypeV_Engine *engine, uint16_t dynlibID);
-size_t engine_ffi_get(TypeV_Engine *engine, uint16_t dynlibID, uint8_t methodId);
+TypeV_FFIFunc engine_ffi_get(TypeV_Engine *engine, uint16_t dynlibID, uint8_t methodId);
 void engine_ffi_close(TypeV_Engine *engine, uint16_t dynlibID);
 
 #endif //TYPE_V_ENGINE_H

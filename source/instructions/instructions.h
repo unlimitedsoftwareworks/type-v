@@ -2152,18 +2152,7 @@ static inline void reg_ffi(TypeV_Core* core){
     engine_ffi_register(core->engineRef, name, id);
 }
 
-static inline void open_ffi(TypeV_Core* core){
-    uint16_t ffi_id;
-    typev_memcpy_unaligned_2(&ffi_id, &core->codePtr[core->ip]);
-    core->ip += 2;
-
-    engine_ffi_open(core->engineRef, ffi_id);
-}
-
-static inline void ld_ffi(TypeV_Core* core){
-    uint8_t dest = core->codePtr[core->ip++];
-    ASSERT(dest < MAX_REG, "Invalid register index");
-
+static inline void call_ffi(TypeV_Core* core){
     uint16_t id;
     typev_memcpy_unaligned_2(&id, &core->codePtr[core->ip]);
 
@@ -2171,13 +2160,7 @@ static inline void ld_ffi(TypeV_Core* core){
 
     uint8_t methodId = core->codePtr[core->ip++];
 
-    core->regs[dest].ptr = (size_t)engine_ffi_get(core->engineRef, id, methodId);
-}
-
-static inline void call_ffi(TypeV_Core* core){
-    uint8_t reg = core->codePtr[core->ip++];
-
-    TypeV_FFIFunc ffi_fn = (TypeV_FFIFunc)(core->regs[reg].ptr);
+    TypeV_FFIFunc ffi_fn = engine_ffi_get(core->engineRef, id, methodId);
     ffi_fn(core);
 }
 

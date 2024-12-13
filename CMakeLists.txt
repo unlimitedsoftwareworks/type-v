@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(type_v C)
+project(typev C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -7,7 +7,6 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -funroll-loops -finline-functions")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -funroll-loops -finline-functions")
-
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
@@ -23,20 +22,14 @@ if(MSVC)
     add_compile_options(/std:c11 /Zc:__cplusplus)
 endif()
 
-
-
-
-# other subdirectories
+# Add subdirectories for standard libraries
 add_subdirectory(stdio)
 add_subdirectory(stdfs)
-add_subdirectory(string)
 add_subdirectory(stdcore)
 add_subdirectory(stdmath)
 
-
-# Your executable target
-add_executable(type_v
-        source/main.c
+# Create a static library target
+add_library(typev_static STATIC
         source/core.c
         source/core.h
         source/gc/gc.c
@@ -70,4 +63,42 @@ add_executable(type_v
         source/errors/errors.h
 )
 
-target_link_libraries(type_v stdio string stdcore stdmath stdfs m)
+# Your executable target
+add_executable(typev
+        source/main.c
+)
+
+set_target_properties(typev_static PROPERTIES OUTPUT_NAME "typev")
+
+# Link the static library to the executable
+target_link_libraries(typev typev_static stdio stdcore stdmath stdfs m)
+
+# Install rules
+# Install the static library
+install(TARGETS typev_static
+        ARCHIVE DESTINATION lib)
+
+# Install selected headers
+# Install only the specific headers, preserving the directory structure
+install(FILES
+        source/core.h
+        source/engine.h
+        source/dynlib/dynlib.h
+        source/errors/errors.h
+        source/api/typev_api.h
+        DESTINATION include/typev)
+install(FILES
+        source/dynlib/dynlib.h
+        DESTINATION include/typev/dynlib)
+install(FILES
+        source/errors/errors.h
+        DESTINATION include/typev/errors)
+install(FILES
+        source/api/typev_api.h
+        DESTINATION include/typev/api)
+install(FILES
+        source/env/env.h
+        DESTINATION include/typev/env)
+install(FILES
+        source/platform/platform.h
+        DESTINATION include/typev/platform)
