@@ -29,6 +29,7 @@ typedef struct TypeV_Struct {
 } TypeV_Struct;
 
 
+/*
 typedef struct TypeV_Class {
     uint64_t* methods;        // Pointer to method table, 8-byte alignment
     uint32_t* globalMethods;  // Pointer to global methods table, 8-byte alignment
@@ -40,8 +41,18 @@ typedef struct TypeV_Class {
     uint8_t numFields;        // Number of fields, 1-byte alignment
     uint8_t* data;            // Pointer to data block, placed last for alignment simplicity
 } TypeV_Class;
-
-
+*/
+typedef struct TypeV_Class {
+    uint64_t* methods;        // 8 bytes, 8-byte alignment
+    uint32_t* globalMethods;  // 8 bytes, 8-byte alignment
+    uint16_t* fieldOffsets;   // 8 bytes, 8-byte alignment
+    uint8_t* pointerBitmask;  // 8 bytes, 8-byte alignment
+    size_t bitMaskSize;       // 8 bytes, 8-byte alignment
+    uint64_t uid;             // 8 bytes, 8-byte alignment
+    uint16_t numMethods;      // 2 bytes, 2-byte alignment
+    uint8_t numFields;        // 1 byte, 1-byte alignment
+    uint8_t* data;            // 8 bytes, 8-byte alignment (last for simplicity)
+} TypeV_Class;
 
 typedef struct TypeV_Array {
     uint64_t length;          ///< Array length
@@ -178,6 +189,8 @@ typedef struct {
     TypeV_ObjectType type;
     uint8_t survivedCount;
     size_t totalSize;
+    struct TypeV_ObjectHeader* fwd;
+    uint8_t flags;
 }TypeV_ObjectHeader;
 
 /**

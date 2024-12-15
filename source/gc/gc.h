@@ -45,7 +45,7 @@
  */
 #define NURSERY_SIZE (NURSERY_REGION_SIZE*2)
 
-#define PROMOTION_SURVIVAL_THRESHOLD 4
+#define PROMOTION_SURVIVAL_THRESHOLD 3
 
 /**
  * Object Colors
@@ -131,15 +131,7 @@ typedef struct TypeV_OldGenerationRegion {
 } TypeV_OldGenerationRegion;
 
 /**
- * Update List pairs
- */
-typedef struct TypeV_GCUpdateList {
-    uintptr_t old_address;
-    uintptr_t new_address;
-} TypeV_GCUpdateList;
-
-/**
- * Update Promise, when marking, each object that is marked will have to register 
+ * Update Promise, when marking, each object that is marked will have to register
  * a pointer to its new address, so that it can be updated after the minor GC.
  * This feature hasn't been studied yet, because size of the array is not predetermined.
  */
@@ -148,7 +140,7 @@ typedef struct TypeV_UpdatePromise {
     /**
      * Pointer to the new address, so that *new_address_pointer = new_address
      */
-    void** new_address_pointer; 
+    void** new_address_pointer;
 } TypeV_UpdatePromise;
 
 /**
@@ -169,39 +161,60 @@ typedef struct TypeV_GC {
      * Amount of minor GCs performed, since last major GC
      */
     uint32_t minorGCCount;
-
-    /**
-     * Static update list.
-     */
-    TypeV_GCUpdateList nurseryUpdateList[NURSERY_MAX_CELLS];
-
-    /**
-     * Number of items to update, resets after each GC
-     */
-    uint64_t updateListSize;
 }TypeV_GC;
 
 
 // Macros for accessing color_bitmap
-#define GET_COLOR(bitmap, cell) ((bitmap[(cell) / 4] >> (((cell) % 4) * 2)) & 0x3)
+//#define GET_COLOR(bitmap, cell) ((bitmap[(cell) / 4] >> (((cell) % 4) * 2)) & 0x3)
 
-#define SET_COLOR(bitmap, cell, color) do { \
+/*#define SET_COLOR(bitmap, cell, color) do { \
     uint8_t mask = 0x3 << (((cell) % 4) * 2); \
     bitmap[(cell) / 4] = (bitmap[(cell) / 4] & ~mask) | (((color) & 0x3) << (((cell) % 4) * 2)); \
-} while (0)
+} while (0)*/
 
+static inline uint8_t gc_get_color(uint8_t* bitmap, size_t index) {
+    size_t byte = index / 4;
+    uint8_t shift = (index % 4) * 2;
+    return (bitmap[byte] >> shift) & 0x3;
+}
 
-// Macros for accessing active_bitmap
-#define GET_ACTIVE(bitmap, cell) ((bitmap[(cell) / 8] >> ((cell) % 8)) & 0x1)
+static inline void gc_set_color(uint8_t* bitmap, size_t index, uint8_t color) {
+    size_t byte = index / 4;
+    uint8_t shift = (index % 4) * 2;
+    bitmap[byte] = (bitmap[byte] & ~(0x3 << shift)) | (color << shift);
+}
 
-#define SET_ACTIVE(bitmap, cell, active) do { \
-    uint8_t mask = 1 << ((cell) % 8); \
-    if (active) \
-        bitmap[(cell) / 8] |= mask; \
-    else \
-        bitmap[(cell) / 8] &= ~mask; \
-} while (0)
+static inline bool gc_get_active(uint8_t* bitmap, size_t index) {
+    size_t byte = index / 8;
+    uint8_t shift = index % 8;
+    return (bitmap[byte] >> shift) & 0x1;
+}
 
+static inline void gc_set_active(uint8_t* bitmap, size_t index, bool active) {
+    size_t byte = index / 8;
+    uint8_t shift = index % 8;
+    bitmap[byte] |= (1 << shift);
+}
+
+static inline void gc_clear_active(uint8_t* bitmap, size_t index) {
+    size_t byte = index / 8;
+    uint8_t shift = index % 8;
+    bitmap[byte] &= ~(1 << shift);
+}
+
+static inline void gc_update_object_pointers(TypeV_Core* core, TypeV_ObjectHeader* old, TypeV_ObjectHeader* new_) {
+    if(old->fwd) {
+        return;
+    }
+
+    old->fwd = new_;
+}
+
+static inline TypeV_ObjectHeader* gc_get_new_ptr_location(TypeV_Core* core, TypeV_ObjectHeader* old) {
+    TypeV_ObjectHeader* new_ = old->fwd;
+    //old->fwd = NULL;
+    return new_;
+}
 
 /**
  * Initializes the GC system
@@ -242,16 +255,6 @@ void gc_minor_gc(TypeV_Core* core);
  * @param core
  */
 void gc_extend_old(TypeV_Core* core);
-
-/**
- * Pointers are updated top-down, so when we push a new (oldPtr, newPtr) pair,
- * they are inherently sorted. This function uses binary search to find the new address
- * If not found, it returns the old address.
- * @param core
- * @param oldPtr
- * @return
- */
-uintptr_t gc_get_new_ptr_location(TypeV_Core* core, uintptr_t oldPtr);
 
 /**
  * Debugs the nursery.

@@ -627,16 +627,18 @@ static inline void c_loadf(TypeV_Core* core){
     typev_memcpy_unaligned(&core->regs[target], c->data + field_offset, byteSize);
     CLEAR_REG_PTR(core->funcState, target);
 }
-
+#include <assert.h>
 static inline void c_loadf_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
     const uint8_t class_reg = core->codePtr[core->ip++];
     const uint8_t fieldIndex = core->codePtr[core->ip++];
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
-    size_t field_offset = c->fieldOffsets[fieldIndex];
+    uint8_t field_offset = c->fieldOffsets[fieldIndex];
+    assert(((uintptr_t)(c->data + field_offset) % alignof(TypeV_Array)) == 0);
+
     typev_memcpy_aligned_8(&core->regs[target], c->data + field_offset);
-    CLEAR_REG_PTR(core->funcState, target);
+    SET_REG_PTR(core->funcState, target);
 }
 
 static inline void i_is_c(TypeV_Core* core){
@@ -650,7 +652,7 @@ static inline void i_is_c(TypeV_Core* core){
     TypeV_Class* class_ = (TypeV_Class*)core->regs[interface_reg].ptr;
 
     core->regs[target].u8 = class_->uid == classId;
-    CLEAR_REG_PTR(core->funcState, target);
+    SET_REG_PTR(core->funcState, target);
 }
 
 static inline void i_has_m(TypeV_Core* core){
@@ -708,7 +710,7 @@ static inline void a_extend(TypeV_Core* core){
     uint64_t num_elements = core->regs[size_reg].u64;
 
     size_t mem = core_array_extend(core, core->regs[target_array].ptr, num_elements);
-    core->regs[target_array].ptr = mem;
+    //core->regs[target_array].ptr = mem;
 }
 
 static inline void a_len(TypeV_Core* core){

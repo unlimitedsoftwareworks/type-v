@@ -100,82 +100,50 @@ void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state) {
 }
 
 
-#define ALIGN_PTR(ptr, alignment) \
-    ((uintptr_t)(((uintptr_t)(ptr) + (alignment - 1)) & ~(alignment - 1)))
+uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSize) {
+    LOG_INFO("CORE[%d]: Allocating struct with %d fields and %zu bytes", core->id, numFields, totalSize);
 
-uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsize) {
-    LOG_INFO("CORE[%d]: Allocating struct with %d fields and %zu bytes, total allocated cellSize: %zu",
-             core->id, numfields, totalsize, sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) + totalsize + numfields * sizeof(uint16_t) + numfields * sizeof(uint32_t));
-
-    // Ensure minimum data size is 8 bytes for alignment purposes
-    if (totalsize < 8) {
-        totalsize = 8;
+    // Ensure minimum data size is 8 bytes
+    if (totalSize < 8) {
+        totalSize = 8;
     }
 
-    // Calculate sizes for each component
-    size_t bitmaskSize = (numfields + 7) / 8;
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct);
+    // Precompute sizes
+    size_t bitmaskSize = (numFields + 7) / 8;
+    size_t globalFieldsSize = (numFields) * sizeof(uint32_t);
+    size_t fieldOffsetsSize = numFields * sizeof(uint16_t);
 
+    // Calculate total allocation size
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) +
+                                 totalSize + globalFieldsSize +
+                                 fieldOffsetsSize + bitmaskSize;
 
-    const uint32_t numFieldsP1 = numfields;
-
-    // Align for `globalFields` (4-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
-    totalAllocationSize += numFieldsP1 * sizeof(uint32_t);  // Global fields array
-
-    // Align for `fieldOffsets` (2-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
-    totalAllocationSize += numfields * sizeof(uint16_t);  // Field offsets array
-
-    // Align for `pointerBitmask` (1-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint8_t));
-    totalAllocationSize += bitmaskSize;  // Pointer bitmask size
-
-    // Align for `data` (8-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
-    totalAllocationSize += totalsize;  // Data block size
-
-    // Allocate the entire memory block
+    // Allocate memory
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
-    static uint32_t uid = 0;
 
-    // Initialize the object header
+    // Initialize object header
     header->type = OT_STRUCT;
     header->totalSize = totalAllocationSize;
     header->survivedCount = 0;
 
-    // Place the `TypeV_Struct` directly after the header
+    // Initialize TypeV_Struct
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
-    struct_ptr->numFields = numfields;
-    struct_ptr->uid = uid++;
-
-    // Set pointers for subsequent arrays with alignment adjustments
-
-    uint8_t* current_ptr = (uint8_t*)(struct_ptr + 1);
-
-    // Set `globalFields` pointer (aligned to 4 bytes)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
-    struct_ptr->globalFields = (uint32_t*)current_ptr;
-    current_ptr += numFieldsP1 * sizeof(uint32_t);
-
-    // Set `fieldOffsets` pointer (aligned to 2 bytes)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
-    struct_ptr->fieldOffsets = (uint16_t*)current_ptr;
-    current_ptr += numfields * sizeof(uint16_t);
-
-    // Set `pointerBitmask` pointer (aligned to 1 byte)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
-    struct_ptr->pointerBitmask = current_ptr;
-    current_ptr += bitmaskSize;
-
-    // Set `data` pointer (aligned to 8 bytes)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
-    struct_ptr->data = current_ptr;
-    current_ptr += totalsize;
-
-
-    // Set `bitMaskSize`
+    struct_ptr->numFields = numFields;
     struct_ptr->bitMaskSize = bitmaskSize;
+
+    // Assign pointers with the new layout
+    uint8_t* base_ptr = (uint8_t*)struct_ptr+ sizeof(TypeV_Struct);
+
+    struct_ptr->data = (uint8_t*)(base_ptr );  // Data starts right after TypeV_Struct
+    base_ptr += totalSize;
+    struct_ptr->globalFields = (uint32_t*)(base_ptr);  // GlobalFields start after data
+    base_ptr += globalFieldsSize;
+    struct_ptr->fieldOffsets = (uint16_t*)(base_ptr);  // FieldOffsets start after GlobalFields
+    base_ptr += fieldOffsetsSize;
+    struct_ptr->pointerBitmask = (uint8_t*)(base_ptr);  // PointerBitmask starts after FieldOffsets
+
+    static uint32_t uid = 0;
+    struct_ptr->uid = uid++;
 
     // Zero out the bitmask
     memset(struct_ptr->pointerBitmask, 0, bitmaskSize);
@@ -185,80 +153,62 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
 }
 
 uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId) {
-    LOG_INFO("CORE[%d]: Allocating class with %d methods and %d attributes, uid: %llu", core->id, num_methods, num_attributes, classId);
-
-    // Calculate bitmask size for pointers
-    size_t bitmaskSize = (num_attributes + 7) / 8;
+    LOG_INFO("CORE[%d]: Allocating class with %d methods, %d attributes, uid: %llu", core->id, num_methods, num_attributes, classId);
 
     // Ensure minimum data size for alignment purposes
     if (total_fields_size < 8) {
         total_fields_size = 8;
     }
 
-    // Start calculating the total size required for allocation
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class);
+    // Precompute sizes
+    size_t bitmaskSize = (num_attributes + 7) / 8;  // Ceiling division for bitmask
+    size_t methodsSize = num_methods * sizeof(uint64_t);
+    size_t globalMethodsSize = num_methods * sizeof(uint32_t);
+    size_t fieldOffsetsSize = num_attributes * sizeof(uint16_t);
 
-    // Align for `methods` (8-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
-    totalAllocationSize += num_methods * sizeof(uint64_t);  // Methods array
+    // Calculate total allocation size
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class) +
+                                 total_fields_size + methodsSize +
+                                 globalMethodsSize + fieldOffsetsSize + bitmaskSize;
 
-    // Align for `globalMethods` (4-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint32_t));
-    totalAllocationSize += (num_methods) * sizeof(uint32_t);  // Global methods array
-
-    // Align for `fieldOffsets` (2-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint16_t));
-    totalAllocationSize += num_attributes * sizeof(uint16_t);  // Field offsets array
-
-    // Align for `pointerBitmask` (1-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint8_t));
-    totalAllocationSize += bitmaskSize;  // Pointer bitmask size
-
-    // Align for `data` (8-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
-    totalAllocationSize += total_fields_size;  // Data block size
-
-    // Allocate memory for the entire class object
+    // Allocate memory
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
-    // Set header information
+    // Initialize object header
     header->type = OT_CLASS;
     header->totalSize = totalAllocationSize;
-    header->survivedCount = 0;  // Assuming survived count is initialized to 0
+    header->survivedCount = 0;
 
-    // Get a pointer to the class, which comes after the header
+    // Initialize TypeV_Class structure
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
     class_ptr->numMethods = num_methods;
     class_ptr->numFields = num_attributes;
     class_ptr->uid = classId;
 
-    // Set pointers for subsequent arrays, ensuring alignment is handled
+    // Assign pointers with the new layout
+    uint8_t* base_ptr = (uint8_t*)class_ptr + sizeof(TypeV_Class);
 
-    uint8_t* current_ptr = (uint8_t*)(class_ptr + 1);
+    // Data starts immediately after the TypeV_Class structure
+    class_ptr->data = (uint8_t*)(base_ptr);
 
-    // Set `methods` pointer (aligned to 8 bytes)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
-    class_ptr->methods = (uint64_t*)current_ptr;
-    current_ptr += num_methods * sizeof(uint64_t);
+    base_ptr += total_fields_size;
 
-    // Set `globalMethods` pointer (aligned to 4 bytes)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint32_t));
-    class_ptr->globalMethods = (uint32_t*)current_ptr;
-    current_ptr += (num_methods) * sizeof(uint32_t);
+    // Methods table starts after the data block
+    class_ptr->methods = (uint64_t*)base_ptr;
 
-    // Set `fieldOffsets` pointer (aligned to 2 bytes)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint16_t));
-    class_ptr->fieldOffsets = (uint16_t*)current_ptr;
-    current_ptr += num_attributes * sizeof(uint16_t);
+    base_ptr += methodsSize;
+    // Global methods table starts after the methods table
+    class_ptr->globalMethods = (uint32_t*) base_ptr;
 
-    // Set `pointerBitmask` pointer (aligned to 1 byte)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
-    class_ptr->pointerBitmask = current_ptr;
-    current_ptr += bitmaskSize;
+    base_ptr += globalMethodsSize;
 
-    // Set `data` pointer (aligned to 8 bytes)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
-    class_ptr->data = current_ptr;
+    // Field offsets table starts after the global methods table
+    class_ptr->fieldOffsets = (uint16_t*)base_ptr;
+
+    base_ptr += fieldOffsetsSize;
+
+    // Pointer bitmask starts after the field offsets table
+    class_ptr->pointerBitmask = base_ptr;
 
     // Zero out the bitmask
     memset(class_ptr->pointerBitmask, 0, bitmaskSize);
@@ -266,6 +216,8 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
     // Return the pointer to the class
     return (uintptr_t)class_ptr;
 }
+
+
 
 uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size) {
     LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of cellSize %d", core->id, num_elements, element_size);
@@ -281,6 +233,9 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint6
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
     array_ptr->data = malloc(num_elements* element_size);
+    if(array_ptr->data == NULL) {
+        core_panic(core, RT_ERROR_OOM, "Failed to allocate array data");
+    }
     array_ptr->uid = uid++;
     array_ptr->isPointerContainer = is_pointer_container;
 
@@ -316,12 +271,18 @@ uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_
     }
 
     array->data = realloc(array->data, num_elements*array->elementSize);
-    array->length = num_elements;
+
+    if(array->data == NULL) {
+        core_panic(core, RT_ERROR_OOM, "Failed to reallocate array");
+    }
+
 
     // if we have increased the size, we fill the new elements with 0
     if(num_elements > array->length){
         memset(array->data + array->length * array->elementSize, 0, (num_elements - array->length) * array->elementSize);
     }
+
+    array->length = num_elements;
 
     return array_ptr;
 }
@@ -495,7 +456,16 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n
     }
 
     // Final check if the value at `index` is equal to `id`
-    return (b[index] == x) ? index : (core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x), -1); // Return -1 if not found
+    if (b[index] == x) {
+        return (uint8_t)index;
+    }
+    else {
+        for(uint8_t i = 0; i < n; i++){
+            printf("%d, ", b[i]);
+        }
+        printf("\n");
+        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
+    }
 }
 
 

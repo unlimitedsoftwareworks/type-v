@@ -56,14 +56,6 @@ void core_gc_mark_nursery_object(TypeV_Core* core, uintptr_t ptr);
  */
 void gc_mark_state(TypeV_Core* core, TypeV_FuncState* state, uint8_t inNursery);
 
-/**
- * After GC has moved an object, this function is called to update all references to the old object with the new object.
- * It follows same principle as marking, but overwriting children pointers with the new address.
- * @param core
- * @param old_address
- * @param new_address
- */
-void gc_update_object_pointers(TypeV_Core* core, uintptr_t old_address, uintptr_t new_address);
 
 /**
  * This function is called after a minor/major GC to update the pointers in the state.

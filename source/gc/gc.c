@@ -47,7 +47,7 @@ TypeV_NurseryRegion* gc_create_nursery() {
     if (!nursery) return NULL;
 
     // Allocate and initialize the nursery data buffer
-    nursery->data = (uint8_t*)aligned_alloc_wrapper(NURSERY_SIZE, NURSERY_SIZE);
+    nursery->data = (uint8_t*)aligned_alloc_wrapper(8, NURSERY_SIZE);
     if (!nursery->data) {
         aligned_free_wrapper(nursery);
         return NULL;
@@ -73,7 +73,7 @@ TypeV_OldGenerationRegion* gc_create_old_generation() {
     // Allocate and initialize the old generation data buffer
     old_gen->color_bitmap = (uint8_t*)malloc(((INITIAL_OLD_CELLS * 2) / 8)*sizeof(uint8_t));
     old_gen->active_bitmap = (uint8_t*)malloc((INITIAL_OLD_CELLS / 8)*sizeof(uint8_t));
-    old_gen->data = (uint8_t*) malloc(OLD_REGION_INITIAL_SIZE);
+    old_gen->data = (uint8_t*) aligned_alloc_wrapper(8, OLD_REGION_INITIAL_SIZE);
     if (!old_gen->data) {
         free(old_gen);
         return NULL;
@@ -87,6 +87,55 @@ TypeV_OldGenerationRegion* gc_create_old_generation() {
     memset(old_gen->active_bitmap, 0, sizeof(old_gen->active_bitmap));
 
     return old_gen;
+}
+
+void gc_extend_old(TypeV_Core* core) {
+    TypeV_GC* gc = core->gc;
+    TypeV_OldGenerationRegion* old = gc->oldRegion;
+
+    // Double the capacity factor
+    size_t original_capacity = old->capacityFactor * INITIAL_OLD_CELLS;
+    old->capacityFactor *= 2;
+    size_t new_capacity = old->capacityFactor * INITIAL_OLD_CELLS;
+
+    // Allocate new data buffer
+    char* newChunk = aligned_alloc_wrapper(8, new_capacity * CELL_SIZE);
+    if (!newChunk) {
+        core_panic(core, RT_ERROR_OOM, "Failed to allocate memory for old generation data");
+        return;
+    }
+
+    // Copy existing data to the new buffer
+    memcpy(newChunk, old->data, original_capacity * CELL_SIZE);
+
+    // Free the old data buffer and update the pointer
+    free(old->data);
+    old->data = newChunk;
+
+    // Reallocate and expand color_bitmap
+    size_t new_color_bitmap_size = (new_capacity * 2) / 8;
+    uint8_t* new_color_bitmap = (uint8_t*)realloc(old->color_bitmap, new_color_bitmap_size);
+    if (!new_color_bitmap) {
+        free(newChunk); // Clean up newly allocated memory
+        core_panic(core, RT_ERROR_OOM, "Failed to extend color bitmap");
+        return;
+    }
+    // Initialize the new portion to 0
+    memset(new_color_bitmap + ((original_capacity * 2) / 8), 0, new_color_bitmap_size - ((original_capacity * 2) / 8));
+    old->color_bitmap = new_color_bitmap;
+
+    // Reallocate and expand active_bitmap
+    size_t new_active_bitmap_size = new_capacity / 8;
+    uint8_t* new_active_bitmap = (uint8_t*)realloc(old->active_bitmap, new_active_bitmap_size);
+    if (!new_active_bitmap) {
+        free(newChunk);
+        free(new_color_bitmap); // Clean up the new color_bitmap if active_bitmap fails
+        core_panic(core, RT_ERROR_OOM, "Failed to extend active bitmap");
+        return;
+    }
+    // Initialize the new portion to 0
+    memset(new_active_bitmap + (original_capacity / 8), 0, new_active_bitmap_size - (original_capacity / 8));
+    old->active_bitmap = new_active_bitmap;
 }
 
 TypeV_GC* gc_initialize() {
@@ -109,12 +158,11 @@ TypeV_GC* gc_initialize() {
     }
 
     gc->minorGCCount = 0;
-    gc->updateListSize = 0;
 
     return gc;
 }
 
-TypeV_ObjectHeader *gc_alloc(TypeV_Core* core, size_t size) {
+TypeV_ObjectHeader *gc_alloc_recursive(TypeV_Core* core, size_t size, size_t iterCounter) {
     TypeV_GC *gc = core->gc;
     TypeV_NurseryRegion *nursery = gc->nurseryRegion;
 
@@ -129,7 +177,7 @@ TypeV_ObjectHeader *gc_alloc(TypeV_Core* core, size_t size) {
 
         // make sure we have enough space now
 
-        return gc_alloc(core, size);
+        return gc_alloc_recursive(core, size, iterCounter + 1);
     }
 
     // Calculate the starting address of the allocation based on the current end of used space
@@ -141,16 +189,20 @@ TypeV_ObjectHeader *gc_alloc(TypeV_Core* core, size_t size) {
 
     // Set each cell in the newly allocated space as active and initialize color to WHITE
     for (size_t i = nursery->cellSize - cells_needed; i < nursery->cellSize; i++) {
-        SET_ACTIVE(nursery->active_bitmap, i, 1);
-        SET_COLOR(nursery->color_bitmap, i, WHITE);
+        gc_set_active(nursery->active_bitmap, i, 1);
+        gc_set_color(nursery->color_bitmap, i, WHITE);
     }
 
     // Return the address of the allocated memory block with metadata header
     return alloc_address;
 }
 
+TypeV_ObjectHeader *gc_alloc(TypeV_Core* core, size_t size) {
+    return gc_alloc_recursive(core, size, 0);
+}
+
 void gc_minor_gc(TypeV_Core* core) {
-    //maprintf("Performing minor GC\n");
+    printf("Performing minor GC\n");
     TypeV_GC *gc = core->gc;
     TypeV_NurseryRegion *nursery = gc->nurseryRegion;
     TypeV_OldGenerationRegion *old = gc->oldRegion;
@@ -162,12 +214,13 @@ void gc_minor_gc(TypeV_Core* core) {
     // printf("Nursery after marking\n");
     //gc_debug_nursery(gc);
 
+    bool used_old_space = false;
     // Step 2: Copy live objects from `from` to `to`
     uint8_t* new_position_in_nursery = nursery->to;  // Start copying to the beginning of `to`
     uint8_t* new_position_in_old = gc->oldRegion->data + gc->oldRegion->cellSize * CELL_SIZE;  // Start copying to the end of `old` space
     for (size_t i = 0; i < nursery->cellSize; i++) {
         //printf("Current update list cellSize: %llu\n", gc->updateListSize);
-        if (GET_ACTIVE(nursery->active_bitmap, i) && GET_COLOR(nursery->color_bitmap, i) == BLACK) {
+        if (gc_get_active(nursery->active_bitmap, i) && gc_get_color(nursery->color_bitmap, i) == BLACK) {
 
             // Copy live object to the `to` space
             TypeV_ObjectHeader* obj = (TypeV_ObjectHeader*)(nursery->from + (i * CELL_SIZE));
@@ -179,9 +232,9 @@ void gc_minor_gc(TypeV_Core* core) {
 
             obj->survivedCount++;
 
-            if(obj->survivedCount >= 3) {
+            if(obj->survivedCount >= PROMOTION_SURVIVAL_THRESHOLD) {
                 // Move to old generation
-
+                used_old_space = true;
                 //printf("moving object %p to old generation\n", obj);
 
                 memcpy(new_position_in_old, nursery->from + (i * CELL_SIZE), object_cell_size * CELL_SIZE);
@@ -190,12 +243,12 @@ void gc_minor_gc(TypeV_Core* core) {
                 size_t new_offset = (new_position_in_old - old->data) / CELL_SIZE;
 
                 for (size_t j = 0; j < object_cell_size; j++) {
-                    SET_ACTIVE(old->active_bitmap, new_offset + j, 1);
-                    SET_COLOR(old->color_bitmap, new_offset + j, BLACK);  // Mark as BLACK in `to`
+                    gc_set_active(old->active_bitmap, new_offset + j, 1);
+                    gc_set_color(old->color_bitmap, new_offset + j, BLACK);  // Mark as BLACK in `to`
                 }
 
                 // Update the pointer and position
-                gc_update_object_pointers(core, (uintptr_t)obj, (uintptr_t)new_position_in_old);
+                gc_update_object_pointers(core, obj, (TypeV_ObjectHeader*)new_position_in_old);
                 new_position_in_old += object_cell_size * CELL_SIZE;
             }
             else {
@@ -213,12 +266,12 @@ void gc_minor_gc(TypeV_Core* core) {
 
                 // TODO: replace with memset?
                 for (size_t j = 0; j < object_cell_size; j++) {
-                    SET_ACTIVE(nursery->active_bitmap, new_offset + j, 1);
-                    SET_COLOR(nursery->color_bitmap, new_offset + j, BLACK);  // Mark as BLACK in `to`
+                    gc_set_active(nursery->active_bitmap, new_offset + j, 1);
+                    gc_set_color(nursery->color_bitmap, new_offset + j, BLACK);  // Mark as BLACK in `to`
                 }
 
                 // Update the pointer and position
-                gc_update_object_pointers(core, (uintptr_t) obj, (uintptr_t) new_position_in_nursery);
+                gc_update_object_pointers(core, obj, (TypeV_ObjectHeader*) new_position_in_nursery);
                 new_position_in_nursery += object_cell_size * CELL_SIZE;
             }
 
@@ -227,7 +280,12 @@ void gc_minor_gc(TypeV_Core* core) {
     }
 
     // Step 3: Update pointers in the stack and registers
-    gc_update_state(core, core->funcState, 1);
+    if(!used_old_space) {
+        gc_update_state(core, core->funcState, 1);
+    }
+    else {
+        gc_update_state(core, core->funcState, 0);
+    }
 
     // Step 4: Swap `from` and `to` pointers
     uint8_t* temp = nursery->from;
@@ -245,80 +303,19 @@ void gc_minor_gc(TypeV_Core* core) {
     //gc_debug_nursery(gc);
     // set the active bits for the new space
     for (size_t i = 0; i < nursery->cellSize; i++) {
-        SET_COLOR(nursery->color_bitmap, i, WHITE);
-        SET_ACTIVE(nursery->active_bitmap, i, 1);
+        gc_set_color(nursery->color_bitmap, i, WHITE);
+        gc_set_active(nursery->active_bitmap, i, 1);
     }
     //gc_debug_nursery(gc);
 
-    if(nursery->cellSize > NURSERY_MAX_CELLS) {
+    if(nursery->cellSize > (NURSERY_MAX_CELLS*95/100)) {
         core_panic(core, RT_ERROR_NURSERY_FULL, "Nursery cellSize exceeded the maximum limit");
     }
 
-    core->gc->minorGCCount++;
-    core->gc->updateListSize = 0;
 
     // extend the old generation if needed
     //gc_extend_old(core);
 }
-
-void gc_extend_old(TypeV_Core* core) {
-    TypeV_GC* gc = core->gc;
-    TypeV_OldGenerationRegion* old = gc->oldRegion;
-
-    if(old->cellSize >= INITIAL_OLD_CELLS - 10) {
-        core_panic(core, RT_ERROR_OOM, "Old generation cellSize exceeded the maximum limit");
-    }
-
-}
-
-
-void gc_update_object_pointers(TypeV_Core* core, uintptr_t old_address, uintptr_t new_address) {
-    if (core->gc->updateListSize >= NURSERY_MAX_CELLS) {
-        core_panic(core, RT_ERROR_OOM, "Exceeded nursery update list capacity");
-        return;
-    }
-
-    core->gc->nurseryUpdateList[core->gc->updateListSize].old_address = old_address;
-    core->gc->nurseryUpdateList[core->gc->updateListSize++].new_address = new_address;
-}
-uintptr_t gc_get_new_ptr_location(TypeV_Core* core, uintptr_t oldPtr) {
-    if(core->gc->updateListSize == 0) {
-        // gc_log("Failed to find new address for %p, 0 updates to be made\n", oldPtr);
-        return oldPtr;
-    }
-
-    if (core->gc->updateListSize == 1) {
-        if (core->gc->nurseryUpdateList[0].old_address == oldPtr) {
-            return core->gc->nurseryUpdateList[0].new_address;
-        } else {
-            // gc_log("Failed to find new address for %p\n", oldPtr);
-            return oldPtr;
-        }
-    }
-
-    uint64_t left = 0;
-    uint64_t right = core->gc->updateListSize - 1;
-
-    while (left <= right) {
-        uint64_t mid = left + (right - left) / 2;
-        if (core->gc->nurseryUpdateList[mid].old_address == oldPtr) {
-            return core->gc->nurseryUpdateList[mid].new_address;
-        }
-        if (core->gc->nurseryUpdateList[mid].old_address < oldPtr) {
-            left = mid + 1;
-        } else {
-            // Ensure `right` does not underflow
-            if (mid == 0) {
-                break; // Prevent underflow of `right`
-            }
-            right = mid - 1;
-        }
-    }
-
-    // gc_log("Failed to find new address for %p\n", oldPtr);
-    return oldPtr;
-}
-
 
 
 
@@ -329,8 +326,8 @@ void gc_debug_nursery(TypeV_GC* gc) {
     printf("| CellID |      Color      |   State  |  Value |\n");
 
     for (uint64_t i = 0; i < NURSERY_MAX_CELLS; i++) {
-        uint8_t isActive = GET_ACTIVE(nursery->active_bitmap, i);
-        uint8_t color = GET_COLOR(nursery->color_bitmap, i);
+        uint8_t isActive = gc_get_active(nursery->active_bitmap, i);
+        uint8_t color = gc_get_color(nursery->color_bitmap, i);
 
         const char* colorString = color == WHITE ? "white" :
                                   color == GRAY  ? "gray"  :
