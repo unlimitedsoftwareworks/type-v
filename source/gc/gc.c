@@ -244,15 +244,20 @@ void perform_major_gc(TypeV_Core* core) {
     gc->oldRegion.from = from;
     gc->oldRegion.to = to;
 
+    free(gc->oldRegion.dirty_bitmap);
+    gc->oldRegion.dirty_bitmap = new_dirty_bitmap;
+    gc->oldRegion.direction = -gc->oldRegion.direction;
+
+    // must update references here before we free (potentially) old buffer
+
+    update_root_references(core);
+
     if(needs_new_buffer) {
         free(gc->oldRegion.data);
         gc->oldRegion.data = new_buffer;
     }
 
-    free(gc->oldRegion.dirty_bitmap);
-    gc->oldRegion.dirty_bitmap = new_dirty_bitmap;
 
-    gc->oldRegion.direction = -gc->oldRegion.direction;
 
     gc_log("MAJOR_END (%d/%d, %d/%d)\n", gc->nursery.cell_size, NURSERY_MAX_CELLS, gc->oldRegion.cell_size, INITIAL_OLD_CELLS*gc->oldRegion.capacity_factor);
     gc_log("perform_major_gc: Completed major GC");

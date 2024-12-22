@@ -176,26 +176,10 @@ void mark_object(TypeV_Core* core, TypeV_ObjectHeader* obj) {
     obj->color = BLACK;
 }
 
-static inline bool is_ptr_valid(TypeV_Core* core, uintptr_t ptr) {
-    if(ptr == 0) {
-        return false;
-    }
-
-    // either in nursery or old region
-    if(ptr >= (uintptr_t)core->gc->nursery.from && ptr < (uintptr_t)core->gc->nursery.from + core->gc->nursery.cell_size * CELL_SIZE) {
-        return true;
-    }
-
-    if (ptr >= (uintptr_t)core->gc->oldRegion.data && ptr < (uintptr_t)core->gc->oldRegion.data + core->gc->oldRegion.cell_size * CELL_SIZE) {
-        return true;
-    }
-
-    return false;
-}
 
 void mark_state(TypeV_Core* core, TypeV_FuncState* state) {
     for (uint32_t i = 0; i < MAX_REG; i++) {
-        if(IS_REG_PTR(state, i) && state->regs[i].ptr && is_ptr_valid(core, state->regs[i].ptr)) {
+        if(IS_REG_PTR(state, i) && state->regs[i].ptr) {
             TypeV_ObjectHeader* obj = GET_OBJ_HEADER(state->regs[i].ptr);
             mark_object(core, obj);
         }

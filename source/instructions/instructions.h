@@ -137,6 +137,8 @@ static inline void mv_reg_reg(TypeV_Core* core){
     //typev_memcpy_unaligned(&core->regs[target], &core->regs[source], byteSize);
     core->regs[target] = core->regs[source];
     CLEAR_REG_PTR(core->funcState, target);
+    CLEAR_REG_PTR(core->funcState, source);
+
 }
 
 static inline void mv_reg_reg_ptr(TypeV_Core* core){
@@ -145,6 +147,7 @@ static inline void mv_reg_reg_ptr(TypeV_Core* core){
 
     typev_memcpy_aligned_8((unsigned char *) &core->regs[target], (unsigned char *) &core->regs[source]);
     SET_REG_PTR(core->funcState, target);
+    SET_REG_PTR(core->funcState, source);
 }
 
 static inline void mv_reg_null(TypeV_Core* core){
@@ -228,6 +231,7 @@ static inline void mv_global_reg_ptr(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     typev_memcpy_aligned_8(&core->globalPtr[offset], &core->regs[source]);
+    SET_REG_PTR(core->funcState, source);
 }
 
 static inline void mv_reg_global(TypeV_Core* core){
@@ -239,6 +243,7 @@ static inline void mv_reg_global(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     typev_memcpy_unaligned(&core->regs[target], &core->globalPtr[offset], byteSize);
+    CLEAR_REG_PTR(core->funcState, target);
 }
 
 static inline void mv_reg_global_ptr(TypeV_Core* core){
@@ -248,6 +253,7 @@ static inline void mv_reg_global_ptr(TypeV_Core* core){
     core->ip += 4;
 
     typev_memcpy_aligned_8(&core->regs[target], &core->globalPtr[offset]);
+    SET_REG_PTR(core->funcState, target);
 }
 
 static inline void s_alloc(TypeV_Core* core){
@@ -330,6 +336,9 @@ static inline void s_reg_field(TypeV_Core* core){
         uint8_t bitOffset = field_index % 8;     // Determine the bit position within the byte
         struct_ptr->pointerBitmask[byteIndex] |= (1 << bitOffset); // Set the bit to mark as a pointer
     }
+
+    SET_REG_PTR(core->funcState, src_reg);
+    CLEAR_REG_PTR(core->funcState, field_index);
 }
 
 static inline void s_loadf(TypeV_Core* core){
@@ -351,6 +360,7 @@ static inline void s_loadf(TypeV_Core* core){
 
     typev_memcpy_unaligned(&core->regs[target], ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], byteSize);
     CLEAR_REG_PTR(core->funcState, target);
+    SET_REG_PTR(core->funcState, source);
 }
 
 static inline void s_loadf_ptr(TypeV_Core* core){
@@ -366,6 +376,7 @@ static inline void s_loadf_ptr(TypeV_Core* core){
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_aligned_8(&core->regs[target], ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index]);
     SET_REG_PTR(core->funcState, target);
+    SET_REG_PTR(core->funcState, source);
 }
 
 static inline void s_storef_const(TypeV_Core* core){
@@ -382,6 +393,7 @@ static inline void s_storef_const(TypeV_Core* core){
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_unaligned(((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->constPtr[offset],
                            byteSize);
+    CLEAR_REG_PTR(core->funcState, dest_reg);
 }
 
 static inline void s_storef_const_ptr(TypeV_Core* core){
@@ -397,6 +409,7 @@ static inline void s_storef_const_ptr(TypeV_Core* core){
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_unaligned_8(((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->constPtr[offset]);
+    SET_REG_PTR(core->funcState, dest_reg);
 
 }
 
@@ -415,7 +428,10 @@ static inline void s_storef_reg(TypeV_Core* core){
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     typev_memcpy_unaligned(((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->regs[source], byteSize);
+    SET_REG_PTR(core->funcState, dest_reg);
+    CLEAR_REG_PTR(core->funcState, source);
 }
+
 static inline void s_storef_reg_ptr(TypeV_Core* core){
     const uint8_t dest_reg = core->codePtr[core->ip++];
 
@@ -431,6 +447,9 @@ static inline void s_storef_reg_ptr(TypeV_Core* core){
     char* dest = ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index];
     char* src = (char*)&core->regs[source].ptr;
     typev_memcpy_aligned_8(dest, src);
+
+    SET_REG_PTR(core->funcState, dest_reg);
+    SET_REG_PTR(core->funcState, source);
 
     divine_barrier(core, (uint8_t*)struct_ptr, (uint8_t*)core->regs[source].ptr);
 }
