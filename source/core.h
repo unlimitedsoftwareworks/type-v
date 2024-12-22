@@ -10,14 +10,14 @@
 #define TYPE_V_CORE_H
 #include <stdint.h>
 #include <stdalign.h>
-
+#include <stddef.h>
 
 #define PTR_SIZE 8
 #define MAX_REG 256
 
 #undef NANO_PREALLOCATE_BAND_VM
 
-
+// TODO: Add align of to data segment to be able to read pointers and such.
 typedef struct TypeV_Struct {
     uint32_t* globalFields;      // Pointer to global fields
     uint16_t* fieldOffsets;      // Pointer to offsets
@@ -170,28 +170,6 @@ typedef struct TypeV_GlobalPool {
     #define ARCH_SUPPORTS_UNALIGNED_ACCESS 0
 #endif
 
-
-/**
- * @brief Object Types, used to identify a the underlying structure of GC allocated memory
- * object
- */
-typedef enum {
-    OT_CLASS = 0,
-    OT_STRUCT,
-    OT_ARRAY,
-    OT_CLOSURE,
-    OT_COROUTINE,
-    OT_CUSTOM_OBJECT,
-    OT_CUSTOM_COLLECTABLE_OBJECT,
-}TypeV_ObjectType;
-
-typedef struct {
-    TypeV_ObjectType type;
-    uint8_t survivedCount;
-    size_t totalSize;
-    struct TypeV_ObjectHeader* fwd;
-    uint8_t flags;
-}TypeV_ObjectHeader;
 
 /**
  * @brief A function state is an object that holds the state of a function. Since function arguments are passed

@@ -60,7 +60,7 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->regs = core->funcState->regs;
 
     // Initialize GC
-    core->gc = gc_initialize();
+    core->gc = initialize_gc();
 
 
     core->engineRef = engineRef;
@@ -99,7 +99,6 @@ void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state) {
     free(state);
 }
 
-
 uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSize) {
     LOG_INFO("CORE[%d]: Allocating struct with %d fields and %zu bytes", core->id, numFields, totalSize);
 
@@ -109,14 +108,19 @@ uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSiz
     }
 
     // Precompute sizes
-    size_t bitmaskSize = (numFields + 7) / 8;
-    size_t globalFieldsSize = (numFields) * sizeof(uint32_t);
+    size_t bitmaskSize = (numFields + 7) / 8; // Ceiling division for bitmask
+    size_t globalFieldsSize = numFields * sizeof(uint32_t);
     size_t fieldOffsetsSize = numFields * sizeof(uint16_t);
 
     // Calculate total allocation size
     size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) +
-                                 totalSize + globalFieldsSize +
-                                 fieldOffsetsSize + bitmaskSize;
+                                 globalFieldsSize + fieldOffsetsSize + bitmaskSize;
+
+    // Align size for the `data` segment
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
+
+    // Add the size of the `data` segment
+    totalAllocationSize += totalSize;
 
     // Allocate memory
     TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
@@ -124,7 +128,7 @@ uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSiz
     // Initialize object header
     header->type = OT_STRUCT;
     header->totalSize = totalAllocationSize;
-    header->survivedCount = 0;
+    header->surviveCount = 0;
 
     // Initialize TypeV_Struct
     TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
@@ -132,15 +136,20 @@ uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSiz
     struct_ptr->bitMaskSize = bitmaskSize;
 
     // Assign pointers with the new layout
-    uint8_t* base_ptr = (uint8_t*)struct_ptr+ sizeof(TypeV_Struct);
+    uint8_t* base_ptr = (uint8_t*)(struct_ptr + 1);
 
-    struct_ptr->data = (uint8_t*)(base_ptr );  // Data starts right after TypeV_Struct
-    base_ptr += totalSize;
-    struct_ptr->globalFields = (uint32_t*)(base_ptr);  // GlobalFields start after data
+    struct_ptr->globalFields = (uint32_t*)(base_ptr);  // GlobalFields start after struct
     base_ptr += globalFieldsSize;
+
     struct_ptr->fieldOffsets = (uint16_t*)(base_ptr);  // FieldOffsets start after GlobalFields
     base_ptr += fieldOffsetsSize;
+
     struct_ptr->pointerBitmask = (uint8_t*)(base_ptr);  // PointerBitmask starts after FieldOffsets
+    base_ptr += bitmaskSize;
+
+    // Align base_ptr to 8 bytes for the data segment
+    base_ptr = (uint8_t*)ALIGN_PTR(base_ptr, alignof(uint64_t));
+    struct_ptr->data = base_ptr;  // Data starts after aligned PointerBitmask
 
     static uint32_t uid = 0;
     struct_ptr->uid = uid++;
@@ -151,6 +160,7 @@ uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSiz
     // Return the pointer to the struct
     return (uintptr_t)struct_ptr;
 }
+
 
 uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_attributes, size_t total_fields_size, uint64_t classId) {
     LOG_INFO("CORE[%d]: Allocating class with %d methods, %d attributes, uid: %llu", core->id, num_methods, num_attributes, classId);
@@ -177,7 +187,7 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
     // Initialize object header
     header->type = OT_CLASS;
     header->totalSize = totalAllocationSize;
-    header->survivedCount = 0;
+    header->surviveCount = 0;
 
     // Initialize TypeV_Class structure
     TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
@@ -186,16 +196,11 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
     class_ptr->uid = classId;
 
     // Assign pointers with the new layout
-    uint8_t* base_ptr = (uint8_t*)class_ptr + sizeof(TypeV_Class);
+    uint8_t* base_ptr = (uint8_t*)(class_ptr + 1);
 
-    // Data starts immediately after the TypeV_Class structure
-    class_ptr->data = (uint8_t*)(base_ptr);
-
-    base_ptr += total_fields_size;
 
     // Methods table starts after the data block
     class_ptr->methods = (uint64_t*)base_ptr;
-
     base_ptr += methodsSize;
     // Global methods table starts after the methods table
     class_ptr->globalMethods = (uint32_t*) base_ptr;
@@ -212,6 +217,14 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
 
     // Zero out the bitmask
     memset(class_ptr->pointerBitmask, 0, bitmaskSize);
+
+    base_ptr += bitmaskSize;
+
+    // Align base_ptr to 8-byte boundary
+    base_ptr = (uint8_t*)(((uintptr_t)base_ptr + (alignof(uint64_t) - 1)) & ~(alignof(uint64_t) - 1));
+
+    // Data in the end
+    class_ptr->data = (uint8_t*)(base_ptr);
 
     // Return the pointer to the class
     return (uintptr_t)class_ptr;
@@ -559,7 +572,7 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
     // Set header information
     header->type = OT_CLOSURE;
     header->totalSize = totalAllocationSize;
-    header->survivedCount = 0;
+    header->surviveCount = 0;
 
     // Get a pointer to the actual closure, which comes after the header
     TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);

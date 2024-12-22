@@ -1,267 +1,120 @@
-#ifndef GC_H
-#define GC_H
+#ifndef TYPEV_GC_H
+#define TYPEV_GC_H
 
-#include <stddef.h>
-#include <stdbool.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
 #include "../core.h"
 
-/*** GC Configuration ***/
+/* ======================= CONSTANTS ======================= */
 
-/**
- * Size of each cell.
- */
 #define CELL_SIZE 64
-
-/**
- * Maximum number of cells in the nursery region.
- */
 #define NURSERY_MAX_CELLS 131072
-
-/**
- * Initial number of cells in the old generation region.
- * The number of cells is scaled by a factor of 2 each time the old generation is extended.
- * The factor is stored in the `capacityFactor` field of the `TypeV_OldGenerationRegion` structure.
- */
-#define INITIAL_OLD_CELLS 131072
-
-/**
- * Total cellSize of the nursery region.
- */
+#define INITIAL_OLD_CELLS 262144
 #define NURSERY_REGION_SIZE (CELL_SIZE * NURSERY_MAX_CELLS)
-
-/**
- * Initial cellSize of the old generation region.
- */
+#define NURSERY_SIZE (NURSERY_REGION_SIZE * 2)
 #define OLD_REGION_INITIAL_SIZE (CELL_SIZE * INITIAL_OLD_CELLS)
+#define PROMOTION_SURVIVAL_THRESHOLD 4
 
-/**
- * Total cellSize of the nursery region.
- * NURSERY_SIZE is the cellSize of the `from` and `to` spaces combined so to speak.
- * Each is NURSERY_REGION_SIZE.
- * Also metadata is limited to NURSERY_REGION_SIZE.
- */
-#define NURSERY_SIZE (NURSERY_REGION_SIZE*2)
+// Define GC_LOG to enable logging, or leave undefined to disable
+//#define GC_LOG
 
-#define PROMOTION_SURVIVAL_THRESHOLD 3
+#ifdef GC_LOG
+#define gc_log(fmt, ...) printf("[GC_LOG] " fmt "\n", ##__VA_ARGS__)
+#else
+#define gc_log(fmt, ...) ((void)0)
+#endif
 
-/**
- * Object Colors
- */
+/** Get the active bit for a cell in the bitmap **/
+#define GET_ACTIVE(bitmap, cell) ((bitmap[(cell) / 8] >> ((cell) % 8)) & 0x1)
+
+/* ======================= ENUMS ======================= */
+
 typedef enum {
     WHITE = 0b00,
     GRAY = 0b01,
+    NOTSU = 0b10,
     BLACK = 0b11
 } ObjectColor;
 
+/* ======================= STRUCTURES ======================= */
+
 /**
- * Nursery Region
- * Uses split space for `from` and `to` spaces.
+ * @brief Object Types, used to identify a the underlying structure of GC allocated memory
+ * object
  */
+typedef enum {
+    OT_CLASS = 0,
+    OT_STRUCT,
+    OT_ARRAY,
+    OT_CLOSURE,
+    OT_COROUTINE,
+    OT_CUSTOM_OBJECT,
+    OT_CUSTOM_COLLECTABLE_OBJECT,
+}TypeV_ObjectType;
+
+typedef struct TypeV_ObjectHeader {
+    TypeV_ObjectType type;
+    ObjectColor color;           // Tri-color marking
+    size_t totalSize;            // Object size in bytes
+    size_t surviveCount;         // GC survival counter
+    struct TypeV_ObjectHeader* fwd;    // Forwarding pointer for GC
+    uint8_t location;            // 0 for nursery, 1 for old region
+    uint32_t uid;                // Unique ID for debugging
+}TypeV_ObjectHeader;
+
 typedef struct TypeV_NurseryRegion {
-    /**
-     * Bitmap for the color of each cell in the nursery region.
-     * Each cell is represented by 2 bits.
-     */
-    uint8_t color_bitmap[(NURSERY_MAX_CELLS * 2) / 8];
-
-    /**
-     * Bitmap for the active status of each cell in the nursery region.
-     * Each cell is represented by 1 bit.
-     */
-    uint8_t active_bitmap[NURSERY_MAX_CELLS / 8];
-
-    /**
-     * The current cellSize of the nursery region in cells.
-     */
-    size_t cellSize;
-
-    /**
-     * The base address of the `from` space.
-     */
-    uint8_t* from; // always storing in from, will be swapped with `to` later on
-
-    /**
-     * The base address of the `to` space.
-     */
-    uint8_t* to;
-
-    /**
-     * The total cellSize of the nursery region in cells.
-     */
-    uint8_t* data;
+    uint8_t* active_bitmap;      // Bitmap for active cells
+    size_t cell_size;            // Total allocated cells
+    uint8_t* from;               // From-space pointer
+    uint8_t* to;                 // To-space pointer
+    uint8_t* data;               // Combined from/to space
 } TypeV_NurseryRegion;
 
-/**
- * Older generation,
- * objects are promote here after surviving PROMOTION_SURVIVAL_THRESHOLD
- */
 typedef struct TypeV_OldGenerationRegion {
-    /**
-     * Bitmap for the color of each cell in the old generation region.
-     * 2 bits per cell
-     * Initial size (INITIAL_OLD_CELLS * 2) / 8
-     */
-    uint8_t* color_bitmap;
-
-    /**
-     * Bitmap for the active status of each cell in the old generation region.
-     * 1 bit per cell
-     * Initial size INITIAL_OLD_CELLS / 8
-     */
-    uint8_t* active_bitmap;
-
-    /**
-     * Occupied cellSize of the region
-     */
-    size_t cellSize;
-
-    /**
-     * Data Segment
-     */
-    uint8_t* data;
-
-    /**
-     * Capacity Factor, multiplied by 2 each time the old generation is extended
-     * default = 1
-     */
-    size_t capacityFactor;
+    uint8_t* active_bitmap;      // Bitmap for active cells
+    uint8_t* dirty_bitmap;       // Bitmap for dirty cells
+    size_t cell_size;            // Total allocated cells
+    uint8_t* data;               // Old generation data
+    size_t capacity_factor;      // Capacity scaling factor
+    uint8_t* from;               // From-space pointer (downwards)
+    uint8_t* to;                 // To-space pointer (upwards)
+    int8_t direction;               // Direction indicator: 1 for downwards, -1 for upwards
 } TypeV_OldGenerationRegion;
 
-/**
- * Update Promise, when marking, each object that is marked will have to register
- * a pointer to its new address, so that it can be updated after the minor GC.
- * This feature hasn't been studied yet, because size of the array is not predetermined.
- */
-typedef struct TypeV_UpdatePromise {
-    uintptr_t old_address;
-    /**
-     * Pointer to the new address, so that *new_address_pointer = new_address
-     */
-    void** new_address_pointer;
-} TypeV_UpdatePromise;
-
-/**
- * Garbage Collector struct, part of the core
- */
 typedef struct TypeV_GC {
-    /**
-     * Nursery Region
-     */
-    TypeV_NurseryRegion* nurseryRegion;
+    TypeV_NurseryRegion nursery;  // Nursery region for young objects
+    TypeV_OldGenerationRegion oldRegion; // Old generation region
+} TypeV_GC;
 
-    /**
-     * Old Generation Region
-     */
-    TypeV_OldGenerationRegion* oldRegion;
-
-    /**
-     * Amount of minor GCs performed, since last major GC
-     */
-    uint32_t minorGCCount;
-}TypeV_GC;
+/* ======================= FUNCTION DECLARATIONS ======================= */
 
 
-// Macros for accessing color_bitmap
-//#define GET_COLOR(bitmap, cell) ((bitmap[(cell) / 4] >> (((cell) % 4) * 2)) & 0x3)
+/** Initialize the GC */
+TypeV_GC* initialize_gc(void);
 
-/*#define SET_COLOR(bitmap, cell, color) do { \
-    uint8_t mask = 0x3 << (((cell) % 4) * 2); \
-    bitmap[(cell) / 4] = (bitmap[(cell) / 4] & ~mask) | (((color) & 0x3) << (((cell) % 4) * 2)); \
-} while (0)*/
+/** Allocate memory using the GC */
+void* gc_alloc(TypeV_Core* core, size_t size);
 
-static inline uint8_t gc_get_color(uint8_t* bitmap, size_t index) {
-    size_t byte = index / 4;
-    uint8_t shift = (index % 4) * 2;
-    return (bitmap[byte] >> shift) & 0x3;
-}
+/** Perform a minor mark phase */
+void perform_minor_mark(TypeV_Core* core);
 
-static inline void gc_set_color(uint8_t* bitmap, size_t index, uint8_t color) {
-    size_t byte = index / 4;
-    uint8_t shift = (index % 4) * 2;
-    bitmap[byte] = (bitmap[byte] & ~(0x3 << shift)) | (color << shift);
-}
+/** Perform a major mark phase */
+void perform_major_mark(TypeV_Core* core);
 
-static inline bool gc_get_active(uint8_t* bitmap, size_t index) {
-    size_t byte = index / 8;
-    uint8_t shift = index % 8;
-    return (bitmap[byte] >> shift) & 0x1;
-}
+/** Perform a minor garbage collection */
+void perform_minor_gc(TypeV_Core* core);
 
-static inline void gc_set_active(uint8_t* bitmap, size_t index, bool active) {
-    size_t byte = index / 8;
-    uint8_t shift = index % 8;
-    bitmap[byte] |= (1 << shift);
-}
+/** Perform a major garbage collection */
+void perform_major_gc(TypeV_Core* core);
 
-static inline void gc_clear_active(uint8_t* bitmap, size_t index) {
-    size_t byte = index / 8;
-    uint8_t shift = index % 8;
-    bitmap[byte] &= ~(1 << shift);
-}
+/** Cleanup all GC resources */
+void cleanup_gc(TypeV_Core* core);
 
-static inline void gc_update_object_pointers(TypeV_Core* core, TypeV_ObjectHeader* old, TypeV_ObjectHeader* new_) {
-    if(old->fwd) {
-        return;
-    }
+void write_barrier(TypeV_Core* core, TypeV_ObjectHeader* old_obj, TypeV_ObjectHeader* new_obj);
 
-    old->fwd = new_;
-}
 
-static inline TypeV_ObjectHeader* gc_get_new_ptr_location(TypeV_Core* core, TypeV_ObjectHeader* old) {
-    TypeV_ObjectHeader* new_ = old->fwd;
-    //old->fwd = NULL;
-    return new_;
-}
-
-/**
- * Initializes the GC system
- * @return
- */
-TypeV_GC* gc_initialize();
-
-/**
- * Creates a new nursery region
- * @return
- */
-TypeV_NurseryRegion* gc_create_nursery();
-
-/**
- * Creates a new old generation region
- * @return
- */
-TypeV_OldGenerationRegion* gc_create_old_generation();
-
-/**
- * Allocates memory in the nursery region, with the given cellSize
- * if it exceeds the nursery cellSize, it will trigger a minor GC.
- * if minor GC fails, it will trigger a major GC.
- * @param core
- * @param size
- * @return
- */
-TypeV_ObjectHeader* gc_alloc(TypeV_Core* core, size_t size);
-
-/**
- * Performs a minor GC
- * @param core
- */
-void gc_minor_gc(TypeV_Core* core);
-
-/**
- * Runs after minor GC to check if the old generation needs to be extended
- * @param core
- */
-void gc_extend_old(TypeV_Core* core);
-
-/**
- * Debugs the nursery.
- * Current cellSize is not debuggable, so it will need to be decreased to a managable cellSize
- * i.e 32/64 cells.
- * @param gc
- */
-void gc_debug_nursery(TypeV_GC* gc);
-
-#endif // GC_H
+#endif // TYPEV_GC_H
