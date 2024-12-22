@@ -378,11 +378,6 @@ typedef enum TypeV_OpCode {
     OP_ADD_F32,
     OP_ADD_F64,
 
-    OP_ADD_PTR_U8,
-    OP_ADD_PTR_U16,
-    OP_ADD_PTR_U32,
-    OP_ADD_PTR_U64,
-
     OP_SUB_I8,
     OP_SUB_U8,
     OP_SUB_I16,
@@ -393,11 +388,6 @@ typedef enum TypeV_OpCode {
     OP_SUB_U64,
     OP_SUB_F32,
     OP_SUB_F64,
-
-    OP_SUB_PTR_U8,
-    OP_SUB_PTR_U16,
-    OP_SUB_PTR_U32,
-    OP_SUB_PTR_U64,
 
     OP_MUL_I8,
     OP_MUL_U8,

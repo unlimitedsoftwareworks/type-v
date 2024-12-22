@@ -207,10 +207,6 @@ static void* dispatch_table[] = { \
     &&DO_ADD_U64, \
     &&DO_ADD_F32, \
     &&DO_ADD_F64, \
-    &&DO_ADD_PTR_U8, \
-    &&DO_ADD_PTR_U16, \
-    &&DO_ADD_PTR_U32, \
-    &&DO_ADD_PTR_U64, \
     &&DO_SUB_I8, \
     &&DO_SUB_U8, \
     &&DO_SUB_I16, \
@@ -221,10 +217,6 @@ static void* dispatch_table[] = { \
     &&DO_SUB_U64, \
     &&DO_SUB_F32, \
     &&DO_SUB_F64, \
-    &&DO_SUB_PTR_U8, \
-    &&DO_SUB_PTR_U16, \
-    &&DO_SUB_PTR_U32, \
-    &&DO_SUB_PTR_U64, \
     &&DO_MUL_I8, \
     &&DO_MUL_U8, \
     &&DO_MUL_I16, \
@@ -620,18 +612,6 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DO_ADD_F64:
         add_f64(core);
         DISPATCH();
-        DO_ADD_PTR_U8:
-        add_ptr_u8(core);
-        DISPATCH();
-        DO_ADD_PTR_U16:
-        add_ptr_u16(core);
-        DISPATCH();
-        DO_ADD_PTR_U32:
-        add_ptr_u32(core);
-        DISPATCH();
-        DO_ADD_PTR_U64:
-        add_ptr_u64(core);
-        DISPATCH();
         DO_SUB_I8:
         sub_i8(core);
         DISPATCH();
@@ -661,18 +641,6 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DISPATCH();
         DO_SUB_F64:
         sub_f64(core);
-        DISPATCH();
-        DO_SUB_PTR_U8:
-        sub_ptr_u8(core);
-        DISPATCH();
-        DO_SUB_PTR_U16:
-        sub_ptr_u16(core);
-        DISPATCH();
-        DO_SUB_PTR_U32:
-        sub_ptr_u32(core);
-        DISPATCH();
-        DO_SUB_PTR_U64:
-        sub_ptr_u64(core);
         DISPATCH();
         DO_MUL_I8:
         mul_i8(core);
