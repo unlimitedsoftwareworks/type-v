@@ -40,36 +40,9 @@ void perform_minor_mark(TypeV_Core* core) {
 
     mark_state(core, core->funcState);
 
-    // Step 2: Traverse the old region
-
-    if(gc->oldRegion.direction == 1) {
-        uint64_t index = 0;
-        while (index < gc->oldRegion.cell_size) {
-            TypeV_ObjectHeader* obj = (TypeV_ObjectHeader *)(gc->oldRegion.from + index * CELL_SIZE);
-            size_t cellSize = (obj->totalSize + CELL_SIZE - 1) / CELL_SIZE;
-
-            // check if the area is dirty
-            if(GET_ACTIVE(gc->oldRegion.dirty_bitmap, index)) {
-                mark_object(core, obj);
-            }
-
-            index += cellSize;
-        }
-    }
-    else {
-        // we will start from the middle downwards here, so we will use
-        // reverse cell indexing
-        uint64_t index = gc->oldRegion.cell_size;
-        while (index != 0) {
-            TypeV_ObjectHeader* obj = (TypeV_ObjectHeader *)(gc->oldRegion.to - index * CELL_SIZE);
-            size_t cellSize = (obj->totalSize + CELL_SIZE - 1) / CELL_SIZE;
-
-            if(GET_ACTIVE(gc->oldRegion.dirty_bitmap, index)) {
-                mark_object(core, obj);
-            }
-
-            index -= cellSize;
-        }
+    // mark the remembered set
+    for (size_t i = 0; i < gc->rs.size; i++) {
+        mark_object(core, gc->rs.set[i]);
     }
 
     gc_log("perform_minor_mark: Completed minor mark phase");

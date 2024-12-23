@@ -76,7 +76,6 @@ typedef struct TypeV_NurseryRegion {
 
 typedef struct TypeV_OldGenerationRegion {
     uint8_t* active_bitmap;      // Bitmap for active cells
-    uint8_t* dirty_bitmap;       // Bitmap for dirty cells
     size_t cell_size;            // Total allocated cells
     uint8_t* data;               // Old generation data
     size_t capacity_factor;      // Capacity scaling factor
@@ -85,9 +84,16 @@ typedef struct TypeV_OldGenerationRegion {
     int8_t direction;               // Direction indicator: 1 for downwards, -1 for upwards
 } TypeV_OldGenerationRegion;
 
+typedef struct TypeV_RememberedSet {
+    size_t capacity;
+    size_t size;
+    TypeV_ObjectHeader** set;
+} TypeV_RememberedSet;
+
 typedef struct TypeV_GC {
     TypeV_NurseryRegion nursery;  // Nursery region for young objects
     TypeV_OldGenerationRegion oldRegion; // Old generation region
+    TypeV_RememberedSet rs;
 } TypeV_GC;
 
 /* ======================= FUNCTION DECLARATIONS ======================= */
@@ -115,6 +121,8 @@ void perform_major_gc(TypeV_Core* core);
 void cleanup_gc(TypeV_Core* core);
 
 void write_barrier(TypeV_Core* core, TypeV_ObjectHeader* old_obj, TypeV_ObjectHeader* new_obj);
+
+void add_to_remembered_set(TypeV_Core* core, TypeV_ObjectHeader* obj);
 
 
 #endif // TYPEV_GC_H

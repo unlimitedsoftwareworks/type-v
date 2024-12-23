@@ -17,10 +17,13 @@ TypeV_GC* initialize_gc() {
     gc->oldRegion.cell_size = 0;
     gc->oldRegion.data = (uint8_t*)aligned_alloc(8, OLD_REGION_INITIAL_SIZE);
     gc->oldRegion.active_bitmap = (uint8_t*)calloc(INITIAL_OLD_CELLS / 8, sizeof(uint8_t));
-    gc->oldRegion.dirty_bitmap = (uint8_t*)calloc(INITIAL_OLD_CELLS / 8, sizeof(uint8_t)); // Initialize dirty bitmap
     gc->oldRegion.from = gc->oldRegion.data;
     gc->oldRegion.to = gc->oldRegion.data + OLD_REGION_INITIAL_SIZE;
     gc->oldRegion.direction = 1; // Start with downwards direction
+
+    gc->rs.size = 0;
+    gc->rs.capacity = 1024;
+    gc->rs.set = (TypeV_ObjectHeader**)malloc(gc->rs.capacity * sizeof(TypeV_ObjectHeader*));
 
     gc_log("initialize_gc: GC initialized");
 
@@ -92,6 +95,13 @@ void perform_minor_gc(TypeV_Core* core) {
 
     size_t nursery_cell_size = 0;
 
+
+    for(uint64_t k = 0; k < gc->rs.size; k++) {
+        gc->rs.set[k]->color = BLACK;
+        gc->rs.set[k]->surviveCount = 5;
+    }
+    gc->rs.size = 0;
+
     while (i < gc->nursery.cell_size) {
         TypeV_ObjectHeader* obj = (TypeV_ObjectHeader *)(gc->nursery.from + i * CELL_SIZE);
         size_t cellSize = (obj->totalSize + CELL_SIZE - 1) / CELL_SIZE;
@@ -141,6 +151,7 @@ void perform_minor_gc(TypeV_Core* core) {
 
     gc->nursery.cell_size = nursery_cell_size;
     gc->oldRegion.cell_size = (gc->oldRegion.direction == 1 ? position_in_old - gc->oldRegion.from : gc->oldRegion.to - (position_in_old)) / CELL_SIZE;
+
 
     update_root_references(core);
 
@@ -198,12 +209,6 @@ void perform_major_gc(TypeV_Core* core) {
                 obj->fwd = new_location;
                 new_location->fwd = NULL;
 
-                // Inherit dirty bit for the first cell
-                if (GET_ACTIVE(gc->oldRegion.dirty_bitmap, i)) {
-                    size_t new_index = new_cell_size - cellSize;
-                    new_dirty_bitmap[new_index / 8] |= (1 << (new_index % 8));
-                    gc_log("Dirty bit inherited from old index %zu to new index %zu", i, new_index);
-                }
             } else {
                 gc_log("Freeing unmarked old object: %d\n", obj->uid);
             }
@@ -223,14 +228,6 @@ void perform_major_gc(TypeV_Core* core) {
                 memcpy(new_location, obj, cellSize * CELL_SIZE);
                 obj->fwd = new_location;
                 new_location->fwd = NULL;
-
-                // Inherit dirty bit for the first cell
-                if (GET_ACTIVE(gc->oldRegion.dirty_bitmap, i)) {
-                    size_t new_index = new_cell_size;
-                    new_dirty_bitmap[new_index / 8] |= (1 << (new_index % 8));
-                    gc_log("Dirty bit inherited from old index %zu to new index %zu", i, new_index);
-                }
-
                 new_cell_size += cellSize;
             } else {
                 gc_log("Freeing unmarked old object: %d\n", obj->uid);
@@ -244,8 +241,6 @@ void perform_major_gc(TypeV_Core* core) {
     gc->oldRegion.from = from;
     gc->oldRegion.to = to;
 
-    free(gc->oldRegion.dirty_bitmap);
-    gc->oldRegion.dirty_bitmap = new_dirty_bitmap;
     gc->oldRegion.direction = -gc->oldRegion.direction;
 
     // must update references here before we free (potentially) old buffer
@@ -267,14 +262,7 @@ void perform_major_gc(TypeV_Core* core) {
 void write_barrier(TypeV_Core* core, TypeV_ObjectHeader* old_obj, TypeV_ObjectHeader* new_obj) {
     TypeV_GC* gc = core->gc;
     if (old_obj->location == 1 && new_obj->location == 0) {
-        size_t index;
-        if(gc->oldRegion.direction == 1) {
-            index = ((uint8_t *) old_obj - gc->oldRegion.from) / CELL_SIZE;
-        }
-        else {
-            index = (gc->oldRegion.to - (uint8_t *) old_obj) / CELL_SIZE;
-        }
-        gc->oldRegion.dirty_bitmap[index / 8] |= (1 << (index % 8));
+        add_to_remembered_set(core, new_obj);
     }
 }
 
@@ -284,5 +272,16 @@ void cleanup_gc(TypeV_Core* core) {
     free(gc->nursery.active_bitmap);
     free(gc->oldRegion.data);
     free(gc->oldRegion.active_bitmap);
-    free(gc->oldRegion.dirty_bitmap); // Free the dirty bitmap
+    free(gc->rs.set);
+}
+
+
+void add_to_remembered_set(TypeV_Core* core, TypeV_ObjectHeader* obj) {
+    TypeV_GC* gc = core->gc;
+    if (gc->rs.size >= gc->rs.capacity) {
+        gc->rs.capacity *= 2;
+        gc->rs.set = (TypeV_ObjectHeader**)realloc(gc->rs.set, gc->rs.capacity * sizeof(TypeV_ObjectHeader*));
+    }
+
+    gc->rs.set[gc->rs.size++] = obj;
 }
