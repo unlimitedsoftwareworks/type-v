@@ -9,10 +9,7 @@
 // Choosing a prime number, hoping for good results
 #define QCGC_HBTABLE_BUCKETS 61
 
-struct hbtable_s {
-	bool mark_flag_ref;
-	hbbucket_t *bucket[QCGC_HBTABLE_BUCKETS];
-} qcgc_hbtable;
+extern struct hbtable_s qcgc_hbtable;
 
 void qcgc_hbtable_initialize(void);
 void qcgc_hbtable_destroy(void);

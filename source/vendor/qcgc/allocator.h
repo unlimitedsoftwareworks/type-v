@@ -38,14 +38,17 @@
 
 #define QCGC_SMALL_FREE_LISTS ((1<<QCGC_LARGE_FREE_LIST_FIRST_EXP) - 1)
 
-struct qcgc_allocator_state {
-	arena_bag_t *arenas;
-	arena_bag_t *free_arenas;
-	struct fit_state {
-		linear_free_list_t *small_free_list[QCGC_SMALL_FREE_LISTS];
-		exp_free_list_t *large_free_list[QCGC_LARGE_FREE_LISTS];
-	} fit_state;
-} qcgc_allocator_state;
+typedef struct qcgc_allocator_state {
+
+    arena_bag_t *arenas;
+    arena_bag_t *free_arenas;
+    struct fit_state {
+        linear_free_list_t *small_free_list[QCGC_SMALL_FREE_LISTS];
+        exp_free_list_t *large_free_list[QCGC_LARGE_FREE_LISTS];
+    } fit_state;
+} qcgc_allocator_state_t;
+
+extern qcgc_allocator_state_t qcgc_allocator_state;
 
 /**
  * Initialize allocator
@@ -84,17 +87,17 @@ void qcgc_fit_allocator_add(cell_t *ptr, size_t cells);
  * Reset bump pointer
  */
 QCGC_STATIC QCGC_INLINE void qcgc_reset_bump_ptr(void) {
-	if (_qcgc_bump_allocator.end > _qcgc_bump_allocator.ptr) {
-		qcgc_arena_set_blocktype(
-				qcgc_arena_addr(_qcgc_bump_allocator.ptr),
-				qcgc_arena_cell_index(
-					_qcgc_bump_allocator.ptr),
-				BLOCK_FREE);
-		qcgc_fit_allocator_add(_qcgc_bump_allocator.ptr,
-				_qcgc_bump_allocator.end - _qcgc_bump_allocator.ptr);
-	}
-	_qcgc_bump_allocator.ptr = NULL;
-	_qcgc_bump_allocator.end = NULL;
+    if (_qcgc_bump_allocator.end > _qcgc_bump_allocator.ptr) {
+        qcgc_arena_set_blocktype(
+                qcgc_arena_addr(_qcgc_bump_allocator.ptr),
+                qcgc_arena_cell_index(
+                        _qcgc_bump_allocator.ptr),
+                BLOCK_FREE);
+        qcgc_fit_allocator_add(_qcgc_bump_allocator.ptr,
+                               _qcgc_bump_allocator.end - _qcgc_bump_allocator.ptr);
+    }
+    _qcgc_bump_allocator.ptr = NULL;
+    _qcgc_bump_allocator.end = NULL;
 }
 
 /**

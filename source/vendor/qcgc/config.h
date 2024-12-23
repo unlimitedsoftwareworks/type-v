@@ -1,18 +1,18 @@
 #pragma once
 
-#define CHECKED 1							// Enable runtime sanity checks
-#define DEBUG_ZERO_ON_SWEEP 0				// Zero memory on sweep (debug only)
+//#define CHECKED 1							// Enable runtime sanity checks
+//#define DEBUG_ZERO_ON_SWEEP 0				// Zero memory on sweep (debug only)
 
-#define QCGC_INIT_ZERO 1					// Init new objects with zero bytes
+//#define QCGC_INIT_ZERO 1					// Init new objects with zero bytes
 
 /**
  * Event logger
  */
-#define EVENT_LOG 0							// Enable event log
-#define LOGFILE "./qcgc_events.log"			// Default logfile
-#define LOG_ALLOCATION 1					// Enable allocation log
-#define LOG_DUMP_FREELIST_STATS 1			// Dump freelist stats
-#define LOG_ALLOCATOR_SWITCH 1				// Log allocator switches
+//#define EVENT_LOG 0							// Enable event log
+//#define LOGFILE "./qcgc_events.log"			// Default logfile
+//#define LOG_ALLOCATION 0					// Enable allocation log
+//#define LOG_DUMP_FREELIST_STATS 1			// Dump freelist stats
+//#define LOG_ALLOCATOR_SWITCH 1				// Log allocator switches
 
 #define QCGC_SHADOWSTACK_SIZE 163840		// Total shadowstack size
 #define QCGC_ARENA_BAG_INIT_SIZE 16			// Initial size of the arena bag
