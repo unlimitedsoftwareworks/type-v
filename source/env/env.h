@@ -11,6 +11,7 @@
 
 #include "../platform/platform.h"
 #include "../dynlib/dynlib.h"
+#include <stdint.h>
 
 typedef struct {
     char* file;
