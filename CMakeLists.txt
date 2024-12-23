@@ -4,7 +4,7 @@ project(typev C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -funroll-loops -finline-functions")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -funroll-loops -finline-functions")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -funroll-loops -finline-functions")
 
@@ -40,8 +40,6 @@ add_subdirectory(stdmath)
 add_library(typev_static STATIC
         source/core.c
         source/core.h
-        source/gc/gc.c
-        source/gc/gc.h
         source/engine.c
         source/engine.h
         source/instructions/instructions.c
@@ -69,6 +67,16 @@ add_library(typev_static STATIC
         source/gc/mark.h
         source/errors/errors.c
         source/errors/errors.h
+        source/vendor/qcgc/allocator.c
+        source/vendor/qcgc/arena.c
+        source/vendor/qcgc/bag.c
+        source/vendor/qcgc/collector.c
+        source/vendor/qcgc/event_logger.c
+        source/vendor/qcgc/hugeblocktable.c
+        source/vendor/qcgc/object_stack.c
+        source/vendor/qcgc/weakref.c
+        source/vendor/qcgc/signal_handler.c
+        source/vendor/qcgc/qcgc.c
 )
 
 # Your executable target

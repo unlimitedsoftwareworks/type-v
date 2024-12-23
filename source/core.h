@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdalign.h>
 #include <stddef.h>
+#include "./vendor/qcgc/qcgc.h"
 
 #define PTR_SIZE 8
 #define MAX_REG 256
@@ -19,6 +20,7 @@
 
 // TODO: Add align of to data segment to be able to read pointers and such.
 typedef struct TypeV_Struct {
+    object_t header;
     uint32_t* globalFields;      // Pointer to global fields
     uint16_t* fieldOffsets;      // Pointer to offsets
     uint8_t* pointerBitmask;     // Pointer to bitmask (8 bytes on 64-bit systems)
@@ -29,8 +31,8 @@ typedef struct TypeV_Struct {
 } TypeV_Struct;
 
 
-/*
 typedef struct TypeV_Class {
+    object_t header;
     uint64_t* methods;        // Pointer to method table, 8-byte alignment
     uint32_t* globalMethods;  // Pointer to global methods table, 8-byte alignment
     uint16_t* fieldOffsets;   // Pointer to field offsets table, 8-byte alignment (since it is a pointer)
@@ -41,20 +43,9 @@ typedef struct TypeV_Class {
     uint8_t numFields;        // Number of fields, 1-byte alignment
     uint8_t* data;            // Pointer to data block, placed last for alignment simplicity
 } TypeV_Class;
-*/
-typedef struct TypeV_Class {
-    uint64_t* methods;        // 8 bytes, 8-byte alignment
-    uint32_t* globalMethods;  // 8 bytes, 8-byte alignment
-    uint16_t* fieldOffsets;   // 8 bytes, 8-byte alignment
-    uint8_t* pointerBitmask;  // 8 bytes, 8-byte alignment
-    size_t bitMaskSize;       // 8 bytes, 8-byte alignment
-    uint64_t uid;             // 8 bytes, 8-byte alignment
-    uint16_t numMethods;      // 2 bytes, 2-byte alignment
-    uint8_t numFields;        // 1 byte, 1-byte alignment
-    uint8_t* data;            // 8 bytes, 8-byte alignment (last for simplicity)
-} TypeV_Class;
 
 typedef struct TypeV_Array {
+    object_t header;
     uint64_t length;          ///< Array length
     uint32_t uid;
     uint8_t isPointerContainer;
@@ -210,6 +201,7 @@ typedef struct TypeV_FuncState {
  * @brief Closure, a closure is a function that has captured its environment.
  */
 typedef struct TypeV_Closure {
+    object_t header;
     TypeV_Register* upvalues; ///< Captured registers
     uint8_t* ptrFields;       ///< Pointer fields bitmap
     uintptr_t fnAddress;      ///< Function address
@@ -231,6 +223,7 @@ typedef enum TypeV_CoroutineExecState {
  * @brief Coroutine, a coroutine is a function that can be paused and resumed.
  */
 typedef struct TypeV_Coroutine {
+    object_t header;
     // A coroutine persists the state of the function
     TypeV_FuncState* state;
     TypeV_Closure* closure;

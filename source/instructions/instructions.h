@@ -16,7 +16,6 @@
 #include "./opcodes.h"
 
 #include "../stack/stack.h"
-#include "../gc/gc.h"
 #include "instructions.h"
 #include "../core.h"
 #include "../utils/utils.h"
@@ -119,12 +118,13 @@ static inline uint64_t typev_memcpy_u64(const unsigned char *s, size_t size) {
     return dest;
 }
 
-static inline void divine_barrier(TypeV_Core* core, uint8_t* big, uint8_t* small) {
-    TypeV_ObjectHeader* big_obj = (TypeV_ObjectHeader*)(big - sizeof(TypeV_ObjectHeader));
-    TypeV_ObjectHeader* small_obj = (TypeV_ObjectHeader*)(small - sizeof(TypeV_ObjectHeader));
+static inline void write_barrier(object_t* object_being_modified) {
+    if (object_being_modified == NULL) return;
 
-    write_barrier(core, big_obj, small_obj);
+    // Apply the write barrier
+    qcgc_write(object_being_modified);
 }
+
 
 static inline void mv_reg_reg(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
@@ -446,12 +446,13 @@ static inline void s_storef_reg_ptr(TypeV_Core* core){
     uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
     char* dest = ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index];
     char* src = (char*)&core->regs[source].ptr;
+
+    write_barrier((object_t*)struct_ptr);
+
     typev_memcpy_aligned_8(dest, src);
 
     SET_REG_PTR(core->funcState, dest_reg);
     SET_REG_PTR(core->funcState, source);
-
-    divine_barrier(core, (uint8_t*)struct_ptr, (uint8_t*)core->regs[source].ptr);
 }
 
 static inline void c_alloc(TypeV_Core* core){
@@ -623,10 +624,8 @@ static inline void c_storef_reg_ptr(TypeV_Core* core){
 
     TypeV_Class* c = (TypeV_Class*)core->regs[class_reg].ptr;
     size_t field_offset = c->fieldOffsets[fieldIndex];
+    write_barrier((object_t*)c);
     typev_memcpy_aligned_8(c->data + field_offset, &core->regs[source].ptr);
-
-
-    divine_barrier(core, (uint8_t*)c, (uint8_t*)core->regs[source].ptr);
 }
 
 static inline void c_storef_const(TypeV_Core* core) {
@@ -818,10 +817,8 @@ static inline void a_storef_reg_ptr(TypeV_Core* core){
     if(core->regs[index].u64 >= array->length) {
         core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
     }
+    write_barrier((object_t*)array);
     typev_memcpy_aligned_8(array->data + (core->regs[index].u64 * array->elementSize), &core->regs[source].ptr);
-
-
-    divine_barrier(core, (uint8_t*)array, (uint8_t*)core->regs[source].ptr);
 }
 
 
@@ -856,8 +853,8 @@ static inline void a_rstoref_reg_ptr(TypeV_Core* core){
     if(core->regs[index].u64 > array->length) {
         core_panic(core, RT_ERROR_OUT_OF_BOUNDS, "Index out of bounds %d >= %d", core->regs[index].u64, array->length);
     }
+    write_barrier((object_t*)array);
     typev_memcpy_aligned_8(array->data + ((array->length - idx) * array->elementSize), &core->regs[source]);
-    divine_barrier(core, (uint8_t*)array, (uint8_t*)core->regs[source].ptr);
 }
 
 static inline void a_storef_const(TypeV_Core* core){

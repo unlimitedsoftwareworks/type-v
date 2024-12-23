@@ -10,7 +10,6 @@ set(stdfs_files
 
 set(typev_files
         ../source/core.c
-        ../source/gc/gc.c
         ../source/gc/mark.c
         ../source/stack/stack.c
         ../source/dynlib/dynlib.c
@@ -18,6 +17,16 @@ set(typev_files
         ../source/api/typev_api.c
         ../source/utils/utils.c
         ../source/errors/errors.c
+        ../source/vendor/qcgc/allocator.c
+        ../source/vendor/qcgc/arena.c
+        ../source/vendor/qcgc/bag.c
+        ../source/vendor/qcgc/collector.c
+        ../source/vendor/qcgc/event_logger.c
+        ../source/vendor/qcgc/hugeblocktable.c
+        ../source/vendor/qcgc/object_stack.c
+        ../source/vendor/qcgc/weakref.c
+        ../source/vendor/qcgc/signal_handler.c
+        ../source/vendor/qcgc/qcgc.c
 )
 
 

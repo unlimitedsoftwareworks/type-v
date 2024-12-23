@@ -9,13 +9,14 @@
 #include <stdalign.h>
 
 #include "stack/stack.h"
-#include "gc/gc.h"
+#include "vendor/qcgc/qcgc.h"
 #include "engine.h"
 #include "core.h"
 #include "utils/log.h"
 #include "dynlib/dynlib.h"
 #include "utils/utils.h"
 #include "errors/errors.h"
+#include "gc/mark.h"
 
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     TypeV_FuncState* state = malloc(sizeof(TypeV_FuncState));
@@ -60,8 +61,10 @@ void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef) {
     core->regs = core->funcState->regs;
 
     // Initialize GC
-    core->gc = initialize_gc();
 
+    // Initialize the garbage collector
+    qcgc_initialize();
+    qcgc_set_root_callback(push_roots_callback, core);
 
     core->engineRef = engineRef;
     core->lastSignal = CSIG_NONE;
@@ -113,7 +116,7 @@ uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSiz
     size_t fieldOffsetsSize = numFields * sizeof(uint16_t);
 
     // Calculate total allocation size
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Struct) +
+    size_t totalAllocationSize = sizeof(TypeV_Struct) +
                                  globalFieldsSize + fieldOffsetsSize + bitmaskSize;
 
     // Align size for the `data` segment
@@ -123,15 +126,12 @@ uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSiz
     totalAllocationSize += totalSize;
 
     // Allocate memory
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)qcgc_allocate(totalAllocationSize);
 
-    // Initialize object header
-    header->type = OT_STRUCT;
-    header->totalSize = totalAllocationSize;
-    header->surviveCount = 0;
+    struct_ptr->header.type = OT_STRUCT;
+    struct_ptr->header.size = totalAllocationSize;
 
     // Initialize TypeV_Struct
-    TypeV_Struct* struct_ptr = (TypeV_Struct*)(header + 1);
     struct_ptr->numFields = numFields;
     struct_ptr->bitMaskSize = bitmaskSize;
 
@@ -157,6 +157,9 @@ uintptr_t core_struct_alloc(TypeV_Core* core, uint8_t numFields, size_t totalSiz
     // Zero out the bitmask
     memset(struct_ptr->pointerBitmask, 0, bitmaskSize);
 
+    // set data to zero
+    memset(struct_ptr->data, 0, totalSize);
+
     // Return the pointer to the struct
     return (uintptr_t)struct_ptr;
 }
@@ -177,20 +180,19 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
     size_t fieldOffsetsSize = num_attributes * sizeof(uint16_t);
 
     // Calculate total allocation size
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Class) +
+    size_t totalAllocationSize = sizeof(TypeV_Class) +
                                  total_fields_size + methodsSize +
                                  globalMethodsSize + fieldOffsetsSize + bitmaskSize;
 
     // Allocate memory
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
+    TypeV_Class* class_ptr = (TypeV_Class*)qcgc_allocate(totalAllocationSize);
 
     // Initialize object header
-    header->type = OT_CLASS;
-    header->totalSize = totalAllocationSize;
-    header->surviveCount = 0;
+    class_ptr->header.type = OT_CLASS;
+    class_ptr->header.size = totalAllocationSize;
 
     // Initialize TypeV_Class structure
-    TypeV_Class* class_ptr = (TypeV_Class*)(header + 1);
+
     class_ptr->numMethods = num_methods;
     class_ptr->numFields = num_attributes;
     class_ptr->uid = classId;
@@ -236,13 +238,11 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint6
     LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of cellSize %d", core->id, num_elements, element_size);
 
     static uint32_t uid = 0;
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
-    header->type = OT_ARRAY;
-    // for arrays 0 means elements are not pointers
-    // anything else means elements are pointers
+    size_t totalAllocationSize = sizeof(TypeV_Array);
 
-    TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
+    TypeV_Array* array_ptr = (TypeV_Array*)qcgc_allocate(totalAllocationSize);
+    array_ptr->header.type = OT_ARRAY;
+
     array_ptr->elementSize = element_size;
     array_ptr->length = num_elements;
     array_ptr->data = malloc(num_elements* element_size);
@@ -259,15 +259,15 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
     LOG_INFO("Slicing array %p from %" PRIu64 " to %" PRIu64, array, start, end);
 
     size_t slice_length = end - start;
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array) + slice_length * array->elementSize;
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
-    header->type = OT_ARRAY;
+    size_t totalAllocationSize = sizeof(TypeV_Array) + slice_length * array->elementSize;
+    TypeV_Array* array_ptr = (TypeV_Array*)qcgc_allocate(totalAllocationSize);
+    array_ptr->header.type = OT_ARRAY;
+    array_ptr->header.size = totalAllocationSize;
 
-    TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
     array_ptr->elementSize = array->elementSize;
     array_ptr->length = slice_length;
     array_ptr->data = malloc(slice_length* array->elementSize);
-    array_ptr->uid = 1000000-array->uid;
+    array_ptr->uid = 0;
     array_ptr->isPointerContainer = array->isPointerContainer;
 
     memcpy(array_ptr->data, array->data + start * array->elementSize, slice_length * array->elementSize);
@@ -501,10 +501,6 @@ void core_ffi_close(TypeV_Core* core, uintptr_t libHandle){
     ffi_dynlib_unload(lib);
 }
 
-uintptr_t core_mem_alloc(TypeV_Core* core, uintptr_t size) {
-    LOG_INFO("CORE[%d]: Allocating %d bytes", core->id, size);
-    return (uintptr_t)gc_alloc(core, size);
-}
 
 void core_resume(TypeV_Core* core) {
     core->state = CS_RUNNING;
@@ -556,7 +552,7 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
     size_t bitmaskSize = (envSize + 7) / 8;
 
     // Start calculating the total size required for allocation
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Closure);
+    size_t totalAllocationSize = sizeof(TypeV_Closure);
 
     // Align for `upvalues` (8-byte alignment)
     totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
@@ -567,15 +563,13 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
     totalAllocationSize += bitmaskSize;  // Pointer bitmask size
 
     // Allocate memory for the entire closure object
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
+    TypeV_Closure* closure_ptr = (TypeV_Closure*)qcgc_allocate(totalAllocationSize);
 
     // Set header information
-    header->type = OT_CLOSURE;
-    header->totalSize = totalAllocationSize;
-    header->surviveCount = 0;
+    closure_ptr->header.type = OT_CLOSURE;
+    closure_ptr->header.size = totalAllocationSize;
 
     // Get a pointer to the actual closure, which comes after the header
-    TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
     closure_ptr->fnAddress = fnPtr;
     closure_ptr->envCounter = 0;
     closure_ptr->offset = argsOffset;
@@ -602,12 +596,12 @@ TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t arg
 
 TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) {
     LOG_INFO("CORE[%d]: Allocating coroutine", core->id);
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Coroutine);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
+    size_t totalAllocationSize =  sizeof(TypeV_Coroutine);
+    TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)qcgc_allocate(totalAllocationSize);
 
     // Set header information
-    header->type = OT_COROUTINE;
-    TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
+    coroutine_ptr->header.type = OT_COROUTINE;
+
     // create a new function state
     coroutine_ptr->closure = closure;
     coroutine_ptr->state = core_create_function_state(core->funcState);
