@@ -170,6 +170,20 @@ void update_root_references(TypeV_Core* core) {
     gc_log("update_root_references: Completed updating references");
 }
 
+void gc_update_single_state(TypeV_Core* core, TypeV_FuncState* state) {
+    for(uint32_t i = 0; i < MAX_REG; i++) {
+        if(IS_REG_PTR(state, i) && state->regs[i].ptr) {
+            // Now, we know reg_index holds a pointer
+            uintptr_t ptr = state->regs[i].ptr;
+            if(ptr) {
+                TypeV_ObjectHeader* obj = GET_OBJ_HEADER(ptr);
+                state->regs[i].ptr = (uintptr_t)update_object_reference(core, obj);
+            }
+        }
+    }
+}
+
+
 void gc_update_state(TypeV_Core* core, TypeV_FuncState* state) {
     for(uint32_t i = 0; i < MAX_REG; i++) {
         if(IS_REG_PTR(state, i) && state->regs[i].ptr) {
@@ -228,6 +242,12 @@ void* update_object_reference(TypeV_Core* core, TypeV_ObjectHeader* obj) {
                         void* res = update_object_reference(core, fieldHeader);
                         if (res) {
                             fast_copy(struct_ptr->data + struct_ptr->fieldOffsets[i], &res);
+
+                            // if the field is in a nursery and the object is in the old region, add it to the remembered set
+                            TypeV_ObjectHeader* head = GET_OBJ_HEADER(res);
+                            if(obj->location > head->location) {
+                                add_to_remembered_set(core, head);
+                            }
                         }
                     }
                 }
@@ -254,6 +274,12 @@ void* update_object_reference(TypeV_Core* core, TypeV_ObjectHeader* obj) {
                         void* res = update_object_reference(core, fieldHeader);
                         if (res) {
                             fast_copy(class_ptr->data + class_ptr->fieldOffsets[i], &res);
+
+                            // if the field is in a nursery and the object is in the old region, add it to the remembered set
+                            TypeV_ObjectHeader* head = GET_OBJ_HEADER(res);
+                            if(obj->location > head->location) {
+                                add_to_remembered_set(core, head);
+                            }
                         }
                     }
                 }
@@ -272,6 +298,12 @@ void* update_object_reference(TypeV_Core* core, TypeV_ObjectHeader* obj) {
                         uintptr_t res = (uintptr_t) update_object_reference(core, fieldHeader);
                         if (res) {
                             fast_copy(array_ptr->data + i * array_ptr->elementSize, &res);
+
+                            // if the field is in a nursery and the object is in the old region, add it to the remembered set
+                            TypeV_ObjectHeader* head = GET_OBJ_HEADER(res);
+                            if(obj->location > head->location) {
+                                add_to_remembered_set(core, head);
+                            }
                         }
                     }
                 }
@@ -291,6 +323,11 @@ void* update_object_reference(TypeV_Core* core, TypeV_ObjectHeader* obj) {
                         void *res = update_object_reference(core, upvalueHeader);
                         if (res) {
                             closure_ptr->upvalues[i].ptr = (uintptr_t)res;
+                            // if the field is in a nursery and the object is in the old region, add it to the remembered set
+                            TypeV_ObjectHeader* head = GET_OBJ_HEADER(res);
+                            if(obj->location > head->location) {
+                                add_to_remembered_set(core, head);
+                            }
                         }
                     }
                 }
@@ -302,7 +339,7 @@ void* update_object_reference(TypeV_Core* core, TypeV_ObjectHeader* obj) {
             TypeV_ObjectHeader* closureHeader = (TypeV_ObjectHeader*)(coroutine_ptr->closure - sizeof(TypeV_ObjectHeader));
 
             coroutine_ptr->closure = update_object_reference(core, closureHeader);
-            gc_update_state(core, coroutine_ptr->state);
+            gc_update_single_state(core, coroutine_ptr->state);
             break;
         }
         case OT_CUSTOM_OBJECT: {

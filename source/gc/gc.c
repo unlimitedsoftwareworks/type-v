@@ -282,6 +282,5 @@ void add_to_remembered_set(TypeV_Core* core, TypeV_ObjectHeader* obj) {
         gc->rs.capacity *= 2;
         gc->rs.set = (TypeV_ObjectHeader**)realloc(gc->rs.set, gc->rs.capacity * sizeof(TypeV_ObjectHeader*));
     }
-
     gc->rs.set[gc->rs.size++] = obj;
 }
