@@ -252,12 +252,9 @@ void perform_major_gc(TypeV_Core* core) {
         gc->oldRegion.data = new_buffer;
     }
 
-
-
     gc_log("MAJOR_END (%d/%d, %d/%d)\n", gc->nursery.cell_size, NURSERY_MAX_CELLS, gc->oldRegion.cell_size, INITIAL_OLD_CELLS*gc->oldRegion.capacity_factor);
     gc_log("perform_major_gc: Completed major GC");
 }
-
 
 void write_barrier(TypeV_Core* core, TypeV_ObjectHeader* old_obj, TypeV_ObjectHeader* new_obj) {
     TypeV_GC* gc = core->gc;

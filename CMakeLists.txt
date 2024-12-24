@@ -78,8 +78,17 @@ add_executable(typev
 
 set_target_properties(typev_static PROPERTIES OUTPUT_NAME "typev")
 
+if(APPLE)
+    target_link_libraries(typev_static PUBLIC "-framework CoreFoundation")
+endif()
+
 # Link the static library to the executable
-target_link_libraries(typev typev_static stdio stdcore stdmath stdfs m)
+#target_link_libraries(typev PRIVATE typev_static m)
+# just to build the executable and dynlibs
+target_link_libraries(typev PRIVATE typev_static stdio stdfs stdcore stdmath m)
+
+
+
 
 # Install rules
 # Install the static library
@@ -95,6 +104,7 @@ install(FILES
         source/errors/errors.h
         source/api/typev_api.h
         DESTINATION include/typev)
+
 install(FILES
         source/dynlib/dynlib.h
         DESTINATION include/typev/dynlib)

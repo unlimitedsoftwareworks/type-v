@@ -7,23 +7,16 @@ set(stdfs_files
         source/fs.h
 )
 
+add_library(stdfs SHARED ${stdfs_files})
 
-set(typev_files
-        ../source/core.c
-        ../source/gc/gc.c
-        ../source/gc/mark.c
-        ../source/stack/stack.c
-        ../source/dynlib/dynlib.c
-        ../source/env/env.c
-        ../source/api/typev_api.c
-        ../source/utils/utils.c
-        ../source/errors/errors.c
-)
+target_include_directories(stdfs PUBLIC ${CMAKE_SOURCE_DIR}/source)
+target_link_libraries(stdfs PUBLIC typev_static)
 
-
-add_library(stdfs SHARED ${stdfs_files} ${typev_files})
 set_target_properties(stdfs PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
         C_EXTENSIONS NO
 )
+
+
+install(TARGETS stdfs LIBRARY DESTINATION lib)

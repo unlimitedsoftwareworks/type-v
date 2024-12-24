@@ -2,20 +2,10 @@ project(stdio VERSION 1.0)
 
 set(stdio_files source/stdio.c)
 
-set(typev_files
-        ../source/core.c
-        ../source/gc/gc.c
-        ../source/gc/mark.c
-        ../source/stack/stack.c
-        ../source/dynlib/dynlib.c
-        ../source/env/env.c
-        ../source/api/typev_api.c
-        ../source/utils/utils.c
-        ../source/errors/errors.c
-)
 
-
-add_library(stdio SHARED ${stdio_files} ${typev_files})
+add_library(stdio SHARED ${stdio_files})
+target_include_directories(stdio PUBLIC ${CMAKE_SOURCE_DIR}/source)
+target_link_libraries(stdio PUBLIC typev_static)
 
 # Use proper C standard
 set_target_properties(stdio PROPERTIES
@@ -23,3 +13,5 @@ set_target_properties(stdio PROPERTIES
         C_STANDARD_REQUIRED YES
         C_EXTENSIONS NO
 )
+
+install(TARGETS stdio LIBRARY DESTINATION lib)
