@@ -88,8 +88,6 @@ endif()
 target_link_libraries(typev PRIVATE typev_static stdio stdfs stdcore stdmath m)
 
 
-
-
 # Install rules
 # Install the static library
 install(TARGETS typev_static

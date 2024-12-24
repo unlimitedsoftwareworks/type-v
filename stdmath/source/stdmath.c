@@ -22,6 +22,16 @@ void absd_(TypeV_Core* core){
     typev_api_return_f64(core, fabs(value));
 }
 
+void absi32_(TypeV_Core* core){
+    int32_t value = typev_api_stack_pop_i32(core);
+    typev_api_return_i32(core, abs(value));
+}
+
+void absi64_(TypeV_Core* core){
+    int64_t value = typev_api_stack_pop_i64(core);
+    typev_api_return_i64(core, llabs(value));
+}
+
 void powf_(TypeV_Core* core){
     float value = typev_api_stack_pop_f32(core);
     float exp = typev_api_stack_pop_f32(core);
@@ -281,6 +291,8 @@ void isfinitef_(TypeV_Core* core){
 static TypeV_FFIFunc stdmath_lib[] = {
     absf_,
     absd_,
+    absi32_,
+    absi64_,
     powf_,
     powd_,
     sqrtf_,
