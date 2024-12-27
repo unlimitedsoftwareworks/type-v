@@ -510,7 +510,7 @@ typedef enum TypeV_OpCode {
     OP_REG_FFI,
 
     /**
-     * OP_CALL_FFI ffi-id I (2 bytes), fn-id: I (1b)
+     * OP_CALL_FFI ffi-id I (2 bytes), fn-id: I (2b)
      * calls a FFI stored in reg
      */
     OP_CALL_FFI,

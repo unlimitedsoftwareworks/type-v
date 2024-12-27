@@ -2142,7 +2142,9 @@ static inline void call_ffi(TypeV_Core* core){
 
     core->ip += 2;
 
-    uint8_t methodId = core->codePtr[core->ip++];
+    uint16_t methodId;
+    typev_memcpy_unaligned_2(&methodId, &core->codePtr[core->ip]);
+    core->ip += 2;
 
     TypeV_FFIFunc ffi_fn = engine_ffi_get(core->engineRef, id, methodId);
     ffi_fn(core);

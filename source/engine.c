@@ -10,6 +10,7 @@
 #include "instructions/opfuncs.h"
 #include "utils/log.h"
 #include "utils/utils.h"
+#include "vendor/yyjson/yyjson.h"
 
 void engine_init(TypeV_Engine *engine, int argc, char** argv) {
     // we will allocate memory for cores later
@@ -40,9 +41,17 @@ void engine_setmain(
         uint64_t globalPoolLength,
         uint8_t* templatePool,
         uint64_t templatePoolLength,
+        uint8_t* objKeysPool,
+        uint64_t objKeysPoolLength,
         uint64_t stackCapacity,
         uint64_t stackLimit){
     core_setup(engine->coreIterator->core, program, constantPool, globalPool, templatePool);
+
+    yyjson_doc *doc = yyjson_read((char*)objKeysPool, objKeysPoolLength, 0);
+    yyjson_val *root = yyjson_doc_get_root(doc);
+
+    engine->objRoot = root;
+    engine->objDoc = doc;
 }
 
 void engine_deallocate(TypeV_Engine *engine) {
@@ -1116,4 +1125,18 @@ void engine_ffi_close(TypeV_Engine *engine, uint16_t dynlibID) {
     ffi->dynlibHandle = NULL;
     ffi->ffi = NULL;
     engine->ffi[dynlibID] = ffi;
+}
+
+
+void engine_get_field_id(TypeV_Engine *engine, const char* fieldName, uint32_t* fieldId, uint8_t* error) {
+    *fieldId = 0;
+    yyjson_val *root = engine->objRoot;
+    yyjson_val *obj = yyjson_obj_get(root, fieldName);
+    if(obj == NULL) {
+        *fieldId = -1;
+        *error = 1;
+        return;
+    }
+    *fieldId = (uint32_t) yyjson_get_int(obj);
+    *error = 0;
 }

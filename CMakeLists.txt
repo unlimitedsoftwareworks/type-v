@@ -69,6 +69,12 @@ add_library(typev_static STATIC
         source/gc/mark.h
         source/errors/errors.c
         source/errors/errors.h
+        source/vendor/yyjson/yyjson.c
+        source/vendor/yyjson/yyjson.h
+        source/api/struct_api.c
+        source/api/struct_api.h
+        source/api/array_api.c
+        source/api/array_api.h
 )
 
 # Your executable target
@@ -101,6 +107,8 @@ install(FILES
         source/dynlib/dynlib.h
         source/errors/errors.h
         source/api/typev_api.h
+        source/api/struct_api.h
+        source/api/array_api.h
         DESTINATION include/typev)
 
 install(FILES

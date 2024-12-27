@@ -17,6 +17,8 @@
 #include "utils/utils.h"
 #include "errors/errors.h"
 
+#include "vendor/yyjson/yyjson.h"
+
 TypeV_FuncState* core_create_function_state(TypeV_FuncState* prev){
     TypeV_FuncState* state = malloc(sizeof(TypeV_FuncState));
 
@@ -77,6 +79,7 @@ void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constan
     core->templatePtr = templatePool;
     core->state = CS_RUNNING;
 }
+
 
 
 void core_deallocate(TypeV_Core *core) {

@@ -54,6 +54,8 @@ typedef struct TypeV_Engine {
     uint8_t interruptNextLoop;                  ///< interrupt the next loop, set to true when cores are spawned/killed
     TypeV_EngineFFI** ffi;                      ///< FFI libraries
     uint16_t ffiCount;                          ///< Number of FFI libraries
+    void* objRoot;                              ///< Keys' JSON Root object
+    void* objDoc;                               ///< Keys' JSON Document object
     uint8_t argc;
     char** argv;
 } TypeV_Engine;
@@ -90,7 +92,21 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter);
  * @param stackCapacity
  * @param stackLimit
  */
-void engine_setmain(TypeV_Engine *engine, uint8_t* program, uint64_t programLength, uint8_t* constantPool, uint64_t constantPoolLength, uint8_t* globalPool, uint64_t globalPoolLength,  uint8_t* templatePool, uint64_t templatePoolLength, uint64_t stackCapacity, uint64_t stackLimit);
+void engine_setmain(
+        TypeV_Engine *engine,
+        uint8_t* program,
+        uint64_t programLength,
+        uint8_t* constantPool,
+        uint64_t constantPoolLength,
+        uint8_t* globalPool,
+        uint64_t globalPoolLength,
+        uint8_t* templatePool,
+        uint64_t templatePoolLength,
+        uint8_t* objKeysPool,
+        uint64_t objKeysPoolLength,
+        uint64_t stackCapacity,
+        uint64_t stackLimit
+    );
 
 
 void engine_set_args(TypeV_Engine *engine, int argc, char** argv);
@@ -129,6 +145,8 @@ TypeV_Core* engine_spawnCore(TypeV_Engine *engine, TypeV_Core* parentCore, uint6
  * @param coreID
  */
 void engine_detach_core(TypeV_Engine *engine, TypeV_Core* core);
+
+void engine_get_field_id(TypeV_Engine *engine, const char* fieldName, uint32_t* fieldId, uint8_t* error);
 
 
 void engine_ffi_register(TypeV_Engine *engine, char* dynlibName, uint16_t dynlibID);

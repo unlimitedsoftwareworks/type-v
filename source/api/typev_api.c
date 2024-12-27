@@ -54,7 +54,6 @@ uint16_t typev_api_stack_pop_u16(TypeV_Core* core) {
     uint16_t value;
     stack_pop_16(core->funcState, &value);
     return value;
-
 }
 
 int32_t typev_api_stack_pop_i32(TypeV_Core* core) {
@@ -82,7 +81,7 @@ uint64_t typev_api_stack_pop_u64(TypeV_Core* core) {
 }
 
 uintptr_t typev_api_stack_pop_ptr(struct TypeV_Core* core){
-    size_t value;
+    uintptr_t value;
     stack_pop_ptr(core->funcState, &value);
     return value;
 }
@@ -101,20 +100,20 @@ double typev_api_stack_pop_f64(TypeV_Core* core) {
 
 TypeV_Struct* typev_api_stack_pop_struct(TypeV_Core* core){
     TypeV_Struct* value;
-    stack_pop_ptr(core->funcState, (size_t*)&value);
+    stack_pop_ptr(core->funcState, (uintptr_t*)&value);
     return value;
 }
 
 TypeV_Class* typev_api_stack_pop_class(TypeV_Core* core) {
     TypeV_Class* value;
-    stack_pop_ptr(core->funcState, (size_t*)&value);
+    stack_pop_ptr(core->funcState, (uintptr_t *)&value);
     return value;
 }
 
 
 TypeV_Array* typev_api_stack_pop_array(TypeV_Core* core) {
     TypeV_Array* value;
-    stack_pop_ptr(core->funcState, (size_t*)&value);
+    stack_pop_ptr(core->funcState, (uintptr_t *)&value);
     return value;
 }
 
@@ -150,7 +149,7 @@ void typev_api_return_u64(TypeV_Core* core, uint64_t value) {
 }
 
 
-void typev_api_return_ptr(TypeV_Core* core, size_t value) {
+void typev_api_return_ptr(TypeV_Core* core, uintptr_t value) {
     stack_push_ptr(core->funcState, value);
 }
 
@@ -174,43 +173,7 @@ void typev_api_return_array(TypeV_Core* core, TypeV_Array* value){
     stack_push_ptr(core->funcState, (size_t)value);
 }
 
-/**
-* Structs
-*/
-TypeV_Struct *typev_api_struct_create(TypeV_Core *core, uint16_t fieldCount, size_t structSize) {
-    // allocate memory for the struct
-    TypeV_Struct *structPtr = malloc(sizeof(TypeV_Struct) + structSize);
-    // set the field count
-    structPtr->fieldOffsets = malloc(fieldCount*sizeof(uint16_t));
-
-    // not used because it's already allocated alongside the struct, contiguous memory
-    //structPtr->data = (uint8_t *) calloc(1, sizeof(structSize));
-
-    return structPtr;
-}
-
-void typev_api_struct_set_offset(TypeV_Core *core, TypeV_Struct *structPtr, uint16_t fieldIndex, uint16_t offset) {
-    structPtr->fieldOffsets[fieldIndex] = offset;
-}
-
-void typev_api_struct_set_field(TypeV_Core *core, TypeV_Struct *structPtr, uint16_t fieldIndex, void *value, size_t valueSize) {
-    memcpy(structPtr->data + structPtr->fieldOffsets[fieldIndex], value, valueSize);
-}
-
 void typev_api_core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...){
     core_panic(core, errorId, fmt);
 };
-
-TypeV_Array* typev_api_array_create(TypeV_Core* core, uint64_t count, uint8_t elementSize, uint8_t ptr) {
-    TypeV_Array* array = (TypeV_Array*)core_array_alloc(core, ptr, count, elementSize);
-    return array;
-}
-
-void typev_api_array_set(TypeV_Core* core, TypeV_Array* array, uint64_t index, void** value) {
-    memcpy(array->data + index * array->elementSize, value, array->elementSize);
-}
-
-void* typev_api_array_get(TypeV_Core* core, TypeV_Array* array, uint64_t index) {
-    return array->data + index * array->elementSize;
-}
 

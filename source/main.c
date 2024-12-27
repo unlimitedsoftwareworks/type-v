@@ -56,16 +56,18 @@ int main(int argc, char **argv) {
     }
 
     // Read offsets
-    uint64_t constantOffset, globalOffset, templateOffset, codeOffset;
+    uint64_t constantOffset, globalOffset, templateOffset, objectKeysOffset, codeOffset;
     fread(&constantOffset, sizeof(uint64_t), 1, file);
     fread(&globalOffset, sizeof(uint64_t), 1, file);
     fread(&templateOffset, sizeof(uint64_t), 1, file);
+    fread(&objectKeysOffset, sizeof(uint64_t), 1, file);
     fread(&codeOffset, sizeof(uint64_t), 1, file);
 
     // Calculate segment sizes
     size_t constantSize = globalOffset - constantOffset;
     size_t globalSize = templateOffset - globalOffset;
     size_t templateSize = codeOffset - templateOffset;
+    size_t objectKeysSize = codeOffset - objectKeysOffset;
     fseek(file, 0, SEEK_END);
     size_t codeSize = ftell(file) - codeOffset;
 
@@ -73,6 +75,7 @@ int main(int argc, char **argv) {
     uint8_t *constantSegment = readSegment(file, constantOffset, constantSize);
     uint8_t *globalSegment = readSegment(file, globalOffset, globalSize);
     uint8_t *templateSegment = readSegment(file, templateOffset, templateSize);
+    uint8_t *objectKeysSegment = readSegment(file, objectKeysOffset, objectKeysSize);
     uint8_t *codeSegment = readSegment(file, codeOffset, codeSize);
 
     fclose(file);
@@ -92,6 +95,8 @@ int main(int argc, char **argv) {
             .templatePoolSize = templateSize,
             .globalPool = globalSegment,
             .globalPoolSize = globalSize,
+            .objKeysPool = objectKeysSegment,
+            .objKeysPoolSize = objectKeysSize,
             .version = 0
     };
 
@@ -100,7 +105,9 @@ int main(int argc, char **argv) {
     engine_setmain(&engine, program.codePool, program.codePoolSize,
                    program.constPool, program.constPoolSize,
                    program.globalPool, program.globalPoolSize,
-                   program.templatePool, program.templatePoolSize, 1024, 1024);
+                   program.templatePool, program.templatePoolSize,
+                     program.objKeysPool, program.objKeysPoolSize,
+                   1024, 1024);
 
 
     engine_run(&engine);

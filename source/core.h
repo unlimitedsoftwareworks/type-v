@@ -264,6 +264,9 @@ typedef struct TypeV_Core {
     const uint8_t* templatePtr;               ///< Template pointer
     const uint8_t* codePtr;                   ///< Code pointer
 
+    void* objKeysJSONRoot;                    ///< Object keys JSON root
+    void* objKeysJSONDoc;                     ///< Object keys JSON document
+
     uint8_t* globalPtr;                       ///< Global pointer
     uint64_t ip;                              ///< Instruction pointer
 
@@ -283,13 +286,20 @@ void core_free_function_state(TypeV_Core* core, TypeV_FuncState* state);
  * @param engineRef
  */
 void core_init(TypeV_Core *core, uint32_t id, struct TypeV_Engine *engineRef);
-void core_setup(TypeV_Core *core, const uint8_t* program, const uint8_t* constantPool, uint8_t* globalPool, const uint8_t* templatePool);
+void core_setup(
+        TypeV_Core *core,
+        const uint8_t* program,
+        const uint8_t* constantPool,
+        uint8_t* globalPool,
+        const uint8_t* templatePool);
 
 /**
  * Deallocates a core
  * @param core
  */
 void core_deallocate(TypeV_Core *core);
+
+void core_parse_object_keys(TypeV_Core* core, const uint8_t* objKeysPool, uint64_t len);
 
 
 /**
