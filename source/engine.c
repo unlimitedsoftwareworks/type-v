@@ -328,7 +328,8 @@ static void* dispatch_table[] = { \
     &&DO_COROUTINE_RET, \
     &&DO_COROUTINE_RESET, \
     &&DO_COROUTINE_FINISH, \
-    &&DO_THROW_RT \
+    &&DO_THROW_RT, \
+    &&DO_THROW_USER_RT \
 };
 
 void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
@@ -961,6 +962,9 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DISPATCH();
         DO_THROW_RT:
         throw_rt(core);
+        DISPATCH();
+        DO_THROW_USER_RT:
+        throw_user_rt(core);
         DISPATCH();
     }
     END_RUN:

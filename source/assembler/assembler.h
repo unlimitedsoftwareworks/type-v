@@ -274,7 +274,8 @@ static char* instructions[] = {
         "coroutine_ret",
         "coroutine_reset",
         "coroutine_finish",
-        "throw_rt"
+        "throw_rt",
+        "throw_user_rt",
 };
 #define MAX_INSTRUCTION 267
 

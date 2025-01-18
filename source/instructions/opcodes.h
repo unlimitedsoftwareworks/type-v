@@ -608,6 +608,10 @@ typedef enum TypeV_OpCode {
     OP_COROUTINE_FINISH,
 
     OP_THROW_RT,
+    /**
+     * OP_THROW_USER_RT array_reg: reg
+     */
+    OP_THROW_USER_RT,
 
 }TypeV_OpCode;
 

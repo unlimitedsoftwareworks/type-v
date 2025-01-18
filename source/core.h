@@ -430,6 +430,7 @@ void core_update_flags(TypeV_Core *core, uint64_t value);
  * @param fmt Message printf style format, followed by arguments
  */
 void core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...);
+void core_panic_custom(TypeV_Core* core, char* msg);
 
 void core_spill_alloc(TypeV_Core* core, uint16_t size);
 

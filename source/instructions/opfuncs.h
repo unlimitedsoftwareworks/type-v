@@ -257,7 +257,8 @@ static op_func op_funcs[] = {
         &coroutine_ret,
         &coroutine_reset,
         &coroutine_finish,
-        &throw_rt
+        &throw_rt,
+        &throw_user_rt,
 };
 
 #endif //TYPE_V_OPFUNCS_H

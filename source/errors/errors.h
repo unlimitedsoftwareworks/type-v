@@ -30,7 +30,7 @@ static const char* TypeV_RTErrorMessages[] = {
     "Out of bounds access",
     "Invalid comparison operator",
     "Entity too large",
-    "Custom error"
+    "User Error",
 };
 
 #endif // TYPE_V_ERRORS_H

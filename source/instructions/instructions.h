@@ -688,7 +688,7 @@ static inline void i_is_c(TypeV_Core* core){
 
     uint64_t classId = 0;
     typev_memcpy_aligned_4(&classId, &core->codePtr[core->ip]);
-    core->ip += 8;
+    core->ip += 4;
 
     TypeV_Class* class_ = (TypeV_Class*)core->regs[interface_reg].ptr;
 
@@ -2404,6 +2404,13 @@ static inline void coroutine_finish(TypeV_Core* core) {
 static inline void throw_rt(TypeV_Core* core) {
     uint8_t code = core->codePtr[core->ip++];
     core_panic(core, code, "Runtime error: %s", TypeV_RTErrorMessages[code]);
+}
+
+static inline void throw_user_rt(TypeV_Core* core) {
+    uint8_t array_reg = core->codePtr[core->ip++];
+    TypeV_Array* arr = (TypeV_Array*) core->regs[array_reg].ptr;
+
+    core_panic_custom(core, (char*)arr->data);
 }
 
 #endif //TYPE_V_INSTRUCTIONS_H
