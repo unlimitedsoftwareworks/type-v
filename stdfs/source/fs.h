@@ -96,6 +96,15 @@ uint8_t fs_open(fs_file *file, const char *filename, uint8_t mode);
  */
 uint8_t fs_close(fs_file *file);
 
+
+/**
+ * @brief Reads a single byte from a file
+ * @param file Pointer to open fs_file structure
+ * @param error Pointer to store error code
+ * @return Byte read from file
+ */
+uint8_t fs_read_one(fs_file *file, uint8_t *error);
+
 /**
  * @brief Reads data from a file into a buffer
  * @param file Pointer to open fs_file structure
@@ -151,7 +160,7 @@ uint8_t fs_seek(fs_file *file, int64_t offset, uint8_t whence);
  * @param error Pointer to store error code
  * @return Current position in file
  */
-uint64_t fs_tell(fs_file *file, uint8_t *error);
+int64_t fs_tell(fs_file *file, uint8_t *error);
 
 /**
  * @brief Checks if end of file is reached

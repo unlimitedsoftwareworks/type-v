@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include "../core.h"
 #include "../dynlib/dynlib.h"
+#include "array_api.h"
 
 DYNLIB_EXPORT size_t typev_api_register_lib(const TypeV_FFIFunc lib[]);
 
@@ -70,13 +71,6 @@ DYNLIB_EXPORT TypeV_Struct *typev_api_struct_create(struct TypeV_Core *core, uin
 DYNLIB_EXPORT void typev_api_struct_set_offset(struct TypeV_Core *core, TypeV_Struct *structPtr, uint16_t fieldIndex, uint16_t offset);
 
 DYNLIB_EXPORT void typev_api_core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...);
-
-
-
-DYNLIB_EXPORT TypeV_Array* typev_api_array_create(TypeV_Core* core, uint64_t count, uint8_t elementSize, uint8_t ptr);
-DYNLIB_EXPORT void typev_api_array_set(TypeV_Core* core, TypeV_Array* array, uint64_t index, void** value);
-DYNLIB_EXPORT void* typev_api_array_get(TypeV_Core* core, TypeV_Array* array, uint64_t index);
-
 
 
 

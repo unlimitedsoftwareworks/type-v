@@ -35,6 +35,16 @@ void _fs_close(TypeV_Core* core) {
     typev_api_return_u8(core, error);
 }
 
+void _fs_read_one(TypeV_Core* core) {
+    fs_file* f = (fs_file*)typev_api_stack_pop_u64(core);
+    
+    uint8_t error = 0;
+    uint8_t result = fs_read_one(f, &error);
+    
+    typev_api_return_u8(core, error);
+    typev_api_return_u8(core, result);
+}
+
 void _fs_read(TypeV_Core* core) {
     fs_file* f = (fs_file*)typev_api_stack_pop_u64(core);
     uint64_t size = typev_api_stack_pop_u64(core);
@@ -44,7 +54,7 @@ void _fs_read(TypeV_Core* core) {
     uint8_t error = 0;
     uint64_t result = fs_read(f, &buffer, size, &error);
 
-    TypeV_Array* array = typev_api_array_create(core, result, 1, 0);
+    TypeV_Array* array = typev_api_array_create_from_buffer(core, result, 1, 0, buffer);
     
     typev_api_return_u8(core, error);
     typev_api_return_array(core, array);
@@ -68,8 +78,7 @@ void _fs_readall(TypeV_Core* core) {
     uint8_t error = 0;
     uint64_t size = fs_readall(f, &buffer, &error);
 
-    TypeV_Array* result = typev_api_array_create(core, size, 1, 0);
-    memcpy(result->data, buffer, size);
+    TypeV_Array* result = typev_api_array_create_from_buffer(core, size, 1, 0, buffer);
     typev_api_return_u8(core, error);
     typev_api_return_array(core, result);
 }
@@ -88,8 +97,8 @@ void _fs_write(TypeV_Core* core) {
 
 void _fs_seek(TypeV_Core* core) {
     fs_file* f = (fs_file*)typev_api_stack_pop_u64(core);
-    uint64_t offset = typev_api_stack_pop_u64(core);
-    uint32_t whence = typev_api_stack_pop_u32(core);
+    int64_t offset = typev_api_stack_pop_u64(core);
+    uint8_t whence = typev_api_stack_pop_u8(core);
 
     uint8_t error = fs_seek(f, offset, whence);
     typev_api_return_u8(core, error);
@@ -98,9 +107,9 @@ void _fs_seek(TypeV_Core* core) {
 void _fs_tell(TypeV_Core* core) {
     fs_file* f = (fs_file*)typev_api_stack_pop_u64(core);
     uint8_t error = 0;
-    uint64_t result = fs_tell(f, &error);
+    int64_t result = fs_tell(f, &error);
     typev_api_return_u8(core, error);
-    typev_api_return_u64(core, result);
+    typev_api_return_i64(core, result);
 }
 
 void _fs_eof(TypeV_Core* core) {
@@ -481,6 +490,7 @@ void _path_get_style(TypeV_Core* core) {}
 static TypeV_FFIFunc stdfs_lib[] = {
     (TypeV_FFIFunc)_fs_open,
     (TypeV_FFIFunc)_fs_close,
+    (TypeV_FFIFunc)_fs_read_one,
     (TypeV_FFIFunc)_fs_read,
     (TypeV_FFIFunc)_fs_readline,
     (TypeV_FFIFunc)_fs_readall,

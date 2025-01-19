@@ -10,6 +10,12 @@ TypeV_Array* typev_api_array_create(TypeV_Core* core, uint64_t count, uint8_t el
     return array;
 }
 
+TypeV_Array* typev_api_array_create_from_buffer(TypeV_Core* core, uint64_t count, uint8_t elementSize, uint8_t ptr, void* buffer) {
+    TypeV_Array* array = (TypeV_Array*)core_array_alloc_from_buffer(core, ptr, count, elementSize, buffer);
+    return array;
+}
+
+
 void typev_api_array_set(TypeV_Core* core, TypeV_Array* array, uint64_t index, void** value) {
     memcpy(array->data + index * array->elementSize, value, array->elementSize);
 }

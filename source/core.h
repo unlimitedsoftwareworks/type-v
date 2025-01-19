@@ -353,12 +353,23 @@ uintptr_t core_class_alloc(TypeV_Core *core, uint16_t num_methods, uint8_t num_a
 
 /**
  * Allocates an array object
- * @param core
- * @param num_elements
- * @param element_size
- * @return
+ * @param core Core
+ * @param num_elements Number of elements
+ * @param element_size Size of each element
+ * @return Pointer to the allocated array
  */
 uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size);
+
+
+/**
+ * Allocates an array object from a buffer
+ * @param core Core
+ * @param num_elements Number of elements
+ * @param element_size Size of each element
+ * @param buffer Pointer to the buffer
+ * @return Pointer to the allocated array
+ */
+uintptr_t core_array_alloc_from_buffer(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size, void* buffer);
 
 /**
  * Extends the cellSize of an array

@@ -1,4 +1,3 @@
-
 #include "fs.h"
 
 #ifdef _WIN32
@@ -70,6 +69,38 @@ uint8_t fs_close(fs_file *file) {
     }
 #endif
     return fs_map_system_error();
+}
+
+uint8_t fs_read_one(fs_file *file, uint8_t *error) {
+    if (!file || !file->is_open) {
+        if (error) *error = FS_ERROR_INVALID_ARGUMENT;
+        return 0;
+    }
+
+    uint8_t byte;
+#ifdef _WIN32
+    DWORD bytes_read;
+    if (ReadFile(file->win_handle, &byte, 1, &bytes_read, NULL)) {
+        if (bytes_read == 0) {
+            if (error) *error = FS_ERROR_EOF;
+            return 0;
+        }
+        if (error) *error = FS_OK;
+        return byte;
+    }
+#else
+    ssize_t result = read(file->fd, &byte, 1);
+    if (result > 0) {
+        if (error) *error = FS_OK;
+        return byte;
+    } else if (result == 0) {
+        if (error) *error = FS_ERROR_EOF;
+        return 0;
+    }
+#endif
+
+    if (error) *error = fs_map_system_error();
+    return 0;
 }
 
 uint64_t fs_read(fs_file *file, void **buffer, uint64_t size, uint8_t *error) {
@@ -336,7 +367,7 @@ uint8_t fs_seek(fs_file *file, int64_t offset, uint8_t whence) {
     return FS_OK;
 }
 
-uint64_t fs_tell(fs_file *file, uint8_t *error){
+int64_t fs_tell(fs_file *file, uint8_t *error){
     if (!file || !file->is_open) {
         *error = FS_ERROR_INVALID_ARGUMENT;
         return 0;
@@ -570,11 +601,11 @@ uint8_t fs_create_temp(fs_file *file, char *name) {
         return FS_ERROR; // likewise, map error if needed
     }
 
-    // Open the file as per your library’s convention
+    // Open the file as per your library's convention
     return fs_open(file, name, FS_READ | FS_WRITE | FS_CREATE);
 
 #else // POSIX-like systems
-    // Generate a template in the caller’s buffer. mkstemp will replace
+    // Generate a template in the caller's buffer. mkstemp will replace
     // the XXXXXX with a unique suffix, and open it.
     snprintf(name, FILENAME_MAX, "/tmp/fs_tempXXXXXX");
 

@@ -258,6 +258,33 @@ uintptr_t core_array_alloc(TypeV_Core *core, uint8_t is_pointer_container, uint6
     return (uintptr_t)array_ptr;
 }
 
+uintptr_t core_array_alloc_from_buffer(TypeV_Core *core, uint8_t is_pointer_container, uint64_t num_elements, uint8_t element_size, void* buffer) {
+    LOG_INFO("CORE[%d]: Allocating array with %" PRIu64 " elements of cellSize %d", core->id, num_elements, element_size);
+    if(buffer == NULL) {
+        // set length to 0 and allocate an empty array
+        return core_array_alloc(core, is_pointer_container, 0, element_size);
+    }
+
+    static uint32_t uid = 0;
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Array);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
+    header->type = OT_ARRAY;
+    // for arrays 0 means elements are not pointers
+    // anything else means elements are pointers
+
+    TypeV_Array* array_ptr = (TypeV_Array*)(header + 1);
+    array_ptr->elementSize = element_size;
+    array_ptr->length = num_elements;
+    array_ptr->data = buffer;
+    if(array_ptr->data == NULL) {
+        core_panic(core, RT_ERROR_OOM, "Failed to allocate array data");
+    }
+    array_ptr->uid = uid++;
+    array_ptr->isPointerContainer = is_pointer_container;
+
+    return (uintptr_t)array_ptr;
+}
+
 uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start, uint64_t end){
     LOG_INFO("Slicing array %p from %" PRIu64 " to %" PRIu64, array, start, end);
 
