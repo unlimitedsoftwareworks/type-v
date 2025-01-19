@@ -219,7 +219,7 @@ void fs_free_file_list(char **files, uint32_t count);
  * @param file Pointer to fs_file structure to initialize
  * @return FS_OK on success, error code otherwise
  */
-uint8_t fs_create_temp(fs_file *file);
+uint8_t fs_create_temp(fs_file *file, char* name);
 
 /**
  * @brief Gets current working directory

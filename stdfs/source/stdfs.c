@@ -11,7 +11,11 @@
 #include "../../source/core.h"
 #include "../../source/api/typev_api.h"
 #include "fs.h"
+#include "cwalk.h"
 
+/**
+ * FS functions
+ */
 void _fs_open(TypeV_Core* core) {
     TypeV_Array* name = typev_api_stack_pop_array(core);
     uint8_t mode = typev_api_stack_pop_u8(core);
@@ -162,9 +166,15 @@ void _fs_listdir(TypeV_Core* core) {
 
 void _fs_create_temp(TypeV_Core* core) {
     fs_file* f = (fs_file*)malloc(sizeof(fs_file));
-    uint8_t error = fs_create_temp(f);
+    char name[FILENAME_MAX] = {0};
+    uint8_t error = fs_create_temp(f, name);
+
+    TypeV_Array* result = typev_api_array_create(core, strlen(name), 1, 0);
+    memcpy(result->data, name, strlen(name));
+
     typev_api_return_u8(core, error);
     typev_api_return_u64(core, (uint64_t)f);
+    typev_api_return_array(core, result);
 }
 
 void _fs_get_cwd(TypeV_Core* core) {
@@ -286,33 +296,187 @@ void _fs_unsetenv(TypeV_Core* core) {
     uint8_t error = fs_unsetenv(name->data);
     typev_api_return_u8(core, error);
 }
-
-/*
-void _fs_path_join(TypeV_Core* core) {
-    TypeV_Array* path1 = typev_api_stack_pop_array(core);
-    TypeV_Array* path2 = typev_api_stack_pop_array(core);
-    char buffer[256] = {0};
-    uint8_t error = fs_path_join(path1->data, path2->data, buffer, 256);
-    TypeV_Array* result = typev_api_array_create(core, strlen(buffer), 1, 0);
-    memcpy(result->data, buffer, strlen(buffer));
-    typev_api_return_u8(core, error);
-    typev_api_return_array(core, result);
-}
-
-void _fs_get_extension(TypeV_Core* core) {
-    TypeV_Array* path = typev_api_stack_pop_array(core);
-    char buffer[256] = {0};
-    uint8_t error = fs_get_extension(path->data, buffer, 256);
-    TypeV_Array* result = typev_api_array_create(core, strlen(buffer), 1, 0);
-    memcpy(result->data, buffer, strlen(buffer));
-    typev_api_return_u8(core, error);
-    typev_api_return_array(core, result);
-}
-*/
 void _fs_get_separator(TypeV_Core* core) {
     char separator = fs_get_separator();
     typev_api_return_u8(core, separator);
 }
+
+/**
+ * Path functions, uses cwalk library
+ */
+
+void _path_get_basename(TypeV_Core* core) {
+    TypeV_Array* pathArray = typev_api_stack_pop_array(core);
+    const char* path = (const char*)pathArray->data;
+    const char* basename;
+    size_t length;
+    // points within the path, so we need to copy it
+    cwk_path_get_basename(path, &basename, &length);
+
+    TypeV_Array* result = typev_api_array_create(core, length, 1, 0);
+    memcpy(result->data, basename, length);
+    typev_api_return_array(core, result);
+}
+
+void _path_change_basename(TypeV_Core* core) {
+    // Pop arguments from the stack in right order because compiler fixes the order
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    TypeV_Array* new_basename = typev_api_stack_pop_array(core);
+    
+    // Create a buffer for the result
+    // Using 256 as a reasonable buffer size, adjust if needed
+    char buffer[FILENAME_MAX] = {0};
+    
+    // Call cwk_path_change_basename
+    size_t result_size = cwk_path_change_basename(
+        (const char*)path->data,
+        (const char*)new_basename->data,
+        buffer,
+        256
+    );
+    
+    // Create a new array for the result
+    // Use the actual written size (minimum of result_size and 255 to account for null terminator)
+    size_t actual_size = result_size < 256 ? result_size : 255;
+    TypeV_Array* result = typev_api_array_create(core, actual_size, 1, 0);
+    
+    // Copy the result into the new array
+    memcpy(result->data, buffer, actual_size);
+    
+    // Return the result array
+    typev_api_return_array(core, result);
+}
+
+void _path_get_dirname(TypeV_Core* core) {
+    // Pop the path argument from the stack
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    
+    // Get the dirname length
+    size_t length = 0;
+    cwk_path_get_dirname((const char*)path->data, &length);
+    
+    // Create a new array for the result
+    // The size will be the length of the dirname
+    TypeV_Array* result = typev_api_array_create(core, length, 1, 0);
+    
+    // Copy the dirname portion into the result array
+    if (length > 0) {
+        memcpy(result->data, path->data, length);
+    }
+    
+    // Return the result array
+    typev_api_return_array(core, result);
+}
+
+void _path_get_root(TypeV_Core* core) {
+    // Pop the path argument from the stack
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    
+    // Get the root length
+    size_t length = 0;
+    cwk_path_get_root((const char*)path->data, &length);
+    
+    // Create a new array for the result
+    // The size will be the length of the root
+    TypeV_Array* result = typev_api_array_create(core, length, 1, 0);
+    
+    // Copy the root portion into the result array
+    if (length > 0) {
+        memcpy(result->data, path->data, length);
+    }
+    
+    // Return the result array
+    typev_api_return_array(core, result);
+}
+
+void _path_change_root(TypeV_Core* core) {
+    // Pop arguments from the stack in right order because compiler fixes the order
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    TypeV_Array* new_root = typev_api_stack_pop_array(core);
+    
+    // Create a buffer for the result
+    char buffer[FILENAME_MAX] = {0};
+    
+    // Call cwk_path_change_root
+    size_t result_size = cwk_path_change_root(
+        (const char*)path->data,
+        (const char*)new_root->data,
+        buffer,
+        FILENAME_MAX
+    );
+    
+    // Create a new array for the result
+    // Use the actual written size (minimum of result_size and FILENAME_MAX-1 to account for null terminator)
+    size_t actual_size = result_size < FILENAME_MAX - 1 ? result_size : FILENAME_MAX - 1;
+    TypeV_Array* result = typev_api_array_create(core, actual_size, 1, 0);
+    
+    // Copy the result into the new array
+    memcpy(result->data, buffer, actual_size);
+    
+    // Return the result array
+    typev_api_return_array(core, result);
+}
+
+void _path_is_absolute(TypeV_Core* core) {
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    uint8_t result = cwk_path_is_absolute((const char*)path->data);
+    typev_api_return_u8(core, result);
+}
+
+void _path_is_relative(TypeV_Core* core) {
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    uint8_t result = cwk_path_is_relative((const char*)path->data);
+    typev_api_return_u8(core, result);
+}
+
+void _path_join(TypeV_Core* core) {
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    TypeV_Array* path2 = typev_api_stack_pop_array(core);
+    char buffer[FILENAME_MAX] = {0};
+    cwk_path_join((const char*)path->data, (const char*)path2->data, buffer, FILENAME_MAX);
+    TypeV_Array* result = typev_api_array_create(core, strlen(buffer), 1, 0);
+    memcpy(result->data, buffer, strlen(buffer));
+    typev_api_return_array(core, result);
+}
+void _path_join_multiple(TypeV_Core* core) {
+
+}
+
+void _path_normalize(TypeV_Core* core) {
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    char buffer[FILENAME_MAX] = {0};
+    size_t len = cwk_path_normalize((const char*)path->data, buffer, FILENAME_MAX);
+    TypeV_Array* result = typev_api_array_create(core, len, 1, 0);
+    memcpy(result->data, buffer, strlen(buffer));
+    typev_api_return_array(core, result);
+}
+void _path_intersection(TypeV_Core* core) {
+    TypeV_Array* path = typev_api_stack_pop_array(core);
+    TypeV_Array* path2 = typev_api_stack_pop_array(core);
+    char buffer[FILENAME_MAX] = {0};
+    size_t length = cwk_path_get_intersection((const char*)path->data, (const char*)path2->data);
+    TypeV_Array* result = typev_api_array_create(core, length, 1, 0);
+    memcpy(result->data, path->data, length);
+    typev_api_return_array(core, result);
+}
+
+void _path_get_absolute(TypeV_Core* core) {}
+void _path_get_relative(TypeV_Core* core) {}
+
+void _path_get_extension(TypeV_Core* core) {}
+void _path_has_extension(TypeV_Core* core) {}
+void _path_change_extension(TypeV_Core* core) {}
+
+void _path_get_first_segment(TypeV_Core* core) {}
+void _path_get_last_segment(TypeV_Core* core) {}
+void _path_get_next_segment(TypeV_Core* core) {}
+void _path_get_previous_segment(TypeV_Core* core) {}
+void _path_get_segment_type(TypeV_Core* core) {}
+void _path_change_segment(TypeV_Core* core) {}
+
+void _path_guess_style(TypeV_Core* core) {}
+void _path_set_style(TypeV_Core* core) {}
+void _path_get_style(TypeV_Core* core) {}
 
 static TypeV_FFIFunc stdfs_lib[] = {
     (TypeV_FFIFunc)_fs_open,
@@ -345,6 +509,18 @@ static TypeV_FFIFunc stdfs_lib[] = {
     (TypeV_FFIFunc)_fs_setenv,
     (TypeV_FFIFunc)_fs_unsetenv,
     (TypeV_FFIFunc)_fs_get_separator,
+
+    // Path functions
+    (TypeV_FFIFunc)_path_get_basename,
+    (TypeV_FFIFunc)_path_change_basename,
+    (TypeV_FFIFunc)_path_get_dirname,
+    (TypeV_FFIFunc)_path_get_root,
+    (TypeV_FFIFunc)_path_change_root,
+    (TypeV_FFIFunc)_path_is_absolute,
+    (TypeV_FFIFunc)_path_is_relative,
+    (TypeV_FFIFunc)_path_join,
+    (TypeV_FFIFunc)_path_normalize,
+    (TypeV_FFIFunc)_path_intersection,
     NULL
 };
 

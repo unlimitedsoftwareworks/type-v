@@ -2,6 +2,7 @@ project(stdfs VERSION 1.0)
 
 
 set(stdfs_files
+        source/cwalk.c
         source/stdfs.c
         source/fs.c
         source/fs.h

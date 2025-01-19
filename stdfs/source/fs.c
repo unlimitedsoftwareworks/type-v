@@ -548,29 +548,45 @@ void fs_free_file_list(char **files, uint32_t count) {
     free(files);
 }
 
-uint8_t fs_create_temp(fs_file *file) {
-    if (!file) {
+#include <stdio.h>   // for snprintf (POSIX) or just <stdlib.h>
+#include <errno.h>
+
+uint8_t fs_create_temp(fs_file *file, char *name) {
+    if (!file || !name) {
         return FS_ERROR_INVALID_ARGUMENT;
     }
 
 #ifdef _WIN32
     char temp_path[MAX_PATH];
+
+    // Get the directory for temp files, e.g., "C:\Users\...\AppData\Local\Temp\"
     if (GetTempPathA(MAX_PATH, temp_path) == 0) {
-        return FS_ERROR;
+        return FS_ERROR; // or map GetLastError() if needed
     }
-    char temp_file[MAX_PATH];
-    if (GetTempFileNameA(temp_path, "tmp", 0, temp_file) == 0) {
-        return FS_ERROR;
+
+    // Write the final filename directly into the caller's buffer `name`.
+    // This means no second copy is necessary.
+    if (GetTempFileNameA(temp_path, "tmp", 0, name) == 0) {
+        return FS_ERROR; // likewise, map error if needed
     }
-    return fs_open(file, temp_file, FS_READ | FS_WRITE | FS_CREATE);
-#else
-    char temp_file[] = "/tmp/fs_tempXXXXXX";
-    int fd = mkstemp(temp_file);
+
+    // Open the file as per your library’s convention
+    return fs_open(file, name, FS_READ | FS_WRITE | FS_CREATE);
+
+#else // POSIX-like systems
+    // Generate a template in the caller’s buffer. mkstemp will replace
+    // the XXXXXX with a unique suffix, and open it.
+    snprintf(name, FILENAME_MAX, "/tmp/fs_tempXXXXXX");
+
+    int fd = mkstemp(name);
     if (fd == -1) {
-        return fs_map_system_error();
+        return fs_map_system_error(); // e.g., map errno
     }
+
+    // Populate your `fs_file` struct
     file->fd = fd;
     file->is_open = true;
+
     return FS_OK;
 #endif
 }

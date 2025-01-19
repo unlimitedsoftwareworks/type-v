@@ -51,6 +51,7 @@ Type-V is a runtime environment for type-c. All instructions are optimized for t
 | Name   |License|     Usage      |Link|
 |:-------|:---|:--------------|:---|
 | libtable|MIT| Table printing |https://github.com/marchelzo/libtable|
+| cwalk|MIT| path library |https://github.com/likle/cwalk|
 
 ## Need help
 Head over to the discussion section, and start a discussion. **Please do not open an issue, start with a discussion and if the issue is verified (or a feature request is accepted), then we will create an issue.** Thank you!
