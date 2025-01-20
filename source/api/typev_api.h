@@ -34,7 +34,7 @@ DYNLIB_EXPORT double typev_api_stack_pop_f64(struct TypeV_Core* core);
 DYNLIB_EXPORT TypeV_Struct* typev_api_stack_pop_struct(struct TypeV_Core* core);
 DYNLIB_EXPORT TypeV_Class* typev_api_stack_pop_class(struct TypeV_Core* core);
 DYNLIB_EXPORT TypeV_Array* typev_api_stack_pop_array(struct TypeV_Core* core);
-DYNLIB_EXPORT TypeV_Struct* typev_api_stack_pop_struct(struct TypeV_Core* core);
+DYNLIB_EXPORT uintptr_t typev_api_stack_pop_userobject(struct TypeV_Core* core);
 
 DYNLIB_EXPORT void typev_api_return_i8(struct TypeV_Core* core, int8_t value);
 DYNLIB_EXPORT void typev_api_return_u8(struct TypeV_Core* core, uint8_t value);
@@ -50,7 +50,8 @@ DYNLIB_EXPORT void typev_api_return_f64(struct TypeV_Core* core, double value);
 DYNLIB_EXPORT void typev_api_return_struct(struct TypeV_Core* core, TypeV_Struct* value);
 DYNLIB_EXPORT void typev_api_return_class(struct TypeV_Core* core, TypeV_Class* value);
 DYNLIB_EXPORT void typev_api_return_array(struct TypeV_Core* core, TypeV_Array* value);
-DYNLIB_EXPORT void typev_api_return_struct(struct TypeV_Core* core, TypeV_Struct* value);
+DYNLIB_EXPORT void typev_api_return_userobject(struct TypeV_Core* core, uintptr_t value);
+
 
 /**
  * Creates a new struct given the number of fields and the total struct size

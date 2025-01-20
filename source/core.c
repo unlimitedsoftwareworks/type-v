@@ -12,6 +12,9 @@
 #include "gc/gc.h"
 #include "engine.h"
 #include "core.h"
+
+#include <sys/types.h>
+
 #include "utils/log.h"
 #include "dynlib/dynlib.h"
 #include "utils/utils.h"
@@ -363,125 +366,93 @@ uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src
     return position + src->length;
 }
 
+uintptr_t core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t argsOffset, uint8_t envSize) {
+    LOG_WARN("CORE[%d]: Allocating closure with %d bytes", core->id, envSize);
 
+    // Calculate bitmask size for pointers
+    size_t bitmaskSize = (envSize + 7) / 8;
 
-/*
-#define CACHE_SIZE 4
+    // Start calculating the total size required for allocation
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Closure);
 
-typedef struct {
-    uint32_t globalID;
-    uint8_t index;
-} CacheEntry;
+    // Align for `upvalues` (8-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
+    totalAllocationSize += envSize * sizeof(TypeV_Register);  // Upvalues array
 
-static CacheEntry cache[CACHE_SIZE] = { {0, -1} };  // Initialize cache entries with invalid index
+    // Align for `ptrFields` (1-byte alignment)
+    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint8_t));
+    totalAllocationSize += bitmaskSize;  // Pointer bitmask size
 
-uint8_t find_in_cache(uint32_t globalID) {
-    for (int i = 0; i < CACHE_SIZE; ++i) {
-        if (__builtin_expect(cache[i].globalID == globalID, 1)) {
-            return cache[i].index;  // Cache hit
-        }
-    }
-    return (uint8_t)-1;  // Cache miss
+    // Allocate memory for the entire closure object
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
+
+    // Set header information
+    header->type = OT_CLOSURE;
+    header->totalSize = totalAllocationSize;
+    header->surviveCount = 0;
+
+    // Get a pointer to the actual closure, which comes after the header
+    TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
+    closure_ptr->fnAddress = fnPtr;
+    closure_ptr->envCounter = 0;
+    closure_ptr->offset = argsOffset;
+    closure_ptr->envSize = envSize;
+
+    // Set pointers for subsequent arrays, ensuring alignment is handled
+    uint8_t* current_ptr = (uint8_t*)(closure_ptr + 1);
+
+    // Set `upvalues` pointer (aligned to 8 bytes)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
+    closure_ptr->upvalues = (TypeV_Register*)current_ptr;
+    current_ptr += envSize * sizeof(TypeV_Register);
+
+    // Set `ptrFields` pointer (aligned to 1 byte)
+    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
+    closure_ptr->ptrFields = current_ptr;
+
+    // Zero out the bitmask
+    memset(closure_ptr->ptrFields, 0, bitmaskSize);
+
+    // Return the pointer to the closure
+    return (uintptr_t)closure_ptr;
 }
 
-void update_cache(uint32_t globalID, uint8_t index) {
-    // Shift entries to make room at the front (simple LRU policy)
-    for (int i = CACHE_SIZE - 1; i > 0; --i) {
-        cache[i] = cache[i - 1];
-    }
-    cache[0].globalID = globalID;
-    cache[0].index = index;
-}
- */
+uintptr_t core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) {
+    LOG_INFO("CORE[%d]: Allocating coroutine", core->id);
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Coroutine);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
 
-/*
-inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
-    int k = 1;
-    while (__builtin_expect(k <= (n), 1)) {
-        __builtin_prefetch(b + k * 16, 0, 1);
-        k = 2 * k + (b[k] < x);  // Adjust for 0-based indexing
-    }
-    k >>= __builtin_ffs(~k);
-    return k-1;  // Convert 1-based to 0-based index
-}
-*/
+    // Set header information
+    header->type = OT_COROUTINE;
+    TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
+    // create a new function state
+    coroutine_ptr->closure = closure;
+    coroutine_ptr->state = core_create_function_state(core->funcState);
+    coroutine_ptr->state->prev = core->funcState;
+    coroutine_ptr->state->ip = closure->fnAddress;
+    coroutine_ptr->executionState = TV_COROUTINE_CREATED;
 
-/*
-inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
-    int k = 1;
+    // initially, the pointer points to the function address
+    coroutine_ptr->ip = closure->fnAddress;
 
-    // Traverse the Eytzinger layout: Continue until we either find x or run out of nodes
-    while (k <= n) {
-        __builtin_prefetch(&b[2 * k], 0, 1);  // Prefetch next likely elements
-
-        // Unrolling the traversal for efficiency
-        if (b[k] == x) {
-            return (uint8_t)(k - 1);  // Found the value, convert to 0-based indexing
-        }
-        if (b[k] < x) {
-            k = 2 * k + 1;
-        } else {
-            k = 2 * k;
-        }
-
-        if (k > n) break;  // Added extra boundary check to prevent overflows
-
-        // Unroll second step
-        __builtin_prefetch(&b[2 * k], 0, 1);  // Prefetch again for the next iteration
-        if (b[k] == x) {
-            return (uint8_t)(k - 1);
-        }
-        if (b[k] < x) {
-            k = 2 * k + 1;
-        } else {
-            k = 2 * k;
-        }
-    }
-
-    // Not found
-    core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
-    return (uint8_t)-1;
+    return (uintptr_t)coroutine_ptr;
 }
 
-*/
+uintptr_t core_user_object_alloc(TypeV_Core* core, uintptr_t ptr, void (*dealloc)(void* ptr)) {
+    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_UserObject);
+    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
+    header->type = OT_USER_OBJECT;
+    header->totalSize = totalAllocationSize;
+    header->surviveCount = 0;
+    header->fwd = NULL;
+    header->location = 0;
 
-/*
-#include <immintrin.h>  // For SIMD intrinsics
+    TypeV_UserObject* user_object = (TypeV_UserObject*)(header + 1);
+    user_object->ptr = ptr;
+    user_object->dealloc = dealloc;
 
-inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
-    int k = 1;
-
-    // Use SIMD to compare four elements at once, where applicable
-    while (k + 4 <= n) {
-        __m128i keys = _mm_loadu_si128((__m128i*)&b[k]);  // Load four elements starting from b[k]
-        __m128i target = _mm_set1_epi32(x);  // Set all four parts to the target value x
-        __m128i cmp = _mm_cmpeq_epi32(keys, target);  // Compare
-
-        int mask = _mm_movemask_epi8(cmp);  // Create a bitmask of the results
-        if (mask != 0) {
-            // If there is a match, determine the exact index
-            for (int i = 0; i < 4; i++) {
-                if (b[k + i] == x) {
-                    return (uint8_t)(k + i - 1);  // Convert to 0-based indexing
-                }
-            }
-        }
-
-        k += 4;  // Move forward by 4 elements
-    }
-
-    // Fallback for remaining elements
-    while (k <= n) {
-        if (b[k] == x) {
-            return (uint8_t)(k - 1);
-        }
-        k++;
-    }
-
-    core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
-    return (uint8_t)-1;
+    return (uintptr_t)header;
 }
-*/
 
 inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
     unsigned int step = 1u << (31 - __builtin_clz(n)); // Closest power of two ≤ numFields
@@ -599,78 +570,6 @@ void core_spill_alloc(TypeV_Core* core, uint16_t size) {
     core->funcState->spillSize = size;
 }
 
-
-TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t argsOffset, uint8_t envSize) {
-    LOG_WARN("CORE[%d]: Allocating closure with %d bytes", core->id, envSize);
-
-    // Calculate bitmask size for pointers
-    size_t bitmaskSize = (envSize + 7) / 8;
-
-    // Start calculating the total size required for allocation
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Closure);
-
-    // Align for `upvalues` (8-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint64_t));
-    totalAllocationSize += envSize * sizeof(TypeV_Register);  // Upvalues array
-
-    // Align for `ptrFields` (1-byte alignment)
-    totalAllocationSize = ALIGN_PTR(totalAllocationSize, alignof(uint8_t));
-    totalAllocationSize += bitmaskSize;  // Pointer bitmask size
-
-    // Allocate memory for the entire closure object
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
-
-    // Set header information
-    header->type = OT_CLOSURE;
-    header->totalSize = totalAllocationSize;
-    header->surviveCount = 0;
-
-    // Get a pointer to the actual closure, which comes after the header
-    TypeV_Closure* closure_ptr = (TypeV_Closure*)(header + 1);
-    closure_ptr->fnAddress = fnPtr;
-    closure_ptr->envCounter = 0;
-    closure_ptr->offset = argsOffset;
-    closure_ptr->envSize = envSize;
-
-    // Set pointers for subsequent arrays, ensuring alignment is handled
-    uint8_t* current_ptr = (uint8_t*)(closure_ptr + 1);
-
-    // Set `upvalues` pointer (aligned to 8 bytes)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint64_t));
-    closure_ptr->upvalues = (TypeV_Register*)current_ptr;
-    current_ptr += envSize * sizeof(TypeV_Register);
-
-    // Set `ptrFields` pointer (aligned to 1 byte)
-    current_ptr = (uint8_t*)ALIGN_PTR(current_ptr, alignof(uint8_t));
-    closure_ptr->ptrFields = current_ptr;
-
-    // Zero out the bitmask
-    memset(closure_ptr->ptrFields, 0, bitmaskSize);
-
-    // Return the pointer to the closure
-    return closure_ptr;
-}
-
-TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure) {
-    LOG_INFO("CORE[%d]: Allocating coroutine", core->id);
-    size_t totalAllocationSize = sizeof(TypeV_ObjectHeader) + sizeof(TypeV_Coroutine);
-    TypeV_ObjectHeader* header = (TypeV_ObjectHeader*)gc_alloc(core, totalAllocationSize);
-
-    // Set header information
-    header->type = OT_COROUTINE;
-    TypeV_Coroutine* coroutine_ptr = (TypeV_Coroutine*)(header + 1);
-    // create a new function state
-    coroutine_ptr->closure = closure;
-    coroutine_ptr->state = core_create_function_state(core->funcState);
-    coroutine_ptr->state->prev = core->funcState;
-    coroutine_ptr->state->ip = closure->fnAddress;
-    coroutine_ptr->executionState = TV_COROUTINE_CREATED;
-
-    // initially, the pointer points to the function address
-    coroutine_ptr->ip = closure->fnAddress;
-
-    return coroutine_ptr;
-}
 
 void* core_load_runtime_env(TypeV_Core* core, const char* name) {
     TypeV_Engine* engine = core->engineRef;

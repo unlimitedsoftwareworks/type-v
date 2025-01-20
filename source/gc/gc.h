@@ -20,7 +20,7 @@
 #define PROMOTION_SURVIVAL_THRESHOLD 4
 
 // Define GC_LOG to enable logging, or leave undefined to disable
-//#define GC_LOG
+#define GC_LOG
 
 #ifdef GC_LOG
 #define gc_log(fmt, ...) printf("[GC_LOG] " fmt "\n", ##__VA_ARGS__)
@@ -52,8 +52,7 @@ typedef enum {
     OT_ARRAY,
     OT_CLOSURE,
     OT_COROUTINE,
-    OT_CUSTOM_OBJECT,
-    OT_CUSTOM_COLLECTABLE_OBJECT,
+    OT_USER_OBJECT,
 }TypeV_ObjectType;
 
 typedef struct TypeV_ObjectHeader {

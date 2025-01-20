@@ -139,11 +139,9 @@ void mark_object(TypeV_Core* core, TypeV_ObjectHeader* obj) {
             gc_update_state(core, coroutine_ptr->state);
             break;
         }
-        case OT_CUSTOM_OBJECT: {
+        case OT_USER_OBJECT: {
             break;
         }
-        case OT_CUSTOM_COLLECTABLE_OBJECT:
-            break;
     }
 
     obj->color = BLACK;
@@ -342,7 +340,7 @@ void* update_object_reference(TypeV_Core* core, TypeV_ObjectHeader* obj) {
             gc_update_single_state(core, coroutine_ptr->state);
             break;
         }
-        case OT_CUSTOM_OBJECT: {
+        case OT_USER_OBJECT: {
             break;
         }
     }

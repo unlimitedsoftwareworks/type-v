@@ -29,7 +29,6 @@ typedef struct TypeV_Struct {
 } TypeV_Struct;
 
 
-/*
 typedef struct TypeV_Class {
     uint64_t* methods;        // Pointer to method table, 8-byte alignment
     uint32_t* globalMethods;  // Pointer to global methods table, 8-byte alignment
@@ -39,19 +38,7 @@ typedef struct TypeV_Class {
     uint64_t uid;             // Unique ID, 8-byte alignment
     uint16_t numMethods;       // Number of methods, 1-byte alignment
     uint8_t numFields;        // Number of fields, 1-byte alignment
-    uint8_t* data;            // Pointer to data block, placed last for alignment simplicity
-} TypeV_Class;
-*/
-typedef struct TypeV_Class {
-    uint64_t* methods;        // 8 bytes, 8-byte alignment
-    uint32_t* globalMethods;  // 8 bytes, 8-byte alignment
-    uint16_t* fieldOffsets;   // 8 bytes, 8-byte alignment
-    uint8_t* pointerBitmask;  // 8 bytes, 8-byte alignment
-    size_t bitMaskSize;       // 8 bytes, 8-byte alignment
-    uint64_t uid;             // 8 bytes, 8-byte alignment
-    uint16_t numMethods;      // 2 bytes, 2-byte alignment
-    uint8_t numFields;        // 1 byte, 1-byte alignment
-    uint8_t* data;            // 8 bytes, 8-byte alignment (last for simplicity)
+    uint8_t* data;            // Pointer to data block, placed last for alignment simplicity, 8-byte alignment
 } TypeV_Class;
 
 typedef struct TypeV_Array {
@@ -61,6 +48,18 @@ typedef struct TypeV_Array {
     uint8_t elementSize;      ///< Size of each element
     uint8_t* data;            ///< Array data
 }TypeV_Array;
+
+/**
+ * @brief Foreign user object, are objects that require deallocation
+ * when no discarded. Hence, requires a deallocator function to be
+ * provided. The dealloc doesn't necessarily have to free the memory,
+ * for example a filehandle ID, could be
+ */
+typedef struct TypeV_UserObject {
+    uintptr_t ptr;
+    // deallocator function
+    void (*dealloc)(void* ptr);
+} TypeV_UserObject;
 
 /**
  * @brief TypeV_Register
@@ -238,11 +237,6 @@ typedef struct TypeV_Coroutine {
     TypeV_CoroutineExecState executionState;
 }TypeV_Coroutine;
 
-
-typedef struct TypeV_CustomObject {
-    uintptr_t data;
-}TypeV_CustomObject;
-
 /**
  * @brief Core structure, a core is the equivalent of a process in type-c.
  * Each core runs independently from each other, and communicates through message passing.
@@ -298,7 +292,6 @@ void core_setup(
  * @param core
  */
 void core_deallocate(TypeV_Core *core);
-
 void core_parse_object_keys(TypeV_Core* core, const uint8_t* objKeysPool, uint64_t len);
 
 
@@ -404,6 +397,36 @@ uintptr_t core_array_slice(TypeV_Core *core, TypeV_Array* array, uint64_t start,
 uint64_t core_array_insert(TypeV_Core* core, TypeV_Array* dest, TypeV_Array* src, uint64_t position);
 
 /**
+ * @brief Allocates a closure
+ * @param core Core
+ * @param fnPtr Function pointer
+ * @param offset Upvalues offset
+ * @param envSize Environment size
+ * @return new allocated closure
+ */
+uintptr_t core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t offset, uint8_t envSize);
+
+/**
+ * @brief Allocates a coroutine
+ * @param core Core
+ * @param closure Closure
+ * @return new allocated coroutine
+ */
+uintptr_t core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure);
+
+
+/**
+ * @brief Allocates a user object
+ * @param core Core
+ * @param ptr Pointer to the user object
+ * @param dealloc Deallocator function
+ * @return new allocated user object
+ */
+uintptr_t core_user_object_alloc(TypeV_Core* core, uintptr_t ptr, void (*dealloc)(void* ptr));
+
+
+
+/**
  * Load a FFI library
  * @param core
  * @param namePointer
@@ -451,8 +474,6 @@ typedef struct TypeV_FFI {
     uint8_t functionCount;   ///< FFI function count
 }TypeV_FFI;
 
-TypeV_Closure* core_closure_alloc(TypeV_Core* core, uintptr_t fnPtr, uint8_t offset, uint8_t envSize);
-TypeV_Coroutine* core_coroutine_alloc(TypeV_Core* core, TypeV_Closure* closure);
 
 
 void* core_load_runtime_env(TypeV_Core* core, const char* name);

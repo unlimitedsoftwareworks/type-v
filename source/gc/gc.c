@@ -141,6 +141,10 @@ void perform_minor_gc(TypeV_Core* core) {
         }
         else {
             gc_log("Freeing unmarked nursery object : %d / %s\n", obj->uid, object_names[obj->type]);
+            if(obj->type == OT_USER_OBJECT) {
+                TypeV_UserObject* user_object = (TypeV_UserObject*)(obj + 1);
+                user_object->dealloc((void*)user_object->ptr);
+            }
         }
         i += cellSize;
     }
@@ -211,6 +215,10 @@ void perform_major_gc(TypeV_Core* core) {
 
             } else {
                 gc_log("Freeing unmarked old object: %d\n", obj->uid);
+                if(obj->type == OT_USER_OBJECT) {
+                    TypeV_UserObject* user_object = (TypeV_UserObject*)(obj + 1);
+                    user_object->dealloc((void*)user_object->ptr);
+                }
             }
 
             i += cellSize; // Move to the next object
@@ -231,6 +239,10 @@ void perform_major_gc(TypeV_Core* core) {
                 new_cell_size += cellSize;
             } else {
                 gc_log("Freeing unmarked old object: %d\n", obj->uid);
+                if(obj->type == OT_USER_OBJECT) {
+                    TypeV_UserObject* user_object = (TypeV_UserObject*)(obj + 1);
+                    user_object->dealloc((void*)user_object->ptr);
+                }
             }
 
             i += cellSize; // Move to the next object
@@ -263,7 +275,31 @@ void write_barrier(TypeV_Core* core, TypeV_ObjectHeader* old_obj, TypeV_ObjectHe
     }
 }
 
+void gc_free_all(TypeV_Core* core) {
+    // iterates over all objects in the nursery and old region and frees them
+    // this is used when the program is exiting
+
+    // nursery
+    for(uint64_t i = 0; i < core->gc->nursery.cell_size; i++) {
+        TypeV_ObjectHeader* obj = (TypeV_ObjectHeader *)(core->gc->nursery.from + i * CELL_SIZE);
+        if(obj->type == OT_USER_OBJECT) {
+            TypeV_UserObject* user_object = (TypeV_UserObject*)(obj + 1);
+            user_object->dealloc((void*)user_object->ptr);
+        }
+    }
+
+    // old region
+    for(uint64_t i = 0; i < core->gc->oldRegion.cell_size; i++) {
+        TypeV_ObjectHeader* obj = (TypeV_ObjectHeader *)(core->gc->oldRegion.from + i * CELL_SIZE);
+        if(obj->type == OT_USER_OBJECT) {
+            TypeV_UserObject* user_object = (TypeV_UserObject*)(obj + 1);
+            user_object->dealloc((void*)user_object->ptr);
+        }
+    }
+}
+
 void cleanup_gc(TypeV_Core* core) {
+    gc_free_all(core);
     TypeV_GC* gc = core->gc;
     free(gc->nursery.data);
     free(gc->nursery.active_bitmap);

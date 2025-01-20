@@ -2201,7 +2201,7 @@ static inline void halt(TypeV_Core* core) {
     uint32_t code = core->regs[code_reg].u32;
 
     //core_gc_sweep_all(core);
-
+    cleanup_gc(core);
     exit(code);
 }
 

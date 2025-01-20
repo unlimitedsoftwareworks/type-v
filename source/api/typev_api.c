@@ -5,10 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-
 #include "typev_api.h"
 #include "../stack/stack.h"
-
 
 size_t typev_api_register_lib(const TypeV_FFIFunc methods[]) {
     // get the number of methods
@@ -110,10 +108,15 @@ TypeV_Class* typev_api_stack_pop_class(TypeV_Core* core) {
     return value;
 }
 
-
 TypeV_Array* typev_api_stack_pop_array(TypeV_Core* core) {
     TypeV_Array* value;
     stack_pop_ptr(core->funcState, (uintptr_t *)&value);
+    return value;
+}
+
+uintptr_t typev_api_stack_pop_userobject(TypeV_Core* core) {
+    uintptr_t value;
+    stack_pop_ptr(core->funcState, &value);
     return value;
 }
 
@@ -171,6 +174,10 @@ void typev_api_return_class(TypeV_Core* core, TypeV_Class* value) {
 
 void typev_api_return_array(TypeV_Core* core, TypeV_Array* value){
     stack_push_ptr(core->funcState, (size_t)value);
+}
+
+void typev_api_return_userobject(TypeV_Core* core, uintptr_t value) {
+    stack_push_ptr(core->funcState, value);
 }
 
 void typev_api_core_panic(TypeV_Core* core, uint32_t errorId, char* fmt, ...){
