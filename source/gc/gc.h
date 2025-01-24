@@ -20,7 +20,7 @@
 #define PROMOTION_SURVIVAL_THRESHOLD 4
 
 // Define GC_LOG to enable logging, or leave undefined to disable
-#define GC_LOG
+//#define GC_LOG
 
 #ifdef GC_LOG
 #define gc_log(fmt, ...) printf("[GC_LOG] " fmt "\n", ##__VA_ARGS__)

@@ -280,21 +280,27 @@ void gc_free_all(TypeV_Core* core) {
     // this is used when the program is exiting
 
     // nursery
-    for(uint64_t i = 0; i < core->gc->nursery.cell_size; i++) {
+    uint64_t i = 0;
+    while(i < core->gc->nursery.cell_size) {
         TypeV_ObjectHeader* obj = (TypeV_ObjectHeader *)(core->gc->nursery.from + i * CELL_SIZE);
         if(obj->type == OT_USER_OBJECT) {
             TypeV_UserObject* user_object = (TypeV_UserObject*)(obj + 1);
             user_object->dealloc((void*)user_object->ptr);
         }
+
+        i += (obj->totalSize + CELL_SIZE - 1) / CELL_SIZE;
     }
 
     // old region
-    for(uint64_t i = 0; i < core->gc->oldRegion.cell_size; i++) {
+    i = 0;
+    while(i < core->gc->oldRegion.cell_size) {
         TypeV_ObjectHeader* obj = (TypeV_ObjectHeader *)(core->gc->oldRegion.from + i * CELL_SIZE);
         if(obj->type == OT_USER_OBJECT) {
             TypeV_UserObject* user_object = (TypeV_UserObject*)(obj + 1);
             user_object->dealloc((void*)user_object->ptr);
         }
+
+        i += (obj->totalSize + CELL_SIZE - 1) / CELL_SIZE;
     }
 }
 
