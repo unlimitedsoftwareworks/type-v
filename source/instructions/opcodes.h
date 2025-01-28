@@ -100,6 +100,20 @@ typedef enum TypeV_OpCode {
     OP_S_LOADF_PTR,
 
     /**
+     * OP_S_LOADF_JMP dest: R, src: R, fieldIndex: I, byteSize: S, jump-address: I (4 bytes)
+     * Loads size bytes from field I of struct stored at src to register dest
+     * if the field is not found, jumps to the given address instead
+     */
+    OP_S_LOADF_JMP,
+    OP_S_LOADF_JMP_PTR,
+    
+    /**
+     * OP_S_COPYF dest: R, src: R, global field ID: I (4 bytes)
+     * Copies field value from src to dest, if it exists
+     */
+    OP_S_COPYF,
+
+    /**
      * OP_S_STOREF_CONST_[size] dest: R, fieldIndex: I, constant-offset: I (4 bytes), byteSize: S
      * Stores [size] bytes from constant pool address offset to field I of
      * struct stored at dest

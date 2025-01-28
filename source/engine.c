@@ -143,6 +143,9 @@ static void* dispatch_table[] = { \
     &&DO_S_REG_FIELD, \
     &&DO_S_LOADF, \
     &&DO_S_LOADF_PTR, \
+    &&DO_S_LOADF_JMP, \
+    &&DO_S_LOADF_JMP_PTR, \
+    &&DO_S_COPYF, \
     &&DO_S_STOREF_CONST, \
     &&DO_S_STOREF_CONST_PTR, \
     &&DO_S_STOREF_REG, \
@@ -402,6 +405,15 @@ void engine_run_core(TypeV_Engine *engine, TypeV_CoreIterator* iter) {
         DISPATCH();
         DO_S_LOADF_PTR:
         s_loadf_ptr(core);
+        DISPATCH();
+        DO_S_LOADF_JMP:
+        s_loadf_jmp(core);
+        DISPATCH();
+        DO_S_LOADF_JMP_PTR:
+        s_loadf_jmp_ptr(core);
+        DISPATCH();
+        DO_S_COPYF:
+        s_copyf(core);
         DISPATCH();
         DO_S_STOREF_CONST:
         s_storef_const(core);

@@ -55,6 +55,11 @@ static char* instructions[] = {
         "s_loadf",
         "s_loadf_ptr",
 
+        "s_loadf_jmp",
+        "s_loadf_jmp_ptr",
+
+        "s_copyf",
+
         "s_storef_const",
         "s_storef_const_ptr",
 

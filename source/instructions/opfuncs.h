@@ -16,7 +16,7 @@ typedef void (*op_func)(TypeV_Core *);
 static op_func op_funcs[] = {
         &mv_reg_reg,
         &mv_reg_reg_ptr,
-        mv_reg_null,
+        &mv_reg_null,
 
         &mv_reg_i,
         &mv_reg_i_ptr,
@@ -36,6 +36,11 @@ static op_func op_funcs[] = {
         &s_reg_field,
         &s_loadf,
         &s_loadf_ptr,
+
+        &s_loadf_jmp,
+        &s_loadf_jmp_ptr,
+
+        &s_copyf,
 
         &s_storef_const,
         &s_storef_const_ptr,

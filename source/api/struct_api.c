@@ -53,10 +53,10 @@ uintptr_t typev_api_struct_get_value(TypeV_Core* core, TypeV_Struct* str, const 
     uint8_t error = 0;
     uint32_t gfieldId = 0;
     engine_get_field_id(core->engineRef, name, &gfieldId, &error);
+    uint8_t errorFlag = 0;
+    uint8_t idx = object_find_global_index(core, str->globalFields, str->numFields, gfieldId, &errorFlag);
 
-    uint8_t idx = object_find_global_index(core, str->globalFields, str->numFields, gfieldId);
-
-    if(error) {
+    if(error || errorFlag) {
         return 0;
     }
 

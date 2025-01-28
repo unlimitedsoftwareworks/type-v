@@ -104,6 +104,17 @@ static inline void typev_memcpy_aligned_1(void* dest, const void* src) {
     *(uint8_t *)dest = *(const uint8_t *)src;
 }
 
+static inline void typev_memcpy_aligned_n(void* dest, const void* src, size_t n){
+    switch(n){
+        case 8: typev_memcpy_aligned_8(dest, src); return;
+        case 4: typev_memcpy_aligned_4(dest, src); return;
+        case 2: typev_memcpy_aligned_2(dest, src); return;
+        case 1: typev_memcpy_aligned_1(dest, src); return;
+    }
+    printf("Unreachable code reached\n");
+    exit(-1);
+}
+
 static inline uint64_t typev_memcpy_u64(const unsigned char *s, size_t size) {
     uint64_t dest = 0;
     switch (size) {
@@ -356,7 +367,11 @@ static inline void s_loadf(TypeV_Core* core){
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
     //TypeV_ObjectHeader *header = (TypeV_ObjectHeader *)core->regs[source].ptr;
 
-    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
+    uint8_t errFlag = 0;
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index, &errFlag);
+    if(errFlag){
+        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", field_index);
+    }
 
     typev_memcpy_unaligned(&core->regs[target], ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], byteSize);
     CLEAR_REG_PTR(core->funcState, target);
@@ -365,7 +380,6 @@ static inline void s_loadf(TypeV_Core* core){
 
 static inline void s_loadf_ptr(TypeV_Core* core){
     const uint8_t target = core->codePtr[core->ip++];
-
     const uint8_t source = core->codePtr[core->ip++];
 
     uint32_t field_index;
@@ -373,10 +387,108 @@ static inline void s_loadf_ptr(TypeV_Core* core){
     core->ip += 4;
 
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
-    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
+    uint8_t errFlag = 0;
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index, &errFlag);
+    if(errFlag){
+        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", field_index);
+    }
     typev_memcpy_aligned_8(&core->regs[target], ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index]);
     SET_REG_PTR(core->funcState, target);
     SET_REG_PTR(core->funcState, source);
+}
+
+
+static inline void s_loadf_jmp(TypeV_Core* core){
+    const char* code = (char*)core->codePtr;
+    const uint8_t target = code[core->ip++];
+    const uint8_t source = code[core->ip++];
+    uint32_t field_index = typev_memcpy_u64(&core->codePtr[core->ip], 4);
+    core->ip += 4;
+    //typev_memcpy_aligned_4(&field_index, code+2);
+
+
+    uint8_t byteSize = code[core->ip++];
+    CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
+
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
+    //TypeV_ObjectHeader *header = (TypeV_ObjectHeader *)core->regs[source].ptr;
+
+    uint8_t errFlag = 0;
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index, &errFlag);
+    if(errFlag){
+        // read the jump label
+        uint32_t jump_label;
+        typev_memcpy_unaligned_4(&jump_label, &code[core->ip]);
+        core->ip = jump_label;
+        return;
+    }
+    // skip the jump label
+    core->ip += 4;
+
+    typev_memcpy_unaligned(&core->regs[target], ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], byteSize);
+    CLEAR_REG_PTR(core->funcState, target);
+    SET_REG_PTR(core->funcState, source);
+}
+
+static inline void s_loadf_jmp_ptr(TypeV_Core* core){
+    const uint8_t target = core->codePtr[core->ip++];
+    const uint8_t source = core->codePtr[core->ip++];
+
+    SET_REG_PTR(core->funcState, target);
+    SET_REG_PTR(core->funcState, source);
+
+    uint32_t field_index;
+    typev_memcpy_unaligned_4(&field_index, &core->codePtr[core->ip]);
+    core->ip += 4;
+
+    TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[source].ptr;
+    uint8_t errFlag = 0;
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index, &errFlag);
+    if(errFlag){
+        // read the jump label
+        uint32_t jump_label;
+        typev_memcpy_unaligned_4(&jump_label, &core->codePtr[core->ip]);
+        core->ip = jump_label;
+        return;
+    }
+
+    // skip the jump label
+    core->ip += 4;
+
+    typev_memcpy_aligned_8(&core->regs[target], ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index]);
+    
+}
+
+static inline void s_copyf(TypeV_Core* core){
+    const uint8_t dest_reg = core->codePtr[core->ip++];
+    const uint8_t src_reg = core->codePtr[core->ip++];
+    
+    uint32_t field_index;
+    typev_memcpy_unaligned_4(&field_index, &core->codePtr[core->ip]);
+    core->ip += 4;
+
+    uint8_t byteSize = core->codePtr[core->ip++];
+
+    TypeV_Struct* dest = (TypeV_Struct*)core->regs[dest_reg].ptr;
+    TypeV_Struct* source = (TypeV_Struct*)core->regs[src_reg].ptr;
+
+    uint8_t errFlag = 0;
+    uint8_t sourceIndex = object_find_global_index(core, source->globalFields, source->numFields, field_index, &errFlag);
+    // if the field is not found, do nothing, because it is a (potentially a) partial struct
+    if(errFlag){
+        return;
+    }
+
+    uint8_t destIndex = object_find_global_index(core, dest->globalFields, dest->numFields, field_index, &errFlag);
+    if(errFlag){
+        return;
+    }
+
+    typev_memcpy_aligned_n(
+        ((char *) dest->data) + dest->fieldOffsets[destIndex],
+        ((char *) source->data) + source->fieldOffsets[sourceIndex],
+        byteSize
+    );
 }
 
 static inline void s_storef_const(TypeV_Core* core){
@@ -390,7 +502,11 @@ static inline void s_storef_const(TypeV_Core* core){
     core->ip += 4;
     uint8_t byteSize = core->codePtr[core->ip++];
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
+    uint8_t errFlag = 0;
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index, &errFlag);
+    if(errFlag){
+        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", field_index);
+    }
     typev_memcpy_unaligned(((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->constPtr[offset],
                            byteSize);
     CLEAR_REG_PTR(core->funcState, dest_reg);
@@ -407,7 +523,11 @@ static inline void s_storef_const_ptr(TypeV_Core* core){
     typev_memcpy_unaligned_4(&offset, &core->codePtr[core->ip]);
     core->ip += 4;
     TypeV_Struct* struct_ptr = (TypeV_Struct*)core->regs[dest_reg].ptr;
-    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
+    uint8_t errFlag = 0;
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index, &errFlag);
+    if(errFlag){
+        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", field_index);
+    }
     typev_memcpy_unaligned_8(((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->constPtr[offset]);
     SET_REG_PTR(core->funcState, dest_reg);
 
@@ -426,7 +546,11 @@ static inline void s_storef_reg(TypeV_Core* core){
     CORE_ASSERT(isValidByte(byteSize), "Invalid byte size");
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
+    uint8_t errFlag = 0;
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index, &errFlag);
+    if(errFlag){
+        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", field_index);
+    }
     typev_memcpy_unaligned(((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index], &core->regs[source], byteSize);
     SET_REG_PTR(core->funcState, dest_reg);
     CLEAR_REG_PTR(core->funcState, source);
@@ -443,7 +567,11 @@ static inline void s_storef_reg_ptr(TypeV_Core* core){
     const uint8_t source = core->codePtr[core->ip++];
 
     TypeV_Struct *struct_ptr = (TypeV_Struct *) core->regs[dest_reg].ptr;
-    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index);
+    uint8_t errFlag = 0;
+    uint8_t index = object_find_global_index(core, struct_ptr->globalFields, struct_ptr->numFields, field_index, &errFlag);
+    if(errFlag){
+        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", field_index);
+    }
     char* dest = ((char *) struct_ptr->data) + struct_ptr->fieldOffsets[index];
     char* src = (char*)&core->regs[source].ptr;
     typev_memcpy_aligned_8(dest, src);
@@ -595,7 +723,11 @@ static inline void c_loadm(TypeV_Core* core){
     }
 
     //uint8_t idx = class_find_global_index(c, method_index);
-    uint8_t idx = object_find_global_index(core, c->globalMethods, c->numMethods, method_index);
+    uint8_t errFlag = 0;
+    uint8_t idx = object_find_global_index(core, c->globalMethods, c->numMethods, method_index, &errFlag);
+    if(errFlag){
+        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", method_index);
+    }
 
     LOG_INFO("Loading method %d from class %p", method_index, (void*)c);
 

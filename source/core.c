@@ -454,7 +454,7 @@ uintptr_t core_user_object_alloc(TypeV_Core* core, uintptr_t ptr, void (*dealloc
     return (uintptr_t)header;
 }
 
-inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x) {
+inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n, uint32_t x, uint8_t* errFlag) {
     unsigned int step = 1u << (31 - __builtin_clz(n)); // Closest power of two ≤ numFields
     unsigned int index = 0;
 
@@ -470,16 +470,8 @@ inline uint8_t object_find_global_index(TypeV_Core *core, uint32_t *b, uint8_t n
     }
 
     // Final check if the value at `index` is equal to `id`
-    if (b[index] == x) {
-        return (uint8_t)index;
-    }
-    else {
-        for(uint8_t i = 0; i < n; i++){
-            printf("%d, ", b[i]);
-        }
-        printf("\n");
-        core_panic(core, RT_ERROR_ATTRIBUTE_NOT_FOUND, "Global ID %d not found in field array", x);
-    }
+    *errFlag = !(b[index] == x);
+    return (uint8_t)index;
 }
 
 

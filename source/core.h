@@ -330,9 +330,10 @@ uintptr_t core_struct_alloc(TypeV_Core *core, uint8_t numfields, size_t totalsiz
  * @param globalFields Global fields table
  * @param numFields Number of fields
  * @param globalID Global ID to find
+ * @param errFlag Error flag must initialized to 0, will be set to 1 if the global ID is not found.
  * @return Index of the global ID in the globalFields array
  */
-uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint8_t numFields , uint32_t globalID);
+uint8_t object_find_global_index(TypeV_Core * core, uint32_t* globalFields, uint8_t numFields , uint32_t globalID, uint8_t* errFlag);
 
 
 /**
