@@ -318,7 +318,7 @@ uintptr_t core_array_extend(TypeV_Core *core, uintptr_t array_ptr, uint64_t num_
 
     array->data = realloc(array->data, num_elements*array->elementSize);
 
-    if(array->data == NULL) {
+    if((array->data == NULL) && num_elements) {
         core_panic(core, RT_ERROR_OOM, "Failed to reallocate array");
     }
 
